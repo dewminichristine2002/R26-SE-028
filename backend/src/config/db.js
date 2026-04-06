@@ -56,9 +56,85 @@ const initializeDatabase = async () => {
     );
   `;
 
+  const createMedicinesTableQuery = `
+    CREATE TABLE IF NOT EXISTS medicines (
+      id SERIAL PRIMARY KEY,
+      "medicineName" TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  const createUserMedicationsTableQuery = `
+    CREATE TABLE IF NOT EXISTS user_medications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      medicine_name TEXT NOT NULL,
+      selected_color TEXT,
+      selected_shape TEXT,
+      total_quantity INTEGER NOT NULL,
+      dosage_mg INTEGER NOT NULL,
+      daily_amount INTEGER NOT NULL,
+      dose_form TEXT NOT NULL,
+      take_with TEXT NOT NULL,
+      intake_timing TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
   await pool.query(createTableQuery);
   await pool.query(createUsersTableQuery);
   await pool.query(createUserRoutinesTableQuery);
+  await pool.query(createMedicinesTableQuery);
+  await pool.query(createUserMedicationsTableQuery);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_color TEXT;`);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_shape TEXT;`);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+
+  // Keep compatibility with older schemas and ensure medicineName exists.
+  await pool.query(`ALTER TABLE medicines ADD COLUMN IF NOT EXISTS "medicineName" TEXT;`);
+  await pool.query(`ALTER TABLE medicines ADD COLUMN IF NOT EXISTS name TEXT;`);
+  await pool.query(`ALTER TABLE medicines ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'medicines' AND column_name = 'name'
+      ) THEN
+        EXECUTE 'UPDATE medicines SET "medicineName" = name WHERE "medicineName" IS NULL AND name IS NOT NULL';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'medicines' AND column_name = 'medicine_name'
+      ) THEN
+        EXECUTE 'UPDATE medicines SET "medicineName" = medicine_name WHERE "medicineName" IS NULL AND medicine_name IS NOT NULL';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'medicines' AND column_name = 'medicinename'
+      ) THEN
+        EXECUTE 'UPDATE medicines SET "medicineName" = medicinename WHERE "medicineName" IS NULL AND medicinename IS NOT NULL';
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    UPDATE medicines
+    SET "medicineName" = CONCAT('Medicine ', id)
+    WHERE "medicineName" IS NULL OR BTRIM("medicineName") = '';
+  `);
+
+  await pool.query(`DROP INDEX IF EXISTS medicines_name_unique_idx;`);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS medicines_name_idx ON medicines ("medicineName");
+  `);
 
   const backfillUserRoutines = `
     INSERT INTO user_routines (user_id)
@@ -68,6 +144,7 @@ const initializeDatabase = async () => {
   `;
 
   await pool.query(backfillUserRoutines);
+
 };
 
 module.exports = {

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from '../i18n/useTranslation';
 import RoutineSetupScreen from './RoutineSetupScreen';
+import ManualEntryScreen from './ManualEntryScreen';
+import MedicineListScreen from './MedicineListScreen';
+import ScheduleBoardScreen from './ScheduleBoardScreen';
 
 const HomeScreen = ({ user, onOpenProfile, onLogout }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
@@ -42,6 +45,21 @@ const HomeScreen = ({ user, onOpenProfile, onLogout }) => {
       return;
     }
 
+    if (menuItem === 'Add Medicine') {
+      setActiveReminderView('add-medicine');
+      return;
+    }
+
+    if (menuItem === 'Medicine List') {
+      setActiveReminderView('medicine-list');
+      return;
+    }
+
+    if (menuItem === 'Schedule Board') {
+      setActiveReminderView('schedule-board');
+      return;
+    }
+
     console.log(`Selected ${menuItem}`);
     // TODO: Navigate to selected reminder menu feature
   };
@@ -51,6 +69,73 @@ const HomeScreen = ({ user, onOpenProfile, onLogout }) => {
   if (showReminderMenu) {
     if (activeReminderView === 'routine-setup') {
       return <RoutineSetupScreen onBackToMenu={() => setActiveReminderView('menu')} />;
+    }
+
+    if (activeReminderView === 'add-medicine') {
+      return (
+        <ScrollView contentContainerStyle={styles.addMedicineContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.addMedicineHeader}>
+            <TouchableOpacity
+              style={styles.addMedicineBackButton}
+              onPress={() => setActiveReminderView('menu')}
+              accessibilityRole="button"
+              accessibilityLabel="Back to reminder menu"
+            >
+              <Text style={styles.addMedicineBackIcon}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.addMedicineTitle}>Add Medicine</Text>
+            <View style={styles.addMedicineHeaderSpacer} />
+          </View>
+
+          <View style={styles.addMedicineHintCard}>
+            <Text style={styles.addMedicineHintTitle}>How would you like to add your medicine today?</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.addMedicineOptionCard, styles.addMedicineOptionCardPrimary]}
+            onPress={() => console.log('Selected Scan Pharmacy Receipt')}
+            accessibilityRole="button"
+            accessibilityLabel="Scan Pharmacy Receipt"
+            accessibilityHint="Scan your pharmacy receipt to add medicines"
+          >
+            <View style={[styles.addMedicineOptionIconWrap, styles.addMedicineOptionIconWrapPrimary]}>
+              <Text style={styles.addMedicineOptionIcon}>📷</Text>
+            </View>
+            <View style={styles.addMedicineOptionTextWrap}>
+              <Text style={styles.addMedicineOptionTitle}>Scan Pharmacy Receipt</Text>
+              <Text style={styles.addMedicineOptionSubtitle}>Capture your pharmacy receipt details</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.addMedicineOptionCard}
+            onPress={() => setActiveReminderView('manual-entry')}
+            accessibilityRole="button"
+            accessibilityLabel="Manual Entry"
+            accessibilityHint="Type medicine details manually"
+          >
+            <View style={styles.addMedicineOptionIconWrap}>
+              <Text style={styles.addMedicineOptionIcon}>⌨️</Text>
+            </View>
+            <View style={styles.addMedicineOptionTextWrap}>
+              <Text style={styles.addMedicineOptionTitle}>Manual Entry</Text>
+              <Text style={styles.addMedicineOptionSubtitle}>Type in the details yourself</Text>
+            </View>
+          </TouchableOpacity>
+        </ScrollView>
+      );
+    }
+
+    if (activeReminderView === 'manual-entry') {
+      return <ManualEntryScreen onBack={() => setActiveReminderView('add-medicine')} />;
+    }
+
+    if (activeReminderView === 'medicine-list') {
+      return <MedicineListScreen onBack={() => setActiveReminderView('menu')} />;
+    }
+
+    if (activeReminderView === 'schedule-board') {
+      return <ScheduleBoardScreen user={user} onBack={() => setActiveReminderView('menu')} />;
     }
 
     return (
@@ -433,6 +518,106 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1e4f72',
     fontWeight: '600',
+  },
+  addMedicineContainer: {
+    flexGrow: 1,
+    backgroundColor: '#f4f6f8',
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 24,
+  },
+  addMedicineHeader: {
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#e7ebef',
+    marginBottom: 12,
+  },
+  addMedicineBackButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f0f5fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMedicineBackIcon: {
+    fontSize: 24,
+    color: '#4c6175',
+    marginTop: -2,
+  },
+  addMedicineTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e2a35',
+  },
+  addMedicineHeaderSpacer: {
+    width: 34,
+    height: 34,
+  },
+  addMedicineHintCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e6eaef',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  addMedicineHintTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+    color: '#2a3c4c',
+    fontWeight: '600',
+  },
+  addMedicineOptionCard: {
+    minHeight: 90,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e0e5ea',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addMedicineOptionCardPrimary: {
+    borderColor: '#3c98d6',
+    backgroundColor: '#f4fbff',
+  },
+  addMedicineOptionIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: '#f2f4f7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  addMedicineOptionIconWrapPrimary: {
+    backgroundColor: '#2f8fd0',
+  },
+  addMedicineOptionIcon: {
+    fontSize: 22,
+  },
+  addMedicineOptionTextWrap: {
+    flex: 1,
+  },
+  addMedicineOptionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1c2b36',
+  },
+  addMedicineOptionSubtitle: {
+    marginTop: 2,
+    fontSize: 16,
+    color: '#556472',
   },
 });
 
