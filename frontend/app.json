@@ -13,6 +13,9 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      "expo-speech-recognition"
+    ],
     "ios": {
       "bundleIdentifier": "com.eldermeds.app",
       "buildNumber": "1"

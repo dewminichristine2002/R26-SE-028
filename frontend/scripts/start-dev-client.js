@@ -43,13 +43,16 @@ const env = {
 
 console.log(`Using LAN host: ${ip}`);
 
-const expoCmd = 'npx';
-const args = ['expo', 'start', '--dev-client', '--lan', '--clear', '--port', '8081'];
+const isWindows = process.platform === 'win32';
+const expoCmd = isWindows ? 'cmd' : 'npx';
+const args = isWindows
+  ? ['/c', 'npx', 'expo', 'start', '--dev-client', '--lan', '--clear']
+  : ['expo', 'start', '--dev-client', '--lan', '--clear'];
 
 const child = spawn(expoCmd, args, {
   stdio: 'inherit',
   env,
-  shell: process.platform === 'win32',
+  shell: false,
 });
 
 child.on('close', (code) => {

@@ -1,0 +1,10 @@
+{
+  "name": "eldermeds-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start:dev-client": "npm --prefix frontend run start:dev-client",
+    "start:frontend": "npm --prefix frontend run start",
+    "start:backend": "npm --prefix backend run start"
+  }
+}
