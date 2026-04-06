@@ -1,0 +1,72 @@
+{
+  "app": {
+    "name": "ElderMeds",
+    "welcome": "Bienvenue sur ElderMeds"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "profile": "Profil",
+    "settings": "Paramètres"
+  },
+  "home": {
+    "title": "Accueil",
+    "welcome": "Bienvenue de retour!",
+    "reminder": "Rappel",
+    "allergies": "Allergies",
+    "emotions": "Émotions",
+    "dashboard": "Tableau de Bord",
+    "medications": "Médicaments",
+    "appointments": "Rendez-vous",
+    "health": "État de Santé"
+  },
+  "profile": {
+    "title": "Profil",
+    "name": "Nom",
+    "email": "Email",
+    "phone": "Téléphone",
+    "dateOfBirth": "Date de Naissance",
+    "bloodType": "Groupe Sanguin",
+    "emergencyContact": "Contact d'Urgence"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "notifications": "Notifications",
+    "privacy": "Confidentialité",
+    "help": "Aide et Support",
+    "about": "À Propos",
+    "logout": "Déconnexion"
+  },
+  "medications": {
+    "title": "Médicaments",
+    "addMedication": "Ajouter un Médicament",
+    "medicationName": "Nom du Médicament",
+    "dosage": "Posologie",
+    "frequency": "Fréquence",
+    "time": "Heure",
+    "instructions": "Instructions",
+    "sideEffects": "Effets Secondaires"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "add": "Ajouter",
+    "search": "Rechercher",
+    "yes": "Oui",
+    "no": "Non",
+    "ok": "D'accord",
+    "close": "Fermer",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "warning": "Avertissement"
+  },
+  "errors": {
+    "networkError": "Erreur réseau. Vérifiez votre connexion.",
+    "serverError": "Erreur du serveur. Veuillez réessayer plus tard.",
+    "invalidInput": "Entrée invalide. Vérifiez vos données.",
+    "unauthorized": "Non autorisé. Veuillez vous connecter à nouveau."
+  }
+}
