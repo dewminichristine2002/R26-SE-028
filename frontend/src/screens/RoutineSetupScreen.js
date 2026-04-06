@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { routineService } from '../services/routineService';
+import { reminderNotificationService } from '../services/reminderNotificationService';
 
 let ExpoSpeechRecognitionModule = null;
 let ExpoEventEmitter = null;
@@ -288,6 +289,13 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
       console.log('[Routine Save] Sending to backend:', mealTimes);
       const response = await routineService.saveRoutine(mealTimes);
       console.log('[Routine Save] Response:', response);
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (notificationError) {
+        console.log('[RoutineSetup] Reminder reschedule failed:', notificationError?.message || notificationError);
+      }
+
       Alert.alert('Saved', 'Your routine has been saved successfully.');
     } catch (error) {
       console.error('[Routine Save] Error:', error);

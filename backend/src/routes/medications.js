@@ -320,6 +320,122 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/status-events', requireAuth, async (req, res) => {
+  const {
+    medicationId,
+    status,
+    overdoseTablets,
+    scheduleSlot,
+    doseNumber,
+    timesPerDay,
+    routineTime,
+    reminderTime,
+    eventTime,
+  } = req.body || {};
+
+  const parsedMedicationId = Number(medicationId);
+  const parsedOverdoseTablets = overdoseTablets == null ? null : Number(overdoseTablets);
+  const parsedDoseNumber = doseNumber == null ? null : Number(doseNumber);
+  const parsedTimesPerDay = timesPerDay == null ? null : Number(timesPerDay);
+  const normalizedStatus = String(status || '').toLowerCase().trim();
+  const normalizedScheduleSlot = String(scheduleSlot || '').trim();
+  const normalizedRoutineTime = String(routineTime || '').trim();
+
+  const validStatuses = ['taken', 'remind', 'overdose', 'speak', 'not-taken'];
+  if (!Number.isInteger(parsedMedicationId) || parsedMedicationId <= 0) {
+    return res.status(400).json({ error: 'Valid medicationId is required' });
+  }
+
+  if (!validStatuses.includes(normalizedStatus)) {
+    return res.status(400).json({ error: 'Status must be taken, remind, overdose, speak, or not-taken' });
+  }
+
+  if (parsedDoseNumber != null && (!Number.isInteger(parsedDoseNumber) || parsedDoseNumber <= 0)) {
+    return res.status(400).json({ error: 'doseNumber must be a positive integer when provided' });
+  }
+
+  if (parsedTimesPerDay != null && (!Number.isInteger(parsedTimesPerDay) || parsedTimesPerDay <= 0)) {
+    return res.status(400).json({ error: 'timesPerDay must be a positive integer when provided' });
+  }
+
+  if (normalizedStatus === 'overdose') {
+    if (!Number.isFinite(parsedOverdoseTablets) || parsedOverdoseTablets <= 0) {
+      return res.status(400).json({ error: 'overdoseTablets is required for overdose and must be a positive number' });
+    }
+  }
+
+  let parsedReminderTime = null;
+  if (reminderTime) {
+    const candidate = new Date(reminderTime);
+    if (Number.isNaN(candidate.getTime())) {
+      return res.status(400).json({ error: 'reminderTime must be a valid date/time string' });
+    }
+    parsedReminderTime = candidate.toISOString();
+  }
+
+  let parsedEventTime = null;
+  if (eventTime) {
+    const candidate = new Date(eventTime);
+    if (Number.isNaN(candidate.getTime())) {
+      return res.status(400).json({ error: 'eventTime must be a valid date/time string' });
+    }
+    parsedEventTime = candidate.toISOString();
+  }
+
+  try {
+    const sql = `
+      INSERT INTO medication_status_events (
+        user_id,
+        medication_id,
+        status,
+        overdose_tablets,
+        schedule_slot,
+        dose_number,
+        times_per_day,
+        routine_time,
+        reminder_time,
+        event_time
+      )
+      SELECT
+        $1,
+        um.id,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        COALESCE($10::timestamptz, NOW())
+      FROM user_medications um
+      WHERE um.id = $2 AND um.user_id = $1
+      RETURNING id, user_id, medication_id, status, overdose_tablets, schedule_slot, dose_number, times_per_day, routine_time, reminder_time, event_time, created_at;
+    `;
+
+    const result = await pool.query(sql, [
+      req.user.id,
+      parsedMedicationId,
+      normalizedStatus,
+      normalizedStatus === 'overdose' ? parsedOverdoseTablets : null,
+      normalizedScheduleSlot || null,
+      parsedDoseNumber,
+      parsedTimesPerDay,
+      normalizedRoutineTime || null,
+      parsedReminderTime,
+      parsedEventTime,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Medication not found' });
+    }
+
+    return res.status(201).json({ statusEvent: result.rows[0] });
+  } catch (error) {
+    console.error('[Medications] status event create error:', error.message);
+    return res.status(500).json({ error: 'Failed to save medication status event' });
+  }
+});
+
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const medicineNameColumn = await resolveMedicineNameColumn();
@@ -483,6 +599,27 @@ router.put('/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[Medications] update error:', error.message);
     return res.status(500).json({ error: 'Failed to update medication' });
+  }
+});
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const sql = `
+      DELETE FROM user_medications
+      WHERE id = $1 AND user_id = $2
+      RETURNING id;
+    `;
+
+    const result = await pool.query(sql, [req.params.id, req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Medication not found' });
+    }
+
+    return res.json({ success: true, deletedId: result.rows[0].id });
+  } catch (error) {
+    console.error('[Medications] delete error:', error.message);
+    return res.status(500).json({ error: 'Failed to delete medication' });
   }
 });
 

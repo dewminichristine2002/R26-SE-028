@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { medicationService } from '../services/medicationService';
+import { reminderNotificationService } from '../services/reminderNotificationService';
 
 const shapeIconMap = {
   round: '●',
@@ -38,6 +39,16 @@ const colorMap = {
   grey: '#95a5a6',
 };
 
+const DOSE_FORM_OPTIONS = ['Tablet', 'Drops'];
+const TAKE_WITH_OPTIONS = ['Breakfast', 'Lunch', 'Dinner', 'Before Sleep'];
+const TIMING_OPTIONS = ['Before', 'After'];
+
+const parseTakeWith = (value = '') =>
+  String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
 const getShapeIcon = (shape) => {
   const normalized = (shape || '').toString().trim().toLowerCase();
   return shapeIconMap[normalized] || '⬤';
@@ -57,6 +68,7 @@ const getColorValue = (color) => {
 };
 
 const MedicineListScreen = ({ onBack }) => {
+  const scrollRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [medications, setMedications] = useState([]);
   const [searchText, setSearchText] = useState('');
@@ -71,7 +83,7 @@ const MedicineListScreen = ({ onBack }) => {
     dosageMg: '',
     dailyAmount: '',
     doseForm: 'Tablet',
-    takeWith: 'Breakfast',
+    takeWithOptions: ['Breakfast'],
     intakeTiming: 'After',
   });
 
@@ -91,6 +103,18 @@ const MedicineListScreen = ({ onBack }) => {
     loadMedications();
   }, []);
 
+  useEffect(() => {
+    if (!selectedMedication) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      scrollRef.current?.scrollToEnd?.({ animated: true });
+    }, 80);
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedMedication]);
+
   const filteredMedications = useMemo(() => {
     const needle = searchText.trim().toLowerCase();
     if (!needle) {
@@ -100,25 +124,58 @@ const MedicineListScreen = ({ onBack }) => {
     return medications.filter((item) => item.medicine_name?.toLowerCase().includes(needle));
   }, [medications, searchText]);
 
-  const handleView = async (id) => {
-    try {
-      const medication = await medicationService.getMedicationById(id);
-      setSelectedMedication(medication);
-      setIsEditMode(false);
-      setForm({
-        medicineName: medication.medicine_name,
-        selectedColor: medication.selected_color || medication.medicine_color || '',
-        selectedShape: medication.selected_shape || medication.medicine_shape || '',
-        totalQuantity: String(medication.total_quantity),
-        dosageMg: String(medication.dosage_mg),
-        dailyAmount: String(medication.daily_amount),
-        doseForm: medication.dose_form,
-        takeWith: medication.take_with,
-        intakeTiming: medication.intake_timing,
-      });
-    } catch (error) {
-      Alert.alert('View Failed', error?.response?.data?.error || error?.message || 'Could not load medicine details.');
+  const applyMedicationToForm = (medication) => {
+    setSelectedMedication(medication);
+    setIsEditMode(false);
+    setForm({
+      medicineName: medication.medicine_name || '',
+      selectedColor: medication.selected_color || medication.medicine_color || '',
+      selectedShape: medication.selected_shape || medication.medicine_shape || '',
+      totalQuantity: String(medication.total_quantity ?? ''),
+      dosageMg: String(medication.dosage_mg ?? ''),
+      dailyAmount: String(medication.daily_amount ?? ''),
+      doseForm: medication.dose_form || 'Tablet',
+      takeWithOptions: parseTakeWith(medication.take_with),
+      intakeTiming: medication.intake_timing || 'After',
+    });
+  };
+
+  const handleView = async (item) => {
+    // Open details immediately using the list payload so the button always feels responsive.
+    applyMedicationToForm(item);
+
+    if (!item?.id) {
+      return;
     }
+
+    try {
+      const medication = await medicationService.getMedicationById(item.id);
+      applyMedicationToForm(medication);
+    } catch (error) {
+      console.log('[MedicineList] View refresh failed:', error?.response?.data?.error || error?.message || error);
+    }
+  };
+
+  const toggleTakeWithOption = (option) => {
+    if (!isEditMode) {
+      return;
+    }
+
+    setForm((prev) => {
+      const hasOption = prev.takeWithOptions.includes(option);
+      if (hasOption) {
+        const nextOptions = prev.takeWithOptions.filter((item) => item !== option);
+        return {
+          ...prev,
+          takeWithOptions: nextOptions.length ? nextOptions : prev.takeWithOptions,
+        };
+      }
+
+      return {
+        ...prev,
+        takeWithOptions: [...prev.takeWithOptions, option],
+      };
+    });
   };
 
   const handleSaveEdit = async () => {
@@ -130,7 +187,8 @@ const MedicineListScreen = ({ onBack }) => {
       !form.medicineName.trim() ||
       Number(form.totalQuantity) <= 0 ||
       Number(form.dosageMg) <= 0 ||
-      Number(form.dailyAmount) <= 0
+      Number(form.dailyAmount) <= 0 ||
+      !form.takeWithOptions.length
     ) {
       Alert.alert('Missing Data', 'Please enter valid values for all fields.');
       return;
@@ -146,9 +204,15 @@ const MedicineListScreen = ({ onBack }) => {
         dosageMg: Number(form.dosageMg),
         dailyAmount: Number(form.dailyAmount),
         doseForm: form.doseForm,
-        takeWith: form.takeWith,
+        takeWith: form.takeWithOptions.join(', '),
         intakeTiming: form.intakeTiming,
       });
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (notificationError) {
+        console.log('[MedicineList] Reminder reschedule failed:', notificationError?.message || notificationError);
+      }
 
       setSelectedMedication(updated);
       setMedications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
@@ -161,8 +225,47 @@ const MedicineListScreen = ({ onBack }) => {
     }
   };
 
+  const handleDeleteMedication = () => {
+    if (!selectedMedication?.id) {
+      return;
+    }
+
+    Alert.alert(
+      'Delete Medicine',
+      `Are you sure you want to delete ${selectedMedication.medicine_name || 'this medicine'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsSaving(true);
+              await medicationService.deleteMedication(selectedMedication.id);
+
+              try {
+                await reminderNotificationService.rescheduleDailyReminders();
+              } catch (notificationError) {
+                console.log('[MedicineList] Reminder reschedule after delete failed:', notificationError?.message || notificationError);
+              }
+
+              setMedications((prev) => prev.filter((item) => item.id !== selectedMedication.id));
+              setSelectedMedication(null);
+              setIsEditMode(false);
+              Alert.alert('Deleted', 'Medicine deleted successfully.');
+            } catch (error) {
+              Alert.alert('Delete Failed', error?.response?.data?.error || error?.message || 'Could not delete medicine.');
+            } finally {
+              setIsSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>‹</Text>
@@ -201,7 +304,7 @@ const MedicineListScreen = ({ onBack }) => {
                   <Text style={styles.metaTextLight}>
                     {item.medicine_color || 'No color'} | {item.medicine_shape || 'No shape'}
                   </Text>
-                  <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item.id)}>
+                  <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
                     <Text style={styles.viewButtonText}>View</Text>
                   </TouchableOpacity>
                 </View>
@@ -290,36 +393,82 @@ const MedicineListScreen = ({ onBack }) => {
                 keyboardType="number-pad"
               />
             </View>
-            <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Dose Form</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={form.doseForm}
-                onChangeText={(v) => setForm((p) => ({ ...p, doseForm: v }))}
-                editable={isEditMode}
-              />
+            <View style={styles.fieldCol} />
+          </View>
+
+          <View style={styles.scheduleCard}>
+            <Text style={styles.scheduleTitle}>Dosage & Schedule</Text>
+
+            <Text style={styles.sectionCaption}>DOSE FORM</Text>
+            <View style={styles.chipRow}>
+              {DOSE_FORM_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.chipButton,
+                    form.doseForm === option && styles.chipButtonActive,
+                    !isEditMode && styles.chipButtonDisabled,
+                  ]}
+                  onPress={() => isEditMode && setForm((p) => ({ ...p, doseForm: option }))}
+                  disabled={!isEditMode}
+                >
+                  <Text style={[styles.chipButtonText, form.doseForm === option && styles.chipButtonTextActive]}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.sectionCaption, styles.takeWithLabel]}>TAKE WITH</Text>
+            <View style={styles.mealGrid}>
+              {TAKE_WITH_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.mealButton,
+                    form.takeWithOptions.includes(option) && styles.mealButtonActive,
+                    !isEditMode && styles.chipButtonDisabled,
+                  ]}
+                  onPress={() => toggleTakeWithOption(option)}
+                  disabled={!isEditMode}
+                >
+                  <Text
+                    style={[
+                      styles.mealButtonText,
+                      form.takeWithOptions.includes(option) && styles.mealButtonTextActive,
+                    ]}
+                  >
+                    {option.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
-          <View style={styles.fieldRow}>
-            <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Take With</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={form.takeWith}
-                onChangeText={(v) => setForm((p) => ({ ...p, takeWith: v }))}
-                editable={isEditMode}
-              />
+          <View style={styles.howSection}>
+            <Text style={styles.howSectionTitle}>How does it get?</Text>
+            <View style={styles.howButtonsRow}>
+              {TIMING_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.howButton,
+                    form.intakeTiming === option && styles.howButtonActive,
+                    !isEditMode && styles.chipButtonDisabled,
+                  ]}
+                  onPress={() => isEditMode && setForm((p) => ({ ...p, intakeTiming: option }))}
+                  disabled={!isEditMode}
+                >
+                  <Text style={[styles.howButtonText, form.intakeTiming === option && styles.howButtonTextActive]}>{option}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Timing</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={form.intakeTiming}
-                onChangeText={(v) => setForm((p) => ({ ...p, intakeTiming: v }))}
-                editable={isEditMode}
-              />
-            </View>
+          </View>
+
+          <View style={styles.safetyCard}>
+            <Text style={styles.safetyTitle}>Safety Verification</Text>
+            <Text style={styles.safetyBody}>
+              This medicine is currently planned with {form.takeWithOptions.length} meal
+              {form.takeWithOptions.length > 1 ? 's' : ''} and reminder timing set to {form.intakeTiming.toLowerCase()}.
+            </Text>
           </View>
 
           {!isEditMode ? (
@@ -336,6 +485,14 @@ const MedicineListScreen = ({ onBack }) => {
               </TouchableOpacity>
             </View>
           )}
+
+          <TouchableOpacity
+            style={[styles.deleteButton, isSaving && styles.chipButtonDisabled]}
+            onPress={handleDeleteMedication}
+            disabled={isSaving}
+          >
+            <Text style={styles.deleteButtonText}>{isSaving ? 'Please wait...' : 'Delete Medicine'}</Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -537,6 +694,144 @@ const styles = StyleSheet.create({
   fieldCol: {
     width: '48.5%',
   },
+  scheduleCard: {
+    marginTop: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dce5ed',
+    backgroundColor: '#f8fcff',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  scheduleTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#203447',
+    marginBottom: 6,
+  },
+  sectionCaption: {
+    fontSize: 11,
+    color: '#63788e',
+    fontWeight: '700',
+    marginBottom: 6,
+    letterSpacing: 0.4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    gap: 8,
+  },
+  chipButton: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d7e1ea',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipButtonActive: {
+    backgroundColor: '#2f8fd0',
+    borderColor: '#2f8fd0',
+  },
+  chipButtonDisabled: {
+    opacity: 0.7,
+  },
+  chipButtonText: {
+    color: '#557089',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  chipButtonTextActive: {
+    color: '#ffffff',
+  },
+  takeWithLabel: {
+    marginTop: 2,
+  },
+  mealGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mealButton: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d7e1ea',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  mealButtonActive: {
+    borderColor: '#2f8fd0',
+    backgroundColor: '#eaf6ff',
+  },
+  mealButtonText: {
+    fontSize: 11,
+    color: '#637b90',
+    fontWeight: '700',
+  },
+  mealButtonTextActive: {
+    color: '#1f6fa8',
+  },
+  howSection: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dce5ed',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  howSectionTitle: {
+    fontSize: 14,
+    color: '#22384b',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  howButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  howButton: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d7e1ea',
+    backgroundColor: '#ffffff',
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  howButtonActive: {
+    borderColor: '#2f8fd0',
+    backgroundColor: '#eaf6ff',
+  },
+  howButtonText: {
+    color: '#5d7489',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  howButtonTextActive: {
+    color: '#1f6fa8',
+  },
+  safetyCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dfe7ef',
+    backgroundColor: '#f9fbfd',
+    padding: 10,
+    marginBottom: 10,
+  },
+  safetyTitle: {
+    fontSize: 13,
+    color: '#2b4054',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  safetyBody: {
+    fontSize: 12,
+    color: '#627a8f',
+    lineHeight: 18,
+  },
   editButton: {
     marginTop: 4,
     height: 44,
@@ -577,6 +872,20 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#fff',
+    fontWeight: '700',
+  },
+  deleteButton: {
+    marginTop: 10,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f3c0c0',
+    backgroundColor: '#fff5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#c0392b',
     fontWeight: '700',
   },
 });

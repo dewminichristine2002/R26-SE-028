@@ -71,4 +71,16 @@ export const medicationService = {
     const response = await axios.put(`${API_BASE_URL}/medications/${id}`, payload, { headers });
     return response.data?.medication;
   },
+
+  async deleteMedication(id) {
+    const headers = await getAuthHeaders();
+    const response = await axios.delete(`${API_BASE_URL}/medications/${id}`, { headers });
+    return response.data;
+  },
+
+  async saveMedicationStatusEvent(payload) {
+    const headers = await getAuthHeaders();
+    const response = await axios.post(`${API_BASE_URL}/medications/status-events`, payload, { headers });
+    return response.data?.statusEvent;
+  },
 };

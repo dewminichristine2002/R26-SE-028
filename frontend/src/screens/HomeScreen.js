@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from '../i18n/useTranslation';
 import RoutineSetupScreen from './RoutineSetupScreen';
@@ -6,7 +6,7 @@ import ManualEntryScreen from './ManualEntryScreen';
 import MedicineListScreen from './MedicineListScreen';
 import ScheduleBoardScreen from './ScheduleBoardScreen';
 
-const HomeScreen = ({ user, onOpenProfile, onLogout }) => {
+const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
@@ -65,6 +65,15 @@ const HomeScreen = ({ user, onOpenProfile, onLogout }) => {
   };
 
   const textScale = largeTextMode ? 1.15 : 1;
+
+  useEffect(() => {
+    if (launchIntent?.type !== 'schedule-board') {
+      return;
+    }
+
+    setShowReminderMenu(true);
+    setActiveReminderView('schedule-board');
+  }, [launchIntent?.nonce, launchIntent?.type]);
 
   if (showReminderMenu) {
     if (activeReminderView === 'routine-setup') {

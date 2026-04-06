@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { medicationService } from '../services/medicationService';
+import { reminderNotificationService } from '../services/reminderNotificationService';
 
 const ManualEntryScreen = ({ onBack }) => {
   const [medicineQuery, setMedicineQuery] = useState('');
@@ -195,6 +196,12 @@ const ManualEntryScreen = ({ onBack }) => {
         takeWith: selectedTakeWith,
         intakeTiming,
       });
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (notificationError) {
+        console.log('[ManualEntry] Reminder reschedule failed:', notificationError?.message || notificationError);
+      }
 
       Alert.alert('Saved', 'Medicine details saved successfully.');
       onBack?.();

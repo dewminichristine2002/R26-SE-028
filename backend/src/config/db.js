@@ -82,14 +82,80 @@ const initializeDatabase = async () => {
     );
   `;
 
+  const createMedicationStatusEventsTableQuery = `
+    CREATE TABLE IF NOT EXISTS medication_status_events (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      medication_id INTEGER NOT NULL REFERENCES user_medications(id) ON DELETE CASCADE,
+      status TEXT NOT NULL CHECK (status IN ('taken', 'remind', 'overdose', 'speak', 'not-taken')),
+      overdose_tablets NUMERIC(6,2) CHECK (overdose_tablets IS NULL OR overdose_tablets > 0),
+      schedule_slot TEXT,
+      dose_number INTEGER,
+      times_per_day INTEGER,
+      routine_time TEXT,
+      reminder_time TIMESTAMPTZ,
+      event_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
   await pool.query(createTableQuery);
   await pool.query(createUsersTableQuery);
   await pool.query(createUserRoutinesTableQuery);
   await pool.query(createMedicinesTableQuery);
   await pool.query(createUserMedicationsTableQuery);
+  await pool.query(createMedicationStatusEventsTableQuery);
   await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_color TEXT;`);
   await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_shape TEXT;`);
   await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS event_time TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS overdose_tablets NUMERIC(6,2);`);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'medication_status_events'
+          AND column_name = 'overdose_tablets'
+          AND data_type <> 'numeric'
+      ) THEN
+        ALTER TABLE medication_status_events
+        ALTER COLUMN overdose_tablets TYPE NUMERIC(6,2)
+        USING overdose_tablets::NUMERIC(6,2);
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+    ALTER TABLE medication_status_events
+    DROP CONSTRAINT IF EXISTS medication_status_events_overdose_tablets_check;
+  `);
+  await pool.query(`
+    ALTER TABLE medication_status_events
+    ADD CONSTRAINT medication_status_events_overdose_tablets_check
+    CHECK (overdose_tablets IS NULL OR overdose_tablets > 0);
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'medication_status_events'::regclass
+          AND conname = 'medication_status_events_status_check'
+      ) THEN
+        ALTER TABLE medication_status_events DROP CONSTRAINT medication_status_events_status_check;
+      END IF;
+
+      ALTER TABLE medication_status_events
+      ADD CONSTRAINT medication_status_events_status_check
+      CHECK (status IN ('taken', 'remind', 'overdose', 'speak', 'not-taken'));
+    END $$;
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS medication_status_events_user_id_idx ON medication_status_events (user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS medication_status_events_medication_id_idx ON medication_status_events (medication_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS medication_status_events_event_time_idx ON medication_status_events (event_time DESC);`);
 
   // Keep compatibility with older schemas and ensure medicineName exists.
   await pool.query(`ALTER TABLE medicines ADD COLUMN IF NOT EXISTS "medicineName" TEXT;`);
