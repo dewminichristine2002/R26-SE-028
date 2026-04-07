@@ -1,15 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from '../i18n/useTranslation';
 import RoutineSetupScreen from './RoutineSetupScreen';
 import ManualEntryScreen from './ManualEntryScreen';
 import MedicineListScreen from './MedicineListScreen';
+import MedicineStockScreen from './MedicineStockScreen';
 import ScheduleBoardScreen from './ScheduleBoardScreen';
+import SafetyCenterScreen from './SafetyCenterScreen';
+import { caregiverAlertService } from '../services/caregiverAlertService';
 
 const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
+  const [caregiverAlerts, setCaregiverAlerts] = useState([]);
+  const [caregiverUnreadCount, setCaregiverUnreadCount] = useState(0);
+  const [caregiverTimeline, setCaregiverTimeline] = useState([]);
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
+  const caregiverUnreadCountRef = useRef(0);
   const { t } = useTranslation();
 
   const menuItems = [
@@ -55,8 +63,18 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
       return;
     }
 
+    if (menuItem === 'Medicine Stock') {
+      setActiveReminderView('medicine-stock');
+      return;
+    }
+
     if (menuItem === 'Schedule Board') {
       setActiveReminderView('schedule-board');
+      return;
+    }
+
+    if (menuItem === 'Safety Center') {
+      setActiveReminderView('safety-center');
       return;
     }
 
@@ -65,6 +83,167 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   };
 
   const textScale = largeTextMode ? 1.15 : 1;
+  const isCaregiver = user?.role === 'caregiver';
+  const criticalAlerts = caregiverAlerts.filter((item) => !item.is_read);
+  const recentAlerts = caregiverAlerts.slice(0, 5);
+  const timelineItems = isTimelineExpanded ? caregiverTimeline : caregiverTimeline.slice(0, 4);
+
+  const getTimelineDayKey = (value) => {
+    const dateValue = new Date(value || Date.now());
+    if (Number.isNaN(dateValue.getTime())) {
+      return 'unknown';
+    }
+
+    const year = dateValue.getFullYear();
+    const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+    const day = String(dateValue.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatTimelineDayLabel = (dayKey) => {
+    if (dayKey === 'unknown') {
+      return 'Unknown Day';
+    }
+
+    const target = new Date(`${dayKey}T00:00:00`);
+    const today = new Date();
+    const todayKey = getTimelineDayKey(today);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = getTimelineDayKey(yesterday);
+
+    if (dayKey === todayKey) {
+      return 'Today';
+    }
+
+    if (dayKey === yesterdayKey) {
+      return 'Yesterday';
+    }
+
+    return target.toLocaleDateString([], {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const timelineDayGroups = timelineItems.reduce((acc, timelineItem) => {
+    const eventDate = timelineItem.event_time || timelineItem.created_at;
+    const dayKey = getTimelineDayKey(eventDate);
+    const existing = acc.find((group) => group.dayKey === dayKey);
+    if (existing) {
+      existing.items.push(timelineItem);
+      return acc;
+    }
+
+    acc.push({
+      dayKey,
+      items: [timelineItem],
+    });
+    return acc;
+  }, []);
+
+  const formatAlertTime = (value) => {
+    if (!value) {
+      return '';
+    }
+
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+      return '';
+    }
+
+    const diffMs = Date.now() - dateValue.getTime();
+    const diffMin = Math.max(1, Math.floor(diffMs / 60000));
+
+    if (diffMin < 60) {
+      return `${diffMin}m ago`;
+    }
+
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
+  const formatClockTime = (value) => {
+    if (!value) {
+      return '--:--';
+    }
+
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+      return '--:--';
+    }
+
+    return dateValue.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getCaregiverAlertTitle = (alertItem) => {
+    const rawTitle = String(alertItem?.title || '').trim();
+    const message = String(alertItem?.message || '').toLowerCase();
+
+    if (
+      message.includes('please arrange a refill') ||
+      message.includes('requested refill') ||
+      message.includes('need my')
+    ) {
+      return 'Refill Alert';
+    }
+
+    return rawTitle || 'Caregiver Alert';
+  };
+
+  const getTimelineMeta = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'overdose') {
+      return { icon: '△', dotStyle: styles.caregiverTimelineDotCritical };
+    }
+
+    if (normalized === 'not-taken') {
+      return { icon: '△', dotStyle: styles.caregiverTimelineDotWarning };
+    }
+
+    if (normalized === 'taken') {
+      return { icon: '◉', dotStyle: styles.caregiverTimelineDotGood };
+    }
+
+    return { icon: '◌', dotStyle: styles.caregiverTimelineDotNeutral };
+  };
+
+  const getTimelineLabel = (entry) => {
+    const medicineName = String(entry?.medicine_name || 'Medicine').trim();
+    const dosageMg = Number(entry?.dosage_mg);
+    const doseText = Number.isFinite(dosageMg) && dosageMg > 0 ? `${dosageMg}mg` : '';
+    const title = [medicineName, doseText].filter(Boolean).join(' ');
+    const normalized = String(entry?.status || '').toLowerCase();
+
+    if (normalized === 'overdose') {
+      return `${title} - Double Dose Detected`;
+    }
+
+    if (normalized === 'not-taken') {
+      return `${title} - Missed`;
+    }
+
+    if (normalized === 'taken') {
+      return `${title} - Taken`;
+    }
+
+    if (normalized === 'remind') {
+      return `${title} - Reminder Pending`;
+    }
+
+    return `${title} - Status Updated`;
+  };
 
   useEffect(() => {
     if (launchIntent?.type !== 'schedule-board') {
@@ -74,6 +253,199 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
     setShowReminderMenu(true);
     setActiveReminderView('schedule-board');
   }, [launchIntent?.nonce, launchIntent?.type]);
+
+  useEffect(() => {
+    if (!isCaregiver) {
+      setCaregiverAlerts([]);
+      setCaregiverUnreadCount(0);
+      setCaregiverTimeline([]);
+      caregiverUnreadCountRef.current = 0;
+      return undefined;
+    }
+
+    let mounted = true;
+
+    const loadCaregiverAlerts = async () => {
+      try {
+        const [alertsResponse, timelineResponse] = await Promise.all([
+          caregiverAlertService.getCaregiverAlerts(),
+          caregiverAlertService.getCaregiverTimeline(),
+        ]);
+        if (!mounted) {
+          return;
+        }
+
+        const alerts = alertsResponse.alerts || [];
+        const unreadCount = Number(alertsResponse.unreadCount) || 0;
+        const previousUnreadCount = caregiverUnreadCountRef.current;
+
+        setCaregiverAlerts(alerts);
+        setCaregiverTimeline(timelineResponse || []);
+        setCaregiverUnreadCount(unreadCount);
+        caregiverUnreadCountRef.current = unreadCount;
+
+        if (unreadCount > previousUnreadCount) {
+          const newestUnread = alerts.find((item) => !item.is_read);
+          if (newestUnread?.message) {
+            Alert.alert(getCaregiverAlertTitle(newestUnread), newestUnread.message);
+          }
+        }
+      } catch (error) {
+        console.log('[HomeScreen] caregiver alerts load failed:', error?.message || error);
+      }
+    };
+
+    loadCaregiverAlerts();
+    const intervalId = setInterval(loadCaregiverAlerts, 10000);
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, [isCaregiver]);
+
+  const handleCaregiverNotificationPress = async () => {
+    const unreadAlerts = caregiverAlerts.filter((item) => !item.is_read);
+    if (!unreadAlerts.length) {
+      Alert.alert('Notifications', 'No unread alerts right now.');
+      return;
+    }
+
+    try {
+      await Promise.all(unreadAlerts.map((item) => caregiverAlertService.markAlertRead(item.id)));
+      setCaregiverAlerts((prev) => prev.map((item) => ({ ...item, is_read: true })));
+      setCaregiverUnreadCount(0);
+      caregiverUnreadCountRef.current = 0;
+    } catch (error) {
+      console.log('[HomeScreen] caregiver alerts mark read failed:', error?.message || error);
+    }
+  };
+
+  const handleMarkSingleAlertRead = async (alertId) => {
+    try {
+      await caregiverAlertService.markAlertRead(alertId);
+      setCaregiverAlerts((prev) => prev.map((item) => (item.id === alertId ? { ...item, is_read: true } : item)));
+      setCaregiverUnreadCount((prev) => Math.max(0, prev - 1));
+      caregiverUnreadCountRef.current = Math.max(0, caregiverUnreadCountRef.current - 1);
+    } catch (error) {
+      console.log('[HomeScreen] mark single caregiver alert read failed:', error?.message || error);
+    }
+  };
+
+  if (isCaregiver) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.caregiverContainer}>
+        <View style={styles.caregiverHeaderRow}>
+          <View>
+            <Text style={styles.title}>Caregiver Alerts</Text>
+            <Text style={styles.welcome}>Today notifications for {user?.fullName || 'your patient'}</Text>
+          </View>
+          <TouchableOpacity style={styles.caregiverNotificationButton} onPress={handleCaregiverNotificationPress}>
+            <Text style={styles.caregiverNotificationIcon}>🔔</Text>
+            {caregiverUnreadCount > 0 && (
+              <View style={styles.caregiverNotificationBadge}>
+                <Text style={styles.caregiverNotificationBadgeText}>{caregiverUnreadCount > 99 ? '99+' : caregiverUnreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.caregiverInfoStrip}>
+          <Text style={styles.caregiverInfoTitle}>Today's Alerts</Text>
+          <Text style={styles.caregiverInfoBadge}>{caregiverUnreadCount} Active</Text>
+        </View>
+
+        {!!criticalAlerts.length && (
+          <View style={styles.caregiverCriticalCard}>
+            <Text style={styles.caregiverSectionTitle}>Immediate Action Required</Text>
+            {criticalAlerts.slice(0, 2).map((alertItem) => (
+              <View key={`critical-${alertItem.id}`} style={styles.caregiverCriticalItem}>
+                <View style={styles.caregiverCriticalHeader}>
+                  <Text style={styles.caregiverCriticalLabel}>{getCaregiverAlertTitle(alertItem)}</Text>
+                  <Text style={styles.caregiverCriticalTime}>{formatAlertTime(alertItem.created_at)}</Text>
+                </View>
+                <Text style={styles.caregiverCriticalMessage}>{alertItem.message}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.caregiverCard}>
+          <Text style={styles.caregiverSectionTitle}>Recent Updates</Text>
+          {!recentAlerts.length ? (
+            <Text style={styles.caregiverEmptyText}>No notifications yet.</Text>
+          ) : (
+            recentAlerts.map((alertItem) => (
+              <View key={`recent-${alertItem.id}`} style={styles.caregiverRecentItem}>
+                <View style={styles.caregiverRecentDotWrap}>
+                  <Text style={styles.caregiverRecentDot}>{alertItem.is_read ? '○' : '●'}</Text>
+                </View>
+                <View style={styles.caregiverRecentContent}>
+                  <View style={styles.caregiverRecentTopRow}>
+                    <Text style={styles.caregiverRecentTitle}>{getCaregiverAlertTitle(alertItem)}</Text>
+                    <Text style={styles.caregiverRecentTime}>{formatAlertTime(alertItem.created_at)}</Text>
+                  </View>
+                  <Text style={styles.caregiverRecentMessage}>{alertItem.message}</Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        <View style={styles.caregiverCard}>
+          <View style={styles.caregiverTimelineHeader}>
+            <Text style={styles.caregiverSectionTitle}>Timeline View</Text>
+            <TouchableOpacity onPress={() => setIsTimelineExpanded((prev) => !prev)}>
+              <Text style={styles.caregiverTimelineLink}>{isTimelineExpanded ? 'Minimize' : 'Maximize'}</Text>
+            </TouchableOpacity>
+          </View>
+          {!caregiverTimeline.length ? (
+            <Text style={styles.caregiverEmptyText}>No timeline events yet.</Text>
+          ) : (
+            timelineDayGroups.map((group, groupIndex) => (
+              <View key={`timeline-day-${group.dayKey}-${groupIndex}`}>
+                <Text style={styles.caregiverTimelineDayLabel}>{formatTimelineDayLabel(group.dayKey)}</Text>
+                {group.items.map((timelineItem, index) => {
+                  const meta = getTimelineMeta(timelineItem.status);
+                  return (
+                    <View key={`timeline-${timelineItem.id || `${group.dayKey}-${index}`}`} style={styles.caregiverTimelineItem}>
+                      <View style={styles.caregiverTimelineMarkerCol}>
+                        {index !== group.items.length - 1 && <View style={styles.caregiverTimelineLine} />}
+                        <View style={[styles.caregiverTimelineDotCircle, meta.dotStyle]}>
+                          <Text style={styles.caregiverTimelineDotIcon}>{meta.icon}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.caregiverTimelineContent}>
+                        <Text style={styles.caregiverTimelineTime}>{formatClockTime(timelineItem.event_time || timelineItem.created_at)}</Text>
+                        <Text style={styles.caregiverTimelineText}>{getTimelineLabel(timelineItem)}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            ))
+          )}
+          {!isTimelineExpanded && caregiverTimeline.length > 4 && (
+            <TouchableOpacity
+              style={styles.caregiverTimelineExpandButton}
+              onPress={() => setIsTimelineExpanded(true)}
+            >
+              <Text style={styles.caregiverTimelineExpandButtonText}>Show {caregiverTimeline.length - 4} more</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.quickActionRow}>
+          <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
+            <Text style={styles.profileButtonText}>View Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
 
   if (showReminderMenu) {
     if (activeReminderView === 'routine-setup') {
@@ -143,8 +515,16 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
       return <MedicineListScreen onBack={() => setActiveReminderView('menu')} />;
     }
 
+    if (activeReminderView === 'medicine-stock') {
+      return <MedicineStockScreen onBack={() => setActiveReminderView('menu')} />;
+    }
+
     if (activeReminderView === 'schedule-board') {
       return <ScheduleBoardScreen user={user} onBack={() => setActiveReminderView('menu')} />;
+    }
+
+    if (activeReminderView === 'safety-center') {
+      return <SafetyCenterScreen onBack={() => setActiveReminderView('menu')} />;
     }
 
     return (
@@ -347,6 +727,271 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     paddingHorizontal: 18,
     position: 'relative',
+  },
+  caregiverContainer: {
+    paddingBottom: 24,
+    backgroundColor: '#f6f7f9',
+  },
+  caregiverHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  caregiverNotificationButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  caregiverNotificationBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#dd4d4d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  caregiverNotificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  caregiverNotificationIcon: {
+    fontSize: 20,
+  },
+  caregiverCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  caregiverCardTitle: {
+    color: '#4c6d82',
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  caregiverCardValue: {
+    fontSize: 20,
+    color: '#0a4b70',
+    fontWeight: '700',
+  },
+  caregiverCardSubValue: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#3f6076',
+  },
+  caregiverInfoStrip: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  caregiverInfoTitle: {
+    fontSize: 14,
+    color: '#2d3c49',
+    fontWeight: '700',
+  },
+  caregiverInfoBadge: {
+    backgroundColor: '#e9f1ff',
+    color: '#2161a8',
+    fontSize: 12,
+    fontWeight: '700',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  caregiverSectionTitle: {
+    fontSize: 14,
+    color: '#2e3d4f',
+    fontWeight: '700',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  caregiverCriticalCard: {
+    backgroundColor: '#fff4f5',
+    borderColor: '#f5ccd1',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  caregiverCriticalItem: {
+    borderLeftColor: '#d64054',
+    borderLeftWidth: 3,
+    paddingLeft: 10,
+    marginBottom: 10,
+  },
+  caregiverCriticalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  caregiverCriticalLabel: {
+    color: '#b0293f',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  caregiverCriticalTime: {
+    color: '#8e5a63',
+    fontSize: 12,
+  },
+  caregiverCriticalMessage: {
+    color: '#4a2d33',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 2,
+  },
+  caregiverRecentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  caregiverRecentDotWrap: {
+    width: 20,
+    alignItems: 'center',
+    paddingTop: 1,
+  },
+  caregiverRecentDot: {
+    color: '#3f6ba8',
+    fontSize: 12,
+  },
+  caregiverRecentContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  caregiverRecentTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  caregiverRecentTitle: {
+    color: '#243542',
+    fontSize: 13,
+    fontWeight: '700',
+    flexShrink: 1,
+    marginRight: 8,
+  },
+  caregiverRecentTime: {
+    color: '#678090',
+    fontSize: 11,
+  },
+  caregiverRecentMessage: {
+    color: '#405361',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  caregiverEmptyText: {
+    color: '#687f90',
+    fontSize: 13,
+  },
+  caregiverTimelineHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  caregiverTimelineDayLabel: {
+    marginTop: 10,
+    marginBottom: 4,
+    color: '#5f7280',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  caregiverTimelineLink: {
+    color: '#2b72b8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  caregiverTimelineItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  },
+  caregiverTimelineMarkerCol: {
+    width: 28,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  caregiverTimelineLine: {
+    position: 'absolute',
+    top: 22,
+    width: 2,
+    bottom: -8,
+    backgroundColor: '#d7dde3',
+  },
+  caregiverTimelineDotCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  caregiverTimelineDotIcon: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  caregiverTimelineDotCritical: {
+    backgroundColor: '#e14c5f',
+  },
+  caregiverTimelineDotWarning: {
+    backgroundColor: '#ef7a3a',
+  },
+  caregiverTimelineDotGood: {
+    backgroundColor: '#2fbe67',
+  },
+  caregiverTimelineDotNeutral: {
+    backgroundColor: '#4f8dd5',
+  },
+  caregiverTimelineContent: {
+    flex: 1,
+    paddingBottom: 12,
+  },
+  caregiverTimelineTime: {
+    color: '#4a5c69',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  caregiverTimelineText: {
+    color: '#324653',
+    fontSize: 14,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  caregiverTimelineExpandButton: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#edf4fb',
+  },
+  caregiverTimelineExpandButtonText: {
+    color: '#2b72b8',
+    fontSize: 12,
+    fontWeight: '700',
   },
   backgroundBlobTop: {
     position: 'absolute',

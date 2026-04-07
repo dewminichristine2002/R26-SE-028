@@ -37,6 +37,8 @@ const initializeDatabase = async () => {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       phone TEXT,
+      caregiver_email TEXT,
+      caregiver_phone TEXT,
       date_of_birth DATE,
       blood_type TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -71,7 +73,7 @@ const initializeDatabase = async () => {
       medicine_name TEXT NOT NULL,
       selected_color TEXT,
       selected_shape TEXT,
-      total_quantity INTEGER NOT NULL,
+      total_quantity NUMERIC(10,2) NOT NULL,
       dosage_mg INTEGER NOT NULL,
       daily_amount INTEGER NOT NULL,
       dose_form TEXT NOT NULL,
@@ -89,6 +91,7 @@ const initializeDatabase = async () => {
       medication_id INTEGER NOT NULL REFERENCES user_medications(id) ON DELETE CASCADE,
       status TEXT NOT NULL CHECK (status IN ('taken', 'remind', 'overdose', 'speak', 'not-taken')),
       overdose_tablets NUMERIC(6,2) CHECK (overdose_tablets IS NULL OR overdose_tablets > 0),
+      quantity_used NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (quantity_used >= 0),
       schedule_slot TEXT,
       dose_number INTEGER,
       times_per_day INTEGER,
@@ -99,18 +102,91 @@ const initializeDatabase = async () => {
     );
   `;
 
+  const createMedicationStockTableQuery = `
+    CREATE TABLE IF NOT EXISTS medication_stock (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      medication_id INTEGER UNIQUE NOT NULL REFERENCES user_medications(id) ON DELETE CASCADE,
+      initial_quantity NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (initial_quantity >= 0),
+      current_quantity NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (current_quantity >= 0),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  const createCaregiverAlertsTableQuery = `
+    CREATE TABLE IF NOT EXISTS caregiver_alerts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status_event_id INTEGER REFERENCES medication_status_events(id) ON DELETE SET NULL,
+      medication_id INTEGER REFERENCES user_medications(id) ON DELETE SET NULL,
+      caregiver_email TEXT,
+      caregiver_phone TEXT,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      is_read BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      read_at TIMESTAMPTZ
+    );
+  `;
+
   await pool.query(createTableQuery);
   await pool.query(createUsersTableQuery);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS caregiver_email TEXT;`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS caregiver_phone TEXT;`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS users_caregiver_email_idx ON users (caregiver_email);`);
   await pool.query(createUserRoutinesTableQuery);
   await pool.query(createMedicinesTableQuery);
   await pool.query(createUserMedicationsTableQuery);
+  await pool.query(createMedicationStockTableQuery);
+  await pool.query(`ALTER TABLE medication_stock ADD COLUMN IF NOT EXISTS initial_quantity NUMERIC(10,2) NOT NULL DEFAULT 0;`);
+  await pool.query(`ALTER TABLE medication_stock ADD COLUMN IF NOT EXISTS current_quantity NUMERIC(10,2) NOT NULL DEFAULT 0;`);
+  await pool.query(`ALTER TABLE medication_stock ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await pool.query(`ALTER TABLE medication_stock ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS medication_stock_medication_id_idx ON medication_stock (medication_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS medication_stock_user_id_idx ON medication_stock (user_id);`);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS total_quantity NUMERIC(10,2);`);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'user_medications'
+          AND column_name = 'total_quantity'
+          AND data_type <> 'numeric'
+      ) THEN
+        ALTER TABLE user_medications
+        ALTER COLUMN total_quantity TYPE NUMERIC(10,2)
+        USING total_quantity::NUMERIC(10,2);
+      END IF;
+    END $$;
+  `);
   await pool.query(createMedicationStatusEventsTableQuery);
+  await pool.query(createCaregiverAlertsTableQuery);
   await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_color TEXT;`);
   await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_shape TEXT;`);
   await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
   await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS event_time TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
   await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
   await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS overdose_tablets NUMERIC(6,2);`);
+  await pool.query(`ALTER TABLE medication_status_events ADD COLUMN IF NOT EXISTS quantity_used NUMERIC(10,2) NOT NULL DEFAULT 0;`);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'medication_status_events'
+          AND column_name = 'quantity_used'
+          AND data_type <> 'numeric'
+      ) THEN
+        ALTER TABLE medication_status_events
+        ALTER COLUMN quantity_used TYPE NUMERIC(10,2)
+        USING quantity_used::NUMERIC(10,2);
+      END IF;
+    END $$;
+  `);
   await pool.query(`
     DO $$
     BEGIN
@@ -137,6 +213,15 @@ const initializeDatabase = async () => {
     CHECK (overdose_tablets IS NULL OR overdose_tablets > 0);
   `);
   await pool.query(`
+    ALTER TABLE medication_status_events
+    DROP CONSTRAINT IF EXISTS medication_status_events_quantity_used_check;
+  `);
+  await pool.query(`
+    ALTER TABLE medication_status_events
+    ADD CONSTRAINT medication_status_events_quantity_used_check
+    CHECK (quantity_used >= 0);
+  `);
+  await pool.query(`
     DO $$
     BEGIN
       IF EXISTS (
@@ -156,6 +241,16 @@ const initializeDatabase = async () => {
   await pool.query(`CREATE INDEX IF NOT EXISTS medication_status_events_user_id_idx ON medication_status_events (user_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS medication_status_events_medication_id_idx ON medication_status_events (medication_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS medication_status_events_event_time_idx ON medication_status_events (event_time DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS caregiver_alerts_user_id_idx ON caregiver_alerts (user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS caregiver_alerts_unread_idx ON caregiver_alerts (user_id, is_read);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS caregiver_alerts_created_at_idx ON caregiver_alerts (created_at DESC);`);
+
+  await pool.query(`
+    INSERT INTO medication_stock (user_id, medication_id, initial_quantity, current_quantity)
+    SELECT um.user_id, um.id, GREATEST(0::numeric, um.total_quantity::numeric), GREATEST(0::numeric, um.total_quantity::numeric)
+    FROM user_medications um
+    ON CONFLICT (medication_id) DO NOTHING;
+  `);
 
   // Keep compatibility with older schemas and ensure medicineName exists.
   await pool.query(`ALTER TABLE medicines ADD COLUMN IF NOT EXISTS "medicineName" TEXT;`);

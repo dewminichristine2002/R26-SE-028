@@ -7,6 +7,8 @@ const ProfileScreen = ({ user, onBack, onProfileUpdated, onLogout }) => {
     fullName: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
+    caregiverEmail: user?.caregiverEmail || '',
+    caregiverPhone: user?.caregiverPhone || '',
     dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).slice(0, 10) : '',
     bloodType: user?.bloodType || '',
   });
@@ -20,6 +22,8 @@ const ProfileScreen = ({ user, onBack, onProfileUpdated, onLogout }) => {
           fullName: profile.fullName || '',
           email: profile.email || '',
           phone: profile.phone || '',
+          caregiverEmail: profile.caregiverEmail || '',
+          caregiverPhone: profile.caregiverPhone || '',
           dateOfBirth: profile.dateOfBirth ? String(profile.dateOfBirth).slice(0, 10) : '',
           bloodType: profile.bloodType || '',
         });
@@ -30,11 +34,18 @@ const ProfileScreen = ({ user, onBack, onProfileUpdated, onLogout }) => {
     };
 
     loadProfile();
-  }, [onProfileUpdated]);
+  }, []);
 
   const handleSave = async () => {
     if (!form.fullName.trim()) {
       Alert.alert('Validation', 'Full name is required.');
+      return;
+    }
+
+    const ownEmail = String(form.email || '').trim().toLowerCase();
+    const caregiverEmail = String(form.caregiverEmail || '').trim().toLowerCase();
+    if (caregiverEmail && ownEmail && caregiverEmail === ownEmail) {
+      Alert.alert('Validation', 'Caregiver email must be different from your own email.');
       return;
     }
 
@@ -43,6 +54,8 @@ const ProfileScreen = ({ user, onBack, onProfileUpdated, onLogout }) => {
       const updated = await userService.updateMyProfile({
         fullName: form.fullName,
         phone: form.phone,
+        caregiverEmail: form.caregiverEmail,
+        caregiverPhone: form.caregiverPhone,
         dateOfBirth: form.dateOfBirth || null,
         bloodType: form.bloodType,
       });
@@ -79,6 +92,28 @@ const ProfileScreen = ({ user, onBack, onProfileUpdated, onLogout }) => {
           value={form.phone}
           onChangeText={(value) => setForm((prev) => ({ ...prev, phone: value }))}
           placeholder="e.g. +94 77 123 4567"
+        />
+
+        <Text style={styles.label}>Caregiver Email</Text>
+        <TextInput
+          style={styles.input}
+          value={form.caregiverEmail}
+          onChangeText={(value) => setForm((prev) => ({ ...prev, caregiverEmail: value }))}
+          placeholder="caregiver@email.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          importantForAutofill="yes"
+        />
+
+        <Text style={styles.label}>Caregiver Phone</Text>
+        <TextInput
+          style={styles.input}
+          value={form.caregiverPhone}
+          onChangeText={(value) => setForm((prev) => ({ ...prev, caregiverPhone: value }))}
+          placeholder="Used for caregiver login"
         />
 
         <Text style={styles.label}>Date of Birth (YYYY-MM-DD)</Text>

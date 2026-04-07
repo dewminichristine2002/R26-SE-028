@@ -261,6 +261,83 @@ const parseMinutesFromVoiceText = (text) => {
   return 10;
 };
 
+const parseOverdoseTabletsFromVoiceText = (text) => {
+  const normalized = String(text || '').toLowerCase();
+
+  const numericWithFractionMatch = normalized.match(/(\d{1,3})(?:\s+and\s+a\s+half|\s+and\s+half)/i);
+  if (numericWithFractionMatch) {
+    const base = Number(numericWithFractionMatch[1]);
+    if (Number.isFinite(base) && base > 0) {
+      return base + 0.5;
+    }
+  }
+
+  const decimalMatch = normalized.match(/(\d{1,3}(?:\.\d{1,2})?)/);
+  if (decimalMatch) {
+    const parsed = Number(decimalMatch[1]);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  const fractionMatch = normalized.match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+  if (fractionMatch) {
+    const numerator = Number(fractionMatch[1]);
+    const denominator = Number(fractionMatch[2]);
+    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0) {
+      const fractionValue = numerator / denominator;
+      if (fractionValue > 0) {
+        return fractionValue;
+      }
+    }
+  }
+
+  const wordToNumber = {
+    half: 0.5,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+    twenty: 20,
+  };
+
+  const words = normalized.split(/[^a-z]+/).filter(Boolean);
+  for (let i = 0; i < words.length; i += 1) {
+    const current = words[i];
+    const currentValue = wordToNumber[current];
+    if (!currentValue) {
+      continue;
+    }
+
+    if (words[i + 1] === 'and' && words[i + 2] === 'a' && words[i + 3] === 'half') {
+      return currentValue + 0.5;
+    }
+
+    if (words[i + 1] === 'and' && words[i + 2] === 'half') {
+      return currentValue + 0.5;
+    }
+
+    return currentValue;
+  }
+
+  return 0.5;
+};
+
 const formatTabletCount = (count) => {
   const normalized = Number(count);
   if (!Number.isFinite(normalized) || normalized <= 0) {
@@ -317,13 +394,25 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
         setIsLoading(true);
         setErrorMessage('');
 
-        const [routineData, medicationData] = await Promise.all([
+        const [routineData, medicationData, todayStatusEvents] = await Promise.all([
           routineService.getRoutine(),
           medicationService.getMyMedications(),
+          medicationService.getTodayLatestStatusEvents(),
         ]);
 
         setRoutine(routineData?.mealTimes || null);
         setMedications(medicationData || []);
+
+        const latestStatusByEntry = {};
+        (todayStatusEvents || []).forEach((eventItem) => {
+          const key = `${eventItem?.medication_id || 'med'}-${eventItem?.schedule_slot || 'slot'}-${eventItem?.dose_number || 1}`;
+          latestStatusByEntry[key] = {
+            status: eventItem?.status || '',
+            overdoseTablets: eventItem?.overdose_tablets == null ? null : Number(eventItem.overdose_tablets),
+            savedAt: eventItem?.event_time ? new Date(eventItem.event_time) : new Date(),
+          };
+        });
+        setLastSavedStatusByEntry(latestStatusByEntry);
       } catch (error) {
         setErrorMessage(error?.message || 'Could not load schedule data.');
       } finally {
@@ -437,6 +526,18 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
           return a.sortDate.getTime() - b.sortDate.getTime();
         }),
     [scheduleRows, currentTime]
+  );
+
+  const upcomingTodaySchedule = useMemo(
+    () =>
+      flatSchedule.filter((entry) => {
+        if (!entry?.sortDate) {
+          return false;
+        }
+
+        return entry.sortDate.getTime() >= currentTime.getTime();
+      }),
+    [flatSchedule, currentTime]
   );
 
   const nextDoseGroup = useMemo(() => {
@@ -654,12 +755,11 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
     const text = transcript.toLowerCase();
 
     if (text.includes('overdose')) {
-      const overdoseCountMatch = text.match(/(\d{1,3})\s*(tablet|tablets|pill|pills)/i);
-      const overdoseCount = overdoseCountMatch ? Number(overdoseCountMatch[1]) : 0.5;
+      const overdoseCount = parseOverdoseTabletsFromVoiceText(text);
       return {
         statusKey: 'overdose',
         overdoseTablets: Number.isFinite(overdoseCount) && overdoseCount > 0 ? overdoseCount : 0.5,
-        speakMessage: buildVoiceMarkMessage('overdose', entry),
+        speakMessage: `I got ${formatTabletCount(overdoseCount)} overdose tablets for ${entry?.medicineName || 'this medicine'}.`,
       };
     }
 
@@ -738,7 +838,7 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
         },
       }));
 
-      if (statusKey === 'taken' || statusKey === 'overdose' || statusKey === 'not-taken') {
+      if (statusKey === 'not-taken') {
         setHiddenNextDoseEntries((prev) => ({
           ...prev,
           [getEntryDoseInstanceKey(entry)]: true,
@@ -876,25 +976,35 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
   useEffect(() => {
     const handledStatuses = new Set(['taken', 'overdose', 'remind', 'not-taken']);
 
-    const expiredEntries = nextDoseGroup.filter((entry) => {
-      const instanceKey = getEntryDoseInstanceKey(entry);
-      if (hiddenNextDoseEntries[instanceKey] || autoMarkingEntries[instanceKey]) {
-        return false;
-      }
+    const expiredEntries = flatSchedule
+      .map((entry) => {
+        const dueDate = entry?.sortDate ? new Date(entry.sortDate) : null;
+        if (!dueDate) {
+          return null;
+        }
 
-      const entryState = lastSavedStatusByEntry[getEntryStatusKey(entry)];
-      if (entryState?.status && handledStatuses.has(entryState.status)) {
-        return false;
-      }
+        const expiryDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
+        return {
+          ...entry,
+          dueDate,
+          expiryDate,
+          nextDate: dueDate,
+        };
+      })
+      .filter(Boolean)
+      .filter((entry) => {
+        const instanceKey = getEntryDoseInstanceKey(entry);
+        if (hiddenNextDoseEntries[instanceKey] || autoMarkingEntries[instanceKey]) {
+          return false;
+        }
 
-      const dueDate = entry?.dueDate ? new Date(entry.dueDate) : null;
-      if (!dueDate) {
-        return false;
-      }
+        const entryState = lastSavedStatusByEntry[getEntryStatusKey(entry)];
+        if (entryState?.status && handledStatuses.has(entryState.status)) {
+          return false;
+        }
 
-      const expiryTime = entry?.expiryDate ? new Date(entry.expiryDate) : new Date(dueDate.getTime() + 60 * 60 * 1000);
-      return currentTime.getTime() >= expiryTime.getTime();
-    });
+        return currentTime.getTime() >= entry.expiryDate.getTime();
+      });
 
     if (!expiredEntries.length) {
       return;
@@ -919,7 +1029,7 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
           });
         });
     });
-  }, [nextDoseGroup, hiddenNextDoseEntries, autoMarkingEntries, lastSavedStatusByEntry, currentTime]);
+  }, [flatSchedule, hiddenNextDoseEntries, autoMarkingEntries, lastSavedStatusByEntry, currentTime]);
 
   const applyCustomRemindMinutes = async () => {
     if (!customRemindEntry) {
@@ -1042,6 +1152,12 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
     return `Saved: ${label} at ${timeLabel}`;
   };
 
+  const isEntryInteractionLocked = (entry) => {
+    const entryState = lastSavedStatusByEntry[getEntryStatusKey(entry)];
+    const status = String(entryState?.status || '').toLowerCase();
+    return status === 'taken' || status === 'overdose';
+  };
+
   const applyCustomOverdoseCount = async () => {
     if (!overdoseEntry) {
       setShowOverdoseModal(false);
@@ -1126,48 +1242,55 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
           )}
 
           {visibleNextDoseGroup.length ? (
-            visibleNextDoseGroup.map((entry) => (
-              <View key={`next-${entry.stableId}`} style={styles.highlightMedicineRow}>
+            visibleNextDoseGroup.map((entry) => {
+              const isLocked = isEntryInteractionLocked(entry);
+
+              return (
+              <View key={`next-${entry.stableId}`} style={[styles.highlightMedicineRow, isLocked && styles.highlightMedicineRowLocked]}>
                 <View style={[styles.highlightAppearance, { backgroundColor: getColorValue(entry.color) }]}>
                   <Text style={styles.highlightAppearanceIcon}>{getShapeIcon(entry.shape)}</Text>
                 </View>
                 <View style={styles.highlightTextWrap}>
-                  <Text style={styles.highlightMedicineName}>{entry.medicineName}</Text>
-                  <Text style={styles.highlightMedicineMeta}>{entry.dosageMg}mg</Text>
-                  <Text style={styles.highlightMedicineSubMeta}>
+                  <Text style={[styles.highlightMedicineName, isLocked && styles.highlightTextLocked]}>{entry.medicineName}</Text>
+                  <Text style={[styles.highlightMedicineMeta, isLocked && styles.highlightTextLocked]}>{entry.dosageMg}mg</Text>
+                  <Text style={[styles.highlightMedicineSubMeta, isLocked && styles.highlightTextLocked]}>
                     {entry.timesPerDay} {entry.timesPerDay === 1 ? 'time' : 'times'} / day
                   </Text>
-                  <Text style={styles.highlightMedicineDoseText}>
+                  <Text style={[styles.highlightMedicineDoseText, isLocked && styles.highlightTextLocked]}>
                     Dose {entry.doseNumber || 1} of {entry.timesPerDay || 1}
                   </Text>
 
                   <View style={styles.entryStatusRow}>
                     <TouchableOpacity
-                      style={styles.entryStatusButton}
+                      style={[styles.entryStatusButton, isLocked && styles.entryStatusButtonDisabled]}
                       onPress={() => handleSaveDoseStatus(entry, 'taken')}
-                      disabled={isSavingStatus}
+                      disabled={isSavingStatus || isLocked}
                     >
-                      <Text style={styles.entryStatusButtonText}>Taken</Text>
+                      <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled]}>Taken</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.entryStatusButton}
+                      style={[styles.entryStatusButton, isLocked && styles.entryStatusButtonDisabled]}
                       onPress={() => openRemindMinutePicker(entry)}
-                      disabled={isSavingStatus}
+                      disabled={isSavingStatus || isLocked}
                     >
-                      <Text style={styles.entryStatusButtonText}>Remind</Text>
+                      <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled]}>Remind</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.entryStatusButton, styles.entryStatusButtonDanger]}
+                      style={[styles.entryStatusButton, styles.entryStatusButtonDanger, isLocked && styles.entryStatusButtonDisabled]}
                       onPress={() => openOverdoseTabletPicker(entry)}
-                      disabled={isSavingStatus}
+                      disabled={isSavingStatus || isLocked}
                     >
-                      <Text style={styles.entryStatusButtonText}>Overdose</Text>
+                      <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled]}>Overdose</Text>
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.entryActionRow}>
-                    <TouchableOpacity style={styles.entryActionButton} onPress={() => handleEntrySpeak(entry)}>
-                      <Text style={styles.entryActionButtonText}>
+                    <TouchableOpacity
+                      style={[styles.entryActionButton, isLocked && styles.entryActionButtonDisabled]}
+                      onPress={() => handleEntrySpeak(entry)}
+                      disabled={isLocked}
+                    >
+                      <Text style={[styles.entryActionButtonText, isLocked && styles.entryActionButtonTextDisabled]}>
                         {isVoiceListening && voiceTargetEntryKey === getEntryStatusKey(entry) ? 'Listening...' : 'Speak'}
                       </Text>
                     </TouchableOpacity>
@@ -1182,7 +1305,7 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
                   )}
                 </View>
               </View>
-            ))
+            );})
           ) : (
             <View style={styles.noNextDoseWrap}>
               <Text style={styles.noNextDoseText}>No upcoming dose found.</Text>
@@ -1191,9 +1314,9 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
         </View>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Today's Schedule</Text>
+          <Text style={styles.sectionTitle}>Upcoming Schedules Today</Text>
           <View style={styles.totalBadge}>
-            <Text style={styles.totalBadgeText}>{flatSchedule.length} total</Text>
+            <Text style={styles.totalBadgeText}>{upcomingTodaySchedule.length} total</Text>
           </View>
         </View>
 
@@ -1206,14 +1329,14 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
 
         {!isLoading && !!errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
-        {!isLoading && !errorMessage && flatSchedule.length === 0 && (
+        {!isLoading && !errorMessage && upcomingTodaySchedule.length === 0 && (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyTitle}>No schedules yet</Text>
-            <Text style={styles.emptyText}>Add medicines with meal timing to see them on Schedule Board.</Text>
+            <Text style={styles.emptyTitle}>No upcoming schedules for today</Text>
+            <Text style={styles.emptyText}>All scheduled reminders for today are already completed or passed.</Text>
           </View>
         )}
 
-        {!isLoading && !errorMessage && flatSchedule.map((entry) => (
+        {!isLoading && !errorMessage && upcomingTodaySchedule.map((entry) => (
           <TouchableOpacity
             key={entry.stableId}
             style={styles.scheduleItemCard}
@@ -1507,6 +1630,11 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
   },
+  highlightMedicineRowLocked: {
+    backgroundColor: '#eef2f5',
+    borderWidth: 1,
+    borderColor: '#d9e0e6',
+  },
   highlightAppearance: {
     width: 40,
     height: 40,
@@ -1545,6 +1673,9 @@ const styles = StyleSheet.create({
     color: '#4d7ea4',
     fontWeight: '700',
   },
+  highlightTextLocked: {
+    color: '#7d8b96',
+  },
   entryStatusRow: {
     flexDirection: 'row',
     columnGap: 6,
@@ -1560,10 +1691,16 @@ const styles = StyleSheet.create({
   entryStatusButtonDanger: {
     backgroundColor: '#cf4e3f',
   },
+  entryStatusButtonDisabled: {
+    backgroundColor: '#b6c0c8',
+  },
   entryStatusButtonText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  entryStatusButtonTextDisabled: {
+    color: '#eef2f5',
   },
   entryActionRow: {
     flexDirection: 'row',
@@ -1579,10 +1716,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
   },
+  entryActionButtonDisabled: {
+    backgroundColor: '#edf1f4',
+    borderColor: '#d4dce3',
+  },
   entryActionButtonText: {
     color: '#2f3c49',
     fontSize: 12,
     fontWeight: '700',
+  },
+  entryActionButtonTextDisabled: {
+    color: '#7e8b95',
   },
   entrySavedStatusText: {
     marginTop: 6,

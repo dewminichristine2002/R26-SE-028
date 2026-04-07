@@ -99,6 +99,109 @@ const getAvailableAppearancesForMedicineName = async (medicineName) => {
   return result.rows.map((row) => ({ color: row.color, shape: row.shape })).filter((row) => row.color && row.shape);
 };
 
+const computeStockSnapshot = (medicationRow) => {
+  const pillsLeft = Math.max(0, Number(medicationRow?.total_quantity) || 0);
+  const dailyIntake = Math.max(1, Number(medicationRow?.daily_amount) || 1);
+  const daysLeftRaw = pillsLeft / dailyIntake;
+  const daysLeft = Math.max(0, Math.ceil(daysLeftRaw));
+
+  const refillDate = new Date();
+  refillDate.setDate(refillDate.getDate() + daysLeft);
+
+  const coveragePercent = Math.max(1, Math.min(100, Math.round((daysLeft / 30) * 100)));
+  const isLowStock = daysLeftRaw <= 3;
+
+  let stockLabel = 'Stock OK';
+  if (daysLeftRaw <= 3) {
+    stockLabel = 'Low Stock';
+  } else if (daysLeftRaw <= 7) {
+    stockLabel = 'Refill Soon';
+  }
+
+  return {
+    pillsLeft,
+    dailyIntake,
+    daysLeft,
+    daysLeftRaw,
+    coveragePercent,
+    isLowStock,
+    stockLabel,
+    refillDate,
+  };
+};
+
+const createLowStockCaregiverAlert = async ({
+  userId,
+  medication,
+  daysLeft,
+  manual,
+}) => {
+  const ownerResult = await pool.query(
+    `
+      SELECT full_name, caregiver_email, caregiver_phone
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  const owner = ownerResult.rows[0] || {};
+  const caregiverEmail = String(owner?.caregiver_email || '').trim();
+  const caregiverPhone = String(owner?.caregiver_phone || '').trim();
+
+  if (!caregiverEmail) {
+    return { created: false, reason: 'no-caregiver' };
+  }
+
+  if (!manual) {
+    const recent = await pool.query(
+      `
+        SELECT id
+        FROM caregiver_alerts
+        WHERE user_id = $1
+          AND medication_id = $2
+          AND title = 'Low Stock Alert'
+          AND created_at >= NOW() - INTERVAL '24 hours'
+        LIMIT 1
+      `,
+      [userId, medication.id]
+    );
+
+    if (recent.rows.length > 0) {
+      return { created: false, reason: 'already-notified-recently' };
+    }
+  }
+
+  const patientName = String(owner?.full_name || 'Patient').trim();
+  const medicineName = String(medication?.medicine_name || 'medicine').trim();
+  const modeText = manual ? 'Manual request' : 'Auto alert';
+
+  await pool.query(
+    `
+      INSERT INTO caregiver_alerts (
+        user_id,
+        medication_id,
+        caregiver_email,
+        caregiver_phone,
+        title,
+        message
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `,
+    [
+      userId,
+      medication.id,
+      caregiverEmail,
+      caregiverPhone || null,
+      'Low Stock Alert',
+      `${modeText}: ${patientName} has low stock for ${medicineName}. Only ${daysLeft} day(s) left.`,
+    ]
+  );
+
+  return { created: true, reason: 'ok' };
+};
+
 router.get('/suggestions', async (req, res) => {
   const rawQuery = (req.query.q || '').toString().trim();
 
@@ -260,6 +363,22 @@ router.post('/', requireAuth, async (req, res) => {
       normalizedIntakeTiming,
     ]);
 
+    if (result.rows.length > 0) {
+      await pool.query(
+        `
+          INSERT INTO medication_stock (user_id, medication_id, initial_quantity, current_quantity)
+          VALUES ($1, $2, $3, $3)
+          ON CONFLICT (medication_id) DO UPDATE
+          SET
+            user_id = EXCLUDED.user_id,
+            initial_quantity = EXCLUDED.initial_quantity,
+            current_quantity = EXCLUDED.current_quantity,
+            updated_at = NOW();
+        `,
+        [req.user.id, result.rows[0].id, parsedTotalQuantity]
+      );
+    }
+
     return res.status(201).json({ medication: result.rows[0] });
   } catch (error) {
     console.error('[Medications] create error:', error.message);
@@ -298,7 +417,7 @@ router.get('/', requireAuth, async (req, res) => {
         um.medicine_name,
         um.selected_color,
         um.selected_shape,
-        um.total_quantity,
+        COALESCE(ms.current_quantity, um.total_quantity) AS total_quantity,
         um.dosage_mg,
         um.daily_amount,
         um.dose_form,
@@ -309,8 +428,9 @@ router.get('/', requireAuth, async (req, res) => {
         COALESCE(NULLIF(BTRIM(um.selected_color), ''), ${colorSelect.replace(' AS medicine_color', '')}) AS medicine_color,
         ${shapeSelect}
       FROM user_medications um
+      LEFT JOIN medication_stock ms ON ms.medication_id = um.id
       WHERE um.user_id = $1
-      ORDER BY created_at DESC;
+      ORDER BY um.created_at DESC;
     `;
     const result = await pool.query(sql, [req.user.id]);
     return res.json({ medications: result.rows });
@@ -383,12 +503,36 @@ router.post('/status-events', requireAuth, async (req, res) => {
   }
 
   try {
+    const medicationMetaResult = await pool.query(
+      `
+        SELECT id, medicine_name, daily_amount
+        FROM user_medications
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1
+      `,
+      [parsedMedicationId, req.user.id]
+    );
+
+    if (medicationMetaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Medication not found' });
+    }
+
+    const medicationMeta = medicationMetaResult.rows[0];
+    const baseDoseAmount = Math.max(0, Number(medicationMeta?.daily_amount) || 0);
+    const overdoseExtra = normalizedStatus === 'overdose'
+      ? Math.max(0, Number(parsedOverdoseTablets) || 0)
+      : 0;
+    const totalUsedQuantity = (normalizedStatus === 'taken' || normalizedStatus === 'overdose')
+      ? baseDoseAmount + overdoseExtra
+      : 0;
+
     const sql = `
       INSERT INTO medication_status_events (
         user_id,
         medication_id,
         status,
         overdose_tablets,
+        quantity_used,
         schedule_slot,
         dose_number,
         times_per_day,
@@ -406,10 +550,11 @@ router.post('/status-events', requireAuth, async (req, res) => {
         $7,
         $8,
         $9,
-        COALESCE($10::timestamptz, NOW())
+        $10,
+        COALESCE($11::timestamptz, NOW())
       FROM user_medications um
       WHERE um.id = $2 AND um.user_id = $1
-      RETURNING id, user_id, medication_id, status, overdose_tablets, schedule_slot, dose_number, times_per_day, routine_time, reminder_time, event_time, created_at;
+      RETURNING id, user_id, medication_id, status, overdose_tablets, quantity_used, schedule_slot, dose_number, times_per_day, routine_time, reminder_time, event_time, created_at;
     `;
 
     const result = await pool.query(sql, [
@@ -417,6 +562,7 @@ router.post('/status-events', requireAuth, async (req, res) => {
       parsedMedicationId,
       normalizedStatus,
       normalizedStatus === 'overdose' ? parsedOverdoseTablets : null,
+      totalUsedQuantity,
       normalizedScheduleSlot || null,
       parsedDoseNumber,
       parsedTimesPerDay,
@@ -429,10 +575,465 @@ router.post('/status-events', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Medication not found' });
     }
 
+    if (normalizedStatus === 'taken' || normalizedStatus === 'overdose') {
+      try {
+        if (totalUsedQuantity > 0) {
+          await pool.query(
+            `
+              UPDATE user_medications
+              SET
+                updated_at = NOW()
+              WHERE id = $1 AND user_id = $2
+            `,
+            [parsedMedicationId, req.user.id]
+          );
+
+          await pool.query(
+            `
+              UPDATE medication_stock
+              SET
+                current_quantity = GREATEST(0::numeric, current_quantity - $3::numeric),
+                updated_at = NOW()
+              WHERE medication_id = $1 AND user_id = $2
+            `,
+            [parsedMedicationId, req.user.id, totalUsedQuantity]
+          );
+        }
+      } catch (stockError) {
+        console.error('[Medications] stock decrement error:', stockError.message);
+      }
+    }
+
+    if (normalizedStatus === 'overdose') {
+      try {
+        const ownerResult = await pool.query(
+          `
+            SELECT full_name, caregiver_email, caregiver_phone
+            FROM users
+            WHERE id = $1
+            LIMIT 1
+          `,
+          [req.user.id]
+        );
+
+        const owner = ownerResult.rows[0] || {};
+        const caregiverEmail = String(owner?.caregiver_email || '').trim();
+        const caregiverPhone = String(owner?.caregiver_phone || '').trim();
+
+        if (caregiverEmail) {
+          const patientName = String(owner?.full_name || 'Patient').trim();
+          const medicineName = String(medicationMeta?.medicine_name || 'medicine').trim();
+          const tabletsText = Number.isFinite(parsedOverdoseTablets) ? parsedOverdoseTablets : 0.5;
+
+          await pool.query(
+            `
+              INSERT INTO caregiver_alerts (
+                user_id,
+                status_event_id,
+                medication_id,
+                caregiver_email,
+                caregiver_phone,
+                title,
+                message
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `,
+            [
+              req.user.id,
+              result.rows[0].id,
+              parsedMedicationId,
+              caregiverEmail,
+              caregiverPhone || null,
+              'Overdose Alert',
+              `${patientName} reported an overdose for ${medicineName} (${tabletsText} tablets).`,
+            ]
+          );
+        }
+      } catch (alertError) {
+        console.error('[Medications] caregiver alert create error:', alertError.message);
+      }
+    }
+
     return res.status(201).json({ statusEvent: result.rows[0] });
   } catch (error) {
     console.error('[Medications] status event create error:', error.message);
     return res.status(500).json({ error: 'Failed to save medication status event' });
+  }
+});
+
+router.get('/status-events/today-latest', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT DISTINCT ON (
+          medication_id,
+          COALESCE(schedule_slot, ''),
+          COALESCE(dose_number, 0)
+        )
+          medication_id,
+          status,
+          overdose_tablets,
+          schedule_slot,
+          dose_number,
+          times_per_day,
+          event_time,
+          created_at
+        FROM medication_status_events
+        WHERE user_id = $1
+          AND event_time::date = CURRENT_DATE
+        ORDER BY
+          medication_id,
+          COALESCE(schedule_slot, ''),
+          COALESCE(dose_number, 0),
+          event_time DESC,
+          id DESC;
+      `,
+      [req.user.id]
+    );
+
+    return res.json({ events: result.rows });
+  } catch (error) {
+    console.error('[Medications] today latest status events error:', error.message);
+    return res.status(500).json({ error: 'Failed to load today status events' });
+  }
+});
+
+router.get('/stock', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          um.id,
+          um.medicine_name,
+          COALESCE(ms.current_quantity, um.total_quantity) AS total_quantity,
+          um.dosage_mg,
+          um.daily_amount,
+          um.take_with,
+          um.intake_timing,
+          um.created_at,
+          COALESCE(stock_usage.used_pills, 0)::numeric AS used_pills
+        FROM user_medications um
+        LEFT JOIN medication_stock ms ON ms.medication_id = um.id
+        LEFT JOIN (
+          SELECT
+            mse.medication_id,
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN mse.status = 'taken' THEN
+                    CASE
+                      WHEN COALESCE(mse.quantity_used, 0) > 0 THEN mse.quantity_used
+                      ELSE COALESCE(um2.daily_amount, 0)
+                    END
+                  WHEN mse.status = 'overdose' THEN
+                    CASE
+                      WHEN COALESCE(mse.quantity_used, 0) > 0 THEN mse.quantity_used
+                      ELSE COALESCE(um2.daily_amount, 0) + COALESCE(mse.overdose_tablets, 0)
+                    END
+                  ELSE 0
+                END
+              ),
+              0
+            )::numeric AS used_pills
+          FROM medication_status_events mse
+          LEFT JOIN user_medications um2 ON um2.id = mse.medication_id
+          WHERE mse.user_id = $1
+          GROUP BY mse.medication_id
+        ) AS stock_usage ON stock_usage.medication_id = um.id
+        WHERE um.user_id = $1
+        ORDER BY um.created_at DESC;
+      `,
+      [req.user.id]
+    );
+
+    const inventory = result.rows.map((row) => {
+      const stock = computeStockSnapshot(row);
+      const usedPills = Math.max(0, Number(row.used_pills) || 0);
+      const totalPills = stock.pillsLeft + usedPills;
+
+      return {
+        id: row.id,
+        medicineName: row.medicine_name,
+        dosageMg: row.dosage_mg,
+        dailyAmount: row.daily_amount,
+        takeWith: row.take_with,
+        intakeTiming: row.intake_timing,
+        totalPills,
+        usedPills,
+        pillsLeft: stock.pillsLeft,
+        daysLeft: stock.daysLeft,
+        coveragePercent: stock.coveragePercent,
+        isLowStock: stock.isLowStock,
+        stockLabel: stock.stockLabel,
+        nextRefillDate: stock.refillDate.toISOString(),
+      };
+    });
+
+    const lowStockCount = inventory.filter((item) => item.isLowStock).length;
+    const totalPills = inventory.reduce((sum, item) => sum + (Number(item.totalPills) || 0), 0);
+    const usedPills = inventory.reduce((sum, item) => sum + (Number(item.usedPills) || 0), 0);
+
+    return res.json({
+      summary: {
+        totalMedications: inventory.length,
+        lowStockCount,
+        totalPills,
+        usedPills,
+      },
+      inventory,
+    });
+  } catch (error) {
+    console.error('[Medications] stock error:', error.message);
+    return res.status(500).json({ error: 'Failed to load medicine stock' });
+  }
+});
+
+router.post('/stock/auto-notify', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT id, medicine_name, total_quantity, daily_amount
+        FROM (
+          SELECT um.id, um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity) AS total_quantity, um.daily_amount
+          FROM user_medications um
+          LEFT JOIN medication_stock ms ON ms.medication_id = um.id
+          WHERE um.user_id = $1
+        ) AS med_view
+        ;
+      `,
+      [req.user.id]
+    );
+
+    let autoNotifiedCount = 0;
+    const skipped = [];
+
+    for (const row of result.rows) {
+      const stock = computeStockSnapshot(row);
+      if (!stock.isLowStock) {
+        continue;
+      }
+
+      const created = await createLowStockCaregiverAlert({
+        userId: req.user.id,
+        medication: row,
+        daysLeft: stock.daysLeft,
+        manual: false,
+      });
+
+      if (created.created) {
+        autoNotifiedCount += 1;
+      } else {
+        skipped.push({ medicationId: row.id, reason: created.reason });
+      }
+    }
+
+    return res.json({ autoNotifiedCount, skipped });
+  } catch (error) {
+    console.error('[Medications] auto low-stock notify error:', error.message);
+    return res.status(500).json({ error: 'Failed to process low stock auto notifications' });
+  }
+});
+
+router.post('/:id/low-stock-notify', requireAuth, async (req, res) => {
+  const medicationId = Number(req.params.id);
+  if (!Number.isInteger(medicationId) || medicationId <= 0) {
+    return res.status(400).json({ error: 'Valid medication id is required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT id, medicine_name, total_quantity, daily_amount
+        FROM (
+          SELECT um.id, um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity) AS total_quantity, um.daily_amount
+          FROM user_medications um
+          LEFT JOIN medication_stock ms ON ms.medication_id = um.id
+          WHERE um.id = $1 AND um.user_id = $2
+        ) AS med_view
+        LIMIT 1;
+      `,
+      [medicationId, req.user.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Medication not found' });
+    }
+
+    const medication = result.rows[0];
+    const stock = computeStockSnapshot(medication);
+    const created = await createLowStockCaregiverAlert({
+      userId: req.user.id,
+      medication,
+      daysLeft: stock.daysLeft,
+      manual: true,
+    });
+
+    if (!created.created && created.reason === 'no-caregiver') {
+      return res.status(400).json({ error: 'No caregiver email found in profile' });
+    }
+
+    return res.json({
+      notified: created.created,
+      reason: created.reason,
+      medicationId,
+    });
+  } catch (error) {
+    console.error('[Medications] low-stock notify error:', error.message);
+    return res.status(500).json({ error: 'Failed to notify caregiver for low stock' });
+  }
+});
+
+router.post('/:id/refill', requireAuth, async (req, res) => {
+  const medicationId = Number(req.params.id);
+  const refillTablets = Number(req.body?.refillTablets);
+
+  if (!Number.isInteger(medicationId) || medicationId <= 0) {
+    return res.status(400).json({ error: 'Valid medication id is required' });
+  }
+
+  if (!Number.isFinite(refillTablets) || refillTablets <= 0) {
+    return res.status(400).json({ error: 'refillTablets must be a positive number' });
+  }
+
+  try {
+    const medicationResult = await pool.query(
+      `
+        SELECT id, user_id, total_quantity
+        FROM user_medications
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1;
+      `,
+      [medicationId, req.user.id]
+    );
+
+    if (!medicationResult.rows.length) {
+      return res.status(404).json({ error: 'Medication not found' });
+    }
+
+    const medication = medicationResult.rows[0];
+    const fallbackQuantity = Math.max(0, Number(medication.total_quantity) || 0);
+
+    await pool.query(
+      `
+        INSERT INTO medication_stock (user_id, medication_id, initial_quantity, current_quantity)
+        VALUES ($1, $2, $3, $3)
+        ON CONFLICT (medication_id) DO NOTHING;
+      `,
+      [req.user.id, medicationId, fallbackQuantity]
+    );
+
+    const stockResult = await pool.query(
+      `
+        UPDATE medication_stock
+        SET
+          current_quantity = current_quantity + $3::numeric,
+          initial_quantity = initial_quantity + $3::numeric,
+          updated_at = NOW()
+        WHERE medication_id = $1 AND user_id = $2
+        RETURNING current_quantity, initial_quantity;
+      `,
+      [medicationId, req.user.id, refillTablets]
+    );
+
+    if (!stockResult.rows.length) {
+      return res.status(500).json({ error: 'Failed to update stock quantity' });
+    }
+
+    await pool.query(
+      `
+        UPDATE user_medications
+        SET
+          total_quantity = $3,
+          updated_at = NOW()
+        WHERE id = $1 AND user_id = $2;
+      `,
+      [medicationId, req.user.id, stockResult.rows[0].current_quantity]
+    );
+
+    return res.json({
+      success: true,
+      medicationId,
+      refillTablets,
+      stock: {
+        currentQuantity: Number(stockResult.rows[0].current_quantity) || 0,
+        initialQuantity: Number(stockResult.rows[0].initial_quantity) || 0,
+      },
+    });
+  } catch (error) {
+    console.error('[Medications] refill error:', error.message);
+    return res.status(500).json({ error: 'Failed to refill medication stock' });
+  }
+});
+
+router.post('/:id/refill-notify', requireAuth, async (req, res) => {
+  const medicationId = Number(req.params.id);
+
+  if (!Number.isInteger(medicationId) || medicationId <= 0) {
+    return res.status(400).json({ error: 'Valid medication id is required' });
+  }
+
+  try {
+    const medicationResult = await pool.query(
+      `
+        SELECT id, medicine_name
+        FROM user_medications
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1;
+      `,
+      [medicationId, req.user.id]
+    );
+
+    if (!medicationResult.rows.length) {
+      return res.status(404).json({ error: 'Medication not found' });
+    }
+
+    const ownerResult = await pool.query(
+      `
+        SELECT full_name, caregiver_email, caregiver_phone
+        FROM users
+        WHERE id = $1
+        LIMIT 1;
+      `,
+      [req.user.id]
+    );
+
+    const owner = ownerResult.rows[0] || {};
+    const caregiverEmail = String(owner?.caregiver_email || '').trim();
+    const caregiverPhone = String(owner?.caregiver_phone || '').trim();
+
+    if (!caregiverEmail) {
+      return res.status(400).json({ error: 'No caregiver email found in profile' });
+    }
+
+    const patientName = String(owner?.full_name || 'Patient').trim();
+    const medicineName = String(medicationResult.rows[0]?.medicine_name || 'medicine').trim();
+
+    await pool.query(
+      `
+        INSERT INTO caregiver_alerts (
+          user_id,
+          medication_id,
+          caregiver_email,
+          caregiver_phone,
+          title,
+          message
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `,
+      [
+        req.user.id,
+        medicationId,
+        caregiverEmail,
+        caregiverPhone || null,
+        'Refill Alert',
+        `${patientName} says: I need my ${medicineName} medicine. Please arrange a refill.`,
+      ]
+    );
+
+    return res.json({ notified: true, medicationId });
+  } catch (error) {
+    console.error('[Medications] refill notify error:', error.message);
+    return res.status(500).json({ error: 'Failed to notify caregiver for refill' });
   }
 });
 
@@ -467,7 +1068,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         um.medicine_name,
         um.selected_color,
         um.selected_shape,
-        um.total_quantity,
+        COALESCE(ms.current_quantity, um.total_quantity) AS total_quantity,
         um.dosage_mg,
         um.daily_amount,
         um.dose_form,
@@ -478,6 +1079,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         COALESCE(NULLIF(BTRIM(um.selected_color), ''), ${colorSelect.replace(' AS medicine_color', '')}) AS medicine_color,
         ${shapeSelect}
       FROM user_medications um
+      LEFT JOIN medication_stock ms ON ms.medication_id = um.id
       WHERE um.id = $1 AND um.user_id = $2
       LIMIT 1;
     `;
@@ -595,7 +1197,21 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Medication not found' });
     }
 
-    return res.json({ medication: result.rows[0] });
+    await pool.query(
+      `
+        INSERT INTO medication_stock (user_id, medication_id, initial_quantity, current_quantity)
+        VALUES ($1, $2, $3, $3)
+        ON CONFLICT (medication_id) DO UPDATE
+        SET
+          user_id = EXCLUDED.user_id,
+          initial_quantity = EXCLUDED.initial_quantity,
+          current_quantity = EXCLUDED.current_quantity,
+          updated_at = NOW();
+      `,
+      [req.user.id, result.rows[0].id, parsedTotalQuantity]
+    );
+
+    return res.json({ medication: { ...result.rows[0], total_quantity: parsedTotalQuantity } });
   } catch (error) {
     console.error('[Medications] update error:', error.message);
     return res.status(500).json({ error: 'Failed to update medication' });
