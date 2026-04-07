@@ -12,7 +12,7 @@ import {
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
-const ManualEntryScreen = ({ onBack }) => {
+const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
   const [medicineQuery, setMedicineQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -31,6 +31,31 @@ const ManualEntryScreen = ({ onBack }) => {
   const [dosageMg, setDosageMg] = useState('20');
   const [dailyAmount, setDailyAmount] = useState('1');
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!initialData) {
+      return;
+    }
+
+    const incomingName = String(initialData.medicineName || '').trim();
+    const incomingDosage = String(initialData.dosageMg || '').trim();
+    const incomingQuantity = String(initialData.totalQuantity || '').trim();
+    const incomingDaily = String(initialData.dailyAmount || '').trim();
+
+    if (incomingName) {
+      setMedicineQuery(incomingName);
+      setSelectedMedicineName(incomingName);
+    }
+    if (incomingDosage) {
+      setDosageMg(incomingDosage);
+    }
+    if (incomingQuantity) {
+      setTotalQuantity(incomingQuantity);
+    }
+    if (incomingDaily) {
+      setDailyAmount(incomingDaily);
+    }
+  }, [initialData]);
 
   useEffect(() => {
     if (!medicineQuery.trim()) {
@@ -204,7 +229,17 @@ const ManualEntryScreen = ({ onBack }) => {
       }
 
       Alert.alert('Saved', 'Medicine details saved successfully.');
-      onBack?.();
+      const shouldClose = onSaved
+        ? onSaved({
+          medicineName: resolvedMedicineName,
+          dosageMg: Number(dosageMg),
+          totalQuantity: Number(totalQuantity),
+          dailyAmount: Number(dailyAmount),
+        })
+        : true;
+      if (shouldClose !== false) {
+        onBack?.();
+      }
     } catch (error) {
       Alert.alert('Save Failed', error?.response?.data?.error || error?.message || 'Could not save medicine details.');
     } finally {

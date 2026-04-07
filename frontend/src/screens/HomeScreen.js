@@ -7,6 +7,7 @@ import MedicineListScreen from './MedicineListScreen';
 import MedicineStockScreen from './MedicineStockScreen';
 import ScheduleBoardScreen from './ScheduleBoardScreen';
 import SafetyCenterScreen from './SafetyCenterScreen';
+import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
 const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
@@ -17,8 +18,30 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   const [caregiverUnreadCount, setCaregiverUnreadCount] = useState(0);
   const [caregiverTimeline, setCaregiverTimeline] = useState([]);
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
+  const [medicineDraft, setMedicineDraft] = useState(null);
+  const [medicineDraftQueue, setMedicineDraftQueue] = useState([]);
+  const [medicineDraftIndex, setMedicineDraftIndex] = useState(0);
+  const [capturedMedicines, setCapturedMedicines] = useState([]);
   const caregiverUnreadCountRef = useRef(0);
   const { t } = useTranslation();
+
+  const toDraftKey = (item) => {
+    const name = String(item?.medicineName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const dose = Number(item?.dosageMg) || 0;
+    const qty = Number(item?.totalQuantity) || 0;
+    return `${name}|${dose}|${qty}`;
+  };
+
+  const removeOneByKey = (list, key) => {
+    let removed = false;
+    return (list || []).filter((entry) => {
+      if (!removed && toDraftKey(entry) === key) {
+        removed = true;
+        return false;
+      }
+      return true;
+    });
+  };
 
   const menuItems = [
     { id: 1, label: 'home.reminder', icon: '🔔' },
@@ -55,6 +78,11 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
     if (menuItem === 'Add Medicine') {
       setActiveReminderView('add-medicine');
+      return;
+    }
+
+    if (menuItem === 'Scan Pharmacy Receipt') {
+      setActiveReminderView('scan-receipt');
       return;
     }
 
@@ -474,7 +502,7 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
           <TouchableOpacity
             style={[styles.addMedicineOptionCard, styles.addMedicineOptionCardPrimary]}
-            onPress={() => console.log('Selected Scan Pharmacy Receipt')}
+            onPress={() => setActiveReminderView('scan-receipt')}
             accessibilityRole="button"
             accessibilityLabel="Scan Pharmacy Receipt"
             accessibilityHint="Scan your pharmacy receipt to add medicines"
@@ -490,7 +518,13 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
           <TouchableOpacity
             style={styles.addMedicineOptionCard}
-            onPress={() => setActiveReminderView('manual-entry')}
+            onPress={() => {
+              setMedicineDraft(null);
+              setMedicineDraftQueue([]);
+              setMedicineDraftIndex(0);
+              setCapturedMedicines([]);
+              setActiveReminderView('manual-entry');
+            }}
             accessibilityRole="button"
             accessibilityLabel="Manual Entry"
             accessibilityHint="Type medicine details manually"
@@ -508,7 +542,85 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
     }
 
     if (activeReminderView === 'manual-entry') {
-      return <ManualEntryScreen onBack={() => setActiveReminderView('add-medicine')} />;
+      const currentDraft = medicineDraftQueue.length
+        ? medicineDraftQueue[Math.min(medicineDraftIndex, medicineDraftQueue.length - 1)]
+        : medicineDraft;
+
+      return (
+        <ManualEntryScreen
+          initialData={currentDraft}
+          onBack={() => {
+            if (capturedMedicines.length) {
+              setMedicineDraftQueue([]);
+              setMedicineDraftIndex(0);
+              setActiveReminderView('scan-receipt');
+              return;
+            }
+
+            setMedicineDraftQueue([]);
+            setMedicineDraftIndex(0);
+            setActiveReminderView('add-medicine');
+          }}
+          onSaved={(savedDraft) => {
+            const activeDraft = medicineDraftQueue.length
+              ? medicineDraftQueue[Math.min(medicineDraftIndex, medicineDraftQueue.length - 1)]
+              : medicineDraft;
+            const savedKey = toDraftKey(savedDraft || activeDraft);
+
+            setCapturedMedicines((prev) => removeOneByKey(prev, savedKey));
+
+            if (medicineDraftQueue.length) {
+              const nextQueue = removeOneByKey(medicineDraftQueue, savedKey);
+              setMedicineDraftQueue(nextQueue);
+
+              if (nextQueue.length) {
+                const nextIndex = Math.min(medicineDraftIndex, nextQueue.length - 1);
+                setMedicineDraftIndex(nextIndex);
+                setMedicineDraft(nextQueue[nextIndex]);
+                return false;
+              }
+
+              setMedicineDraftIndex(0);
+              setMedicineDraft(null);
+              return true;
+            }
+
+            return true;
+          }}
+        />
+      );
+    }
+
+    if (activeReminderView === 'scan-receipt') {
+      return (
+        <ReceiptScanScreen
+          onBack={() => setActiveReminderView('add-medicine')}
+          initialDetectedMedicines={capturedMedicines}
+          onCapturedListChange={(list) => {
+            const next = Array.isArray(list) ? list : [];
+            setCapturedMedicines(next);
+          }}
+          onDetected={(detectedFields) => {
+            setMedicineDraft(detectedFields || null);
+            setMedicineDraftQueue([]);
+            setMedicineDraftIndex(0);
+            setCapturedMedicines((prev) => (prev.length ? prev : (detectedFields ? [detectedFields] : [])));
+            setActiveReminderView('manual-entry');
+          }}
+          onDetectedMany={(detectedList) => {
+            const list = Array.isArray(detectedList) ? detectedList : [];
+            if (!list.length) {
+              return;
+            }
+
+            setCapturedMedicines(list);
+            setMedicineDraftQueue(list);
+            setMedicineDraftIndex(0);
+            setMedicineDraft(list[0]);
+            setActiveReminderView('manual-entry');
+          }}
+        />
+      );
     }
 
     if (activeReminderView === 'medicine-list') {

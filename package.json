@@ -6,5 +6,8 @@
     "start:dev-client": "npm --prefix frontend run start:dev-client",
     "start:frontend": "npm --prefix frontend run start",
     "start:backend": "npm --prefix backend run start"
+  },
+  "dependencies": {
+    "expo-image-picker": "~14.7.1"
   }
 }

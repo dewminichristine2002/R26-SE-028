@@ -3,6 +3,13 @@
   "version": "1.0.0",
   "description": "ElderMeds Mobile App - React Native",
   "main": "node_modules/expo/AppEntry.js",
+  "expo": {
+    "autolinking": {
+      "searchPaths": [
+        "./node_modules"
+      ]
+    }
+  },
   "scripts": {
     "start": "expo start",
     "start:dev-client": "node scripts/start-dev-client.js",
@@ -24,6 +31,7 @@
     "axios": "^1.6.0",
     "expo": "^50.0.0",
     "expo-dev-client": "~3.3.12",
+    "expo-image-picker": "~14.7.1",
     "expo-localization": "^14.0.0",
     "expo-notifications": "~0.27.8",
     "expo-speech": "~11.7.0",
