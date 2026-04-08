@@ -9,6 +9,22 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
+import { reminderNotificationService } from './src/services/reminderNotificationService';
+
+let NotificationsModule = null;
+let SpeechModule = null;
+
+try {
+  NotificationsModule = require('expo-notifications');
+} catch (error) {
+  console.log('[App] Notifications module unavailable:', error?.message || error);
+}
+
+try {
+  SpeechModule = require('expo-speech');
+} catch (error) {
+  console.log('[App] Speech module unavailable:', error?.message || error);
+}
 
 export default function App() {
   const [isBooting, setIsBooting] = useState(true);
@@ -16,6 +32,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState('home');
   const [currentUser, setCurrentUser] = useState(null);
+  const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -40,6 +57,71 @@ export default function App() {
     };
 
     bootstrap();
+  }, []);
+
+  useEffect(() => {
+    const scheduleReminders = async () => {
+      if (!isAuthenticated) {
+        return;
+      }
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (error) {
+        console.log('[App] Reminder scheduling failed:', error?.message || error);
+      }
+    };
+
+    scheduleReminders();
+  }, [isAuthenticated, currentUser?.id]);
+
+  useEffect(() => {
+    if (!NotificationsModule || !SpeechModule) {
+      return undefined;
+    }
+
+    const subscription = NotificationsModule.addNotificationReceivedListener((event) => {
+      const title = event?.request?.content?.title || '';
+      const body = event?.request?.content?.body || '';
+      const speechText = [title, body].filter(Boolean).join('. ');
+
+      if (!speechText) {
+        return;
+      }
+
+      SpeechModule.speak(speechText, {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.95,
+      });
+    });
+
+    return () => {
+      subscription?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!NotificationsModule) {
+      return undefined;
+    }
+
+    const responseSubscription = NotificationsModule.addNotificationResponseReceivedListener((response) => {
+      const notificationType = response?.notification?.request?.content?.data?.type;
+      if (notificationType !== 'medicine-reminder') {
+        return;
+      }
+
+      setActiveScreen('home');
+      setHomeLaunchIntent({
+        type: 'schedule-board',
+        nonce: Date.now(),
+      });
+    });
+
+    return () => {
+      responseSubscription?.remove?.();
+    };
   }, []);
 
   const handleLoginSuccess = (user) => {
@@ -97,6 +179,7 @@ export default function App() {
     return (
       <HomeScreen
         user={currentUser}
+        launchIntent={homeLaunchIntent}
         onOpenProfile={() => setActiveScreen('profile')}
         onLogout={handleLogout}
       />

@@ -29,7 +29,7 @@ const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
     <View style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Welcome to ElderMeds</Text>
-        <Text style={styles.subtitle}>Login to manage reminders and profile</Text>
+        <Text style={styles.subtitle}>Login with user email/password or caregiver email/phone</Text>
 
         <TextInput
           style={styles.input}
@@ -37,13 +37,17 @@ const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
           placeholderTextColor="#8a97a4"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          importantForAutofill="yes"
           value={email}
           onChangeText={setEmail}
         />
 
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder="Password (or caregiver phone)"
           placeholderTextColor="#8a97a4"
           secureTextEntry
           value={password}
