@@ -18,6 +18,7 @@
       "buildNumber": "1"
     },
     "android": {
+      "usesCleartextTraffic": true,
       "package": "com.eldermeds.app",
       "versionCode": 1
     },

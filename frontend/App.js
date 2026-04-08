@@ -7,6 +7,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import MedicineSafetyScreen from './src/screens/MedicineSafetyScreen';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState('home');
   const [currentUser, setCurrentUser] = useState(null);
+  const [isLocalMode, setIsLocalMode] = useState(false);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -28,9 +30,29 @@ export default function App() {
           const profile = await userService.getMyProfile();
           setCurrentUser(profile);
           setIsAuthenticated(true);
+          setIsLocalMode(await authService.isUsingLocalMode());
         } catch (error) {
-          console.log('[App] Session restore failed, clearing local auth:', error.message);
-          await authService.logout();
+          const status = error.response?.status;
+          const storedUser = await authService.getStoredUser();
+
+          if (status === 401) {
+            console.log('[App] Session restore failed with 401, clearing local auth.');
+            await authService.logout();
+          } else if (status === 503) {
+            console.log('[App] Session restore skipped because database is unavailable:', error.response?.data?.error);
+            if (storedUser) {
+              setCurrentUser(storedUser);
+            }
+            setIsAuthenticated(true);
+            setIsLocalMode(await authService.isUsingLocalMode());
+          } else {
+            console.log('[App] Session restore skipped because backend is unreachable:', error.message);
+            if (storedUser) {
+              setCurrentUser(storedUser);
+            }
+            setIsAuthenticated(true);
+            setIsLocalMode(await authService.isUsingLocalMode());
+          }
         }
       }
 
@@ -42,10 +64,11 @@ export default function App() {
     bootstrap();
   }, []);
 
-  const handleLoginSuccess = (user) => {
+  const handleLoginSuccess = async (user) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveScreen('home');
+    setIsLocalMode(await authService.isUsingLocalMode());
   };
 
   const handleLogout = async () => {
@@ -54,6 +77,7 @@ export default function App() {
     setIsAuthenticated(false);
     setAuthMode('login');
     setActiveScreen('home');
+    setIsLocalMode(false);
   };
 
   const handleProfileUpdated = (updatedUser) => {
@@ -83,7 +107,7 @@ export default function App() {
       );
     }
 
-    if (activeScreen === 'profile') {
+    if (activeScreen === 'account') {
       return (
         <ProfileScreen
           user={currentUser}
@@ -94,10 +118,30 @@ export default function App() {
       );
     }
 
+    if (activeScreen === 'allergies' || activeScreen === 'history' || activeScreen === 'medicine-profile') {
+      return (
+        <MedicineSafetyScreen
+          onBack={() => setActiveScreen('home')}
+          onLogout={handleLogout}
+          initialRoute={
+            activeScreen === 'history'
+              ? 'history'
+              : activeScreen === 'medicine-profile'
+                ? 'profile-view'
+                : 'home'
+          }
+        />
+      );
+    }
+
     return (
       <HomeScreen
         user={currentUser}
-        onOpenProfile={() => setActiveScreen('profile')}
+        isLocalMode={isLocalMode}
+        onOpenProfile={() => setActiveScreen('medicine-profile')}
+        onOpenAllergies={() => setActiveScreen('allergies')}
+        onOpenMedicine={() => setActiveScreen('allergies')}
+        onOpenHistory={() => setActiveScreen('history')}
         onLogout={handleLogout}
       />
     );
