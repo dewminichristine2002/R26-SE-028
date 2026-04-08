@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { BackHandler, Platform } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './src/i18n/config';
 import { languageService } from './src/services/languageService';
@@ -27,6 +28,30 @@ try {
 }
 
 export default function App() {
+    // Android hardware back button navigation
+    useEffect(() => {
+      if (Platform.OS !== 'android') return;
+      const onBackPress = () => {
+        // If on login/register, exit app
+        if (!isAuthenticated) {
+          return false;
+        }
+        // If on profile, go back to home
+        if (activeScreen === 'profile') {
+          setActiveScreen('home');
+          return true;
+        }
+        // If not on home, go back to home
+        if (activeScreen !== 'home') {
+          setActiveScreen('home');
+          return true;
+        }
+        // Otherwise, let default (exit app)
+        return false;
+      };
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [isAuthenticated, activeScreen]);
   const [isBooting, setIsBooting] = useState(true);
   const [authMode, setAuthMode] = useState('login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);

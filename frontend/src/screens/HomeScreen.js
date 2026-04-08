@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { BackHandler, Platform } from 'react-native';
 import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from '../i18n/useTranslation';
 import RoutineSetupScreen from './RoutineSetupScreen';
@@ -273,14 +274,35 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
     return `${title} - Status Updated`;
   };
 
+
   useEffect(() => {
-    if (launchIntent?.type !== 'schedule-board') {
+    if (!launchIntent || launchIntent.type !== 'schedule-board') {
       return;
     }
-
     setShowReminderMenu(true);
     setActiveReminderView('schedule-board');
-  }, [launchIntent?.nonce, launchIntent?.type]);
+  }, [launchIntent && launchIntent.nonce, launchIntent && launchIntent.type]);
+
+  // Android hardware back button navigation for HomeScreen
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      // If in a subview, go back to main menu
+      if (showReminderMenu && activeReminderView !== 'menu') {
+        setActiveReminderView('menu');
+        return true;
+      }
+      // If reminder menu open, close it
+      if (showReminderMenu) {
+        setShowReminderMenu(false);
+        return true;
+      }
+      // Otherwise, let default (handled by App.js)
+      return false;
+    };
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [showReminderMenu, activeReminderView]);
 
   useEffect(() => {
     if (!isCaregiver) {
