@@ -1,94 +1,200 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import {
-  Pressable,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './src/i18n/config';
 import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
+import { languageService } from './src/services/languageService';
+import HomeScreen from './src/screens/HomeScreen';
+import SplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import { authService } from './src/services/authService';
+import { userService } from './src/services/userService';
+import { reminderNotificationService } from './src/services/reminderNotificationService';
 
-const Stack = createStackNavigator();
+let NotificationsModule = null;
+let SpeechModule = null;
 
-function HomeScreen({ navigation }) {
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F6F3EC" />
-      <View style={styles.container}>
-        <Text style={styles.eyebrow}>ElderMeds</Text>
-        <Text style={styles.title}>Home</Text>
-        <Text style={styles.subtitle}>
-          Open your emotional and cognitive engagement support module from here.
-        </Text>
+try {
+  NotificationsModule = require('expo-notifications');
+} catch (error) {
+  console.log('[App] Notifications module unavailable:', error?.message || error);
+}
 
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('EmotionalSupport')}
-        >
-          <Text style={styles.primaryButtonText}>Emotional Support</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
-  );
+try {
+  SpeechModule = require('expo-speech');
+} catch (error) {
+  console.log('[App] Speech module unavailable:', error?.message || error);
 }
 
 export default function App() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Home">
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen
-          name="EmotionalSupport"
-          component={EmotionalSupportNavigator}
-          options={{ headerShown: false }}
+  const [isBooting, setIsBooting] = useState(true);
+  const [authMode, setAuthMode] = useState('login');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeScreen, setActiveScreen] = useState('home');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      languageService.loadSavedLanguage();
+
+      const token = await authService.getToken();
+
+      if (token) {
+        try {
+          const profile = await userService.getMyProfile();
+          setCurrentUser(profile);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.log('[App] Session restore failed, clearing local auth:', error.message);
+          await authService.logout();
+        }
+      }
+
+      setTimeout(() => {
+        setIsBooting(false);
+      }, 1500);
+    };
+
+    bootstrap();
+  }, []);
+
+  useEffect(() => {
+    const scheduleReminders = async () => {
+      if (!isAuthenticated) {
+        return;
+      }
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (error) {
+        console.log('[App] Reminder scheduling failed:', error?.message || error);
+      }
+    };
+
+    scheduleReminders();
+  }, [isAuthenticated, currentUser?.id]);
+
+  useEffect(() => {
+    if (!NotificationsModule || !SpeechModule) {
+      return undefined;
+    }
+
+    const subscription = NotificationsModule.addNotificationReceivedListener((event) => {
+      const title = event?.request?.content?.title || '';
+      const body = event?.request?.content?.body || '';
+      const speechText = [title, body].filter(Boolean).join('. ');
+
+      if (!speechText) {
+        return;
+      }
+
+      SpeechModule.speak(speechText, {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.95,
+      });
+    });
+
+    return () => {
+      subscription?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!NotificationsModule) {
+      return undefined;
+    }
+
+    const responseSubscription = NotificationsModule.addNotificationResponseReceivedListener((response) => {
+      const notificationType = response?.notification?.request?.content?.data?.type;
+      if (notificationType !== 'medicine-reminder') {
+        return;
+      }
+
+      setActiveScreen('home');
+      setHomeLaunchIntent({
+        type: 'schedule-board',
+        nonce: Date.now(),
+      });
+    });
+
+    return () => {
+      responseSubscription?.remove?.();
+    };
+  }, []);
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setActiveScreen('home');
+  };
+
+  const handleLogout = async () => {
+    await authService.logout();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setAuthMode('login');
+    setActiveScreen('home');
+  };
+
+  const handleProfileUpdated = (updatedUser) => {
+    setCurrentUser(updatedUser);
+  };
+
+  const renderContent = () => {
+    if (isBooting) {
+      return <SplashScreen />;
+    }
+
+    if (!isAuthenticated) {
+      if (authMode === 'register') {
+        return (
+          <RegisterScreen
+            onRegisterSuccess={handleLoginSuccess}
+            onBackToLogin={() => setAuthMode('login')}
+          />
+        );
+      }
+
+      return (
+        <LoginScreen
+          onLoginSuccess={handleLoginSuccess}
+          onNavigateRegister={() => setAuthMode('register')}
         />
-      </Stack.Navigator>
-    </NavigationContainer>
+      );
+    }
+
+    if (activeScreen === 'profile') {
+      return (
+        <ProfileScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+          onProfileUpdated={handleProfileUpdated}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
+    if (activeScreen === 'emotional-support') {
+      return <EmotionalSupportNavigator />;
+    }
+
+    return (
+      <HomeScreen
+        user={currentUser}
+        launchIntent={homeLaunchIntent}
+        onOpenProfile={() => setActiveScreen('profile')}
+        onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
+        onLogout={handleLogout}
+      />
+    );
+  };
+
+  return (
+    <I18nextProvider i18n={i18n}>
+      {renderContent()}
+    </I18nextProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F6F3EC',
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 16,
-  },
-  eyebrow: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    color: '#7D6545',
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: '#2F2418',
-  },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#5D5447',
-  },
-  primaryButton: {
-    marginTop: 8,
-    backgroundColor: '#31584C',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-});

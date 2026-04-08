@@ -2,31 +2,51 @@
   "expo": {
     "name": "ElderMeds",
     "slug": "eldermeds",
+    "scheme": "eldermeds",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      "expo-speech-recognition",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/medicine_reminder.mp3"
+          ]
+        }
+      ]
+    ],
     "ios": {
-      "supportsTabletMode": true,
-      "bundleIdentifier": "com.eldermeds.app"
+      "bundleIdentifier": "com.eldermeds.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+      }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.eldermeds.app"
+      "package": "com.eldermeds.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "owner": "sanuji",
+    "extra": {
+      "eas": {
+        "projectId": "42883724-755a-47af-b465-a673a2dd9b0b"
+      }
     }
   }
 }
