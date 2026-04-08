@@ -1,55 +1,94 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import {
+  Pressable,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
-// Placeholder screens
-const HomeScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Home Screen</Text>
-  </View>
-);
-
-const ProfileScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Profile Screen</Text>
-  </View>
-);
-
-const SettingsScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Settings Screen</Text>
-  </View>
-);
-
-function MainTabs() {
+function HomeScreen({ navigation }) {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: true,
-        tabBarActiveTintColor: '#4CAF50',
-      }}
-    >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
-    </Tab.Navigator>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F6F3EC" />
+      <View style={styles.container}>
+        <Text style={styles.eyebrow}>ElderMeds</Text>
+        <Text style={styles.title}>Home</Text>
+        <Text style={styles.subtitle}>
+          Open your emotional and cognitive engagement support module from here.
+        </Text>
+
+        <Pressable
+          style={styles.primaryButton}
+          onPress={() => navigation.navigate('EmotionalSupport')}
+        >
+          <Text style={styles.primaryButtonText}>Emotional Support</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen 
-          name="Main" 
-          component={MainTabs} 
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen
+          name="EmotionalSupport"
+          component={EmotionalSupportNavigator}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F6F3EC',
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  eyebrow: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: '#7D6545',
+  },
+  title: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#2F2418',
+  },
+  subtitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#5D5447',
+  },
+  primaryButton: {
+    marginTop: 8,
+    backgroundColor: '#31584C',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+});

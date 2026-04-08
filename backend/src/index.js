@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
+const emotionalSupportRoutes = require('./modules/emotionalSupport/routes/emotionalSupportRoutes');
 
 dotenv.config();
 
@@ -16,9 +19,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/medications', require('./routes/medications'));
+function mountIfExists(routePath, routeModulePath) {
+  const absoluteModulePath = path.join(__dirname, routeModulePath);
+
+  if (!fs.existsSync(`${absoluteModulePath}.js`)) {
+    return;
+  }
+
+  app.use(routePath, require(routeModulePath));
+}
+
+mountIfExists('/api/auth', './routes/auth');
+mountIfExists('/api/users', './routes/users');
+mountIfExists('/api/medications', './routes/medications');
+app.use('/api/emotional-support', emotionalSupportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
