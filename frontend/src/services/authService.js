@@ -29,7 +29,8 @@ export const authService = {
   },
 
   async logout() {
-    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+    // Keep local user/app data on device; only clear active auth session token.
+    await AsyncStorage.removeItem(TOKEN_KEY);
   },
 
   async getToken() {

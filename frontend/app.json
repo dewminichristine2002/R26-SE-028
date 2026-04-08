@@ -13,21 +13,39 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      "expo-speech-recognition",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/medicine_reminder.mp3"
+          ]
+        }
+      ]
+    ],
     "ios": {
       "bundleIdentifier": "com.eldermeds.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+      }
     },
     "android": {
       "package": "com.eldermeds.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "sandanima",
+    "owner": "sanuji",
     "extra": {
       "eas": {
-        "projectId": "a4f3c948-9552-4422-bfb1-981aa85e78c8"
+        "projectId": "42883724-755a-47af-b465-a673a2dd9b0b"
       }
     }
   }

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +10,24 @@ import {
   View,
 } from 'react-native';
 import { routineService } from '../services/routineService';
+import { reminderNotificationService } from '../services/reminderNotificationService';
+
+let ExpoSpeechRecognitionModule = null;
+let ExpoEventEmitter = null;
+
+try {
+  const speech = require('expo-speech-recognition');
+  ExpoSpeechRecognitionModule = speech.ExpoSpeechRecognitionModule;
+} catch (error) {
+  console.log('[Voice] expo-speech-recognition not available in this build');
+}
+
+try {
+  const expoModulesCore = require('expo-modules-core');
+  ExpoEventEmitter = expoModulesCore.EventEmitter;
+} catch (error) {
+  console.log('[Voice] expo-modules-core EventEmitter not available in this build');
+}
 
 const routineRows = [
   { key: 'breakfast', label: 'BREAKFAST', icon: '☀️' },
@@ -31,6 +50,164 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
   const [pickerHours, setPickerHours] = useState('08');
   const [pickerMinutes, setPickerMinutes] = useState('00');
   const [pickerPeriod, setPickerPeriod] = useState('AM');
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+
+  const parseVoiceCommand = (transcript) => {
+    if (!transcript || typeof transcript !== 'string') {
+      return null;
+    }
+
+    const text = transcript.toLowerCase();
+
+    let mealKey = null;
+    if (text.includes('breakfast') || text.includes('morning')) {
+      mealKey = 'breakfast';
+    } else if (text.includes('lunch') || text.includes('noon')) {
+      mealKey = 'lunch';
+    } else if (text.includes('dinner') || text.includes('evening')) {
+      mealKey = 'dinner';
+    } else if (text.includes('sleep') || text.includes('bed')) {
+      mealKey = 'sleep';
+    }
+
+    const timeMatch = text.match(/(\d{1,2})(?:\s*[:.]\s*(\d{1,2}))?\s*(am|pm)?/i);
+    if (!timeMatch || !mealKey) {
+      return null;
+    }
+
+    let hour = parseInt(timeMatch[1], 10);
+    const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+    let period = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+
+    if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return null;
+    }
+
+    if (!period) {
+      if (hour === 0) {
+        hour = 12;
+        period = 'AM';
+      } else if (hour > 12) {
+        hour -= 12;
+        period = 'PM';
+      } else {
+        period = mealKey === 'breakfast' ? 'AM' : 'PM';
+      }
+    } else if (hour === 0) {
+      hour = 12;
+    } else if (hour > 12) {
+      hour -= 12;
+    }
+
+    return {
+      mealKey,
+      normalizedTime: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`,
+    };
+  };
+
+  const applyVoiceCommand = (transcript) => {
+    const parsed = parseVoiceCommand(transcript);
+
+    if (!parsed) {
+      Alert.alert(
+        'Voice Not Recognized',
+        'Try saying: Breakfast 8 AM, Lunch 1:30 PM, Dinner 7 PM, or Sleep 10:30 PM.'
+      );
+      return;
+    }
+
+    setMealTimes((prev) => ({
+      ...prev,
+      [parsed.mealKey]: parsed.normalizedTime,
+    }));
+
+    Alert.alert('Voice Time Set', `${parsed.mealKey.toUpperCase()} set to ${parsed.normalizedTime}`);
+  };
+
+  const handleVoiceSetup = async () => {
+    if (!ExpoSpeechRecognitionModule) {
+      Alert.alert(
+        'Voice Unavailable',
+        'This app build does not include speech module yet. Rebuild dev client to enable voice setup.'
+      );
+      return;
+    }
+
+    try {
+      if (Platform.OS === 'web' && !ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
+        Alert.alert('Voice Not Available', 'Speech recognition is not available in this browser.');
+        return;
+      }
+
+      if (isListening) {
+        ExpoSpeechRecognitionModule.stop();
+        return;
+      }
+
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission?.granted) {
+        Alert.alert('Permission Needed', 'Microphone permission is required to use voice setup.');
+        return;
+      }
+
+      setVoiceTranscript('');
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-US',
+        interimResults: true,
+        maxAlternatives: 1,
+        continuous: false,
+      });
+    } catch (error) {
+      Alert.alert('Voice Error', error?.message || 'Unable to start voice input.');
+    }
+  };
+
+  useEffect(() => {
+    if (!ExpoSpeechRecognitionModule || !ExpoEventEmitter) {
+      return undefined;
+    }
+
+    const speechEventEmitter = new ExpoEventEmitter(ExpoSpeechRecognitionModule);
+
+    const onStart = speechEventEmitter.addListener('start', () => {
+      setIsListening(true);
+    });
+
+    const onEnd = speechEventEmitter.addListener('end', () => {
+      setIsListening(false);
+    });
+
+    const onError = speechEventEmitter.addListener('error', (event) => {
+      setIsListening(false);
+      Alert.alert('Voice Error', event?.message || 'Voice recognition failed.');
+    });
+
+    const onResult = speechEventEmitter.addListener('result', (event) => {
+      const latest = event?.results?.[0]?.transcript || '';
+      if (latest) {
+        setVoiceTranscript(latest);
+      }
+
+      if (event?.isFinal && latest) {
+        applyVoiceCommand(latest);
+        setVoiceTranscript('');
+      }
+    });
+
+    return () => {
+      onStart?.remove?.();
+      onEnd?.remove?.();
+      onError?.remove?.();
+      onResult?.remove?.();
+
+      try {
+        ExpoSpeechRecognitionModule?.abort();
+      } catch (error) {
+        console.log('[Voice] cleanup skipped:', error?.message || error);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const loadRoutine = async () => {
@@ -112,6 +289,13 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
       console.log('[Routine Save] Sending to backend:', mealTimes);
       const response = await routineService.saveRoutine(mealTimes);
       console.log('[Routine Save] Response:', response);
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (notificationError) {
+        console.log('[RoutineSetup] Reminder reschedule failed:', notificationError?.message || notificationError);
+      }
+
       Alert.alert('Saved', 'Your routine has been saved successfully.');
     } catch (error) {
       console.error('[Routine Save] Error:', error);
@@ -137,7 +321,7 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.topTitle}>Routine Setup</Text>
-        <TouchableOpacity style={styles.voiceIconButton}>
+        <TouchableOpacity style={styles.voiceIconButton} onPress={handleVoiceSetup}>
           <Text style={styles.voiceIcon}>🔊</Text>
         </TouchableOpacity>
       </View>
@@ -150,10 +334,20 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.voiceSetupButton}>
+        <TouchableOpacity
+          style={[styles.voiceSetupButton, isListening && styles.voiceSetupButtonActive]}
+          onPress={handleVoiceSetup}
+        >
           <Text style={styles.voiceSetupIcon}>🎤</Text>
-          <Text style={styles.voiceSetupText}>Set with Voice</Text>
+          <Text style={styles.voiceSetupText}>{isListening ? 'Listening... Tap to Stop' : 'Set with Voice'}</Text>
         </TouchableOpacity>
+
+        {!!voiceTranscript && (
+          <View style={styles.voiceResultCard}>
+            <Text style={styles.voiceResultLabel}>Heard</Text>
+            <Text style={styles.voiceResultText}>{voiceTranscript}</Text>
+          </View>
+        )}
 
         {cards.map((item, index) => (
           <View
@@ -340,6 +534,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
   },
+  voiceSetupButtonActive: {
+    backgroundColor: '#d8ecff',
+    borderColor: '#1d7ec7',
+  },
   voiceSetupIcon: {
     fontSize: 18,
     marginRight: 8,
@@ -348,6 +546,26 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '700',
     color: '#2a81c7',
+  },
+  voiceResultCard: {
+    borderWidth: 1,
+    borderColor: '#d7e3ef',
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  voiceResultLabel: {
+    color: '#5f7386',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  voiceResultText: {
+    color: '#1f2c3a',
+    fontSize: 16,
+    fontWeight: '600',
   },
   timeCard: {
     backgroundColor: '#ffffff',
