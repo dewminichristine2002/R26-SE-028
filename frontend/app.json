@@ -2,31 +2,33 @@
   "expo": {
     "name": "ElderMeds",
     "slug": "eldermeds",
+    "scheme": "eldermeds",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTabletMode": true,
-      "bundleIdentifier": "com.eldermeds.app"
+      "bundleIdentifier": "com.eldermeds.app",
+      "buildNumber": "1"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.eldermeds.app"
+      "package": "com.eldermeds.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "owner": "sandanima",
+    "extra": {
+      "eas": {
+        "projectId": "a4f3c948-9552-4422-bfb1-981aa85e78c8"
+      }
     }
   }
 }
