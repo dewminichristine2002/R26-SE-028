@@ -11,6 +11,7 @@ const {
   createCard,
   saveCard,
   fetchHistory,
+  fetchReactions,
   createReaction,
   analyzeMedicine,
 } = require('../controllers/allergyController');
@@ -33,6 +34,7 @@ router.get('/cards/:id', fetchCard);
 router.put('/cards/:id', saveCard);
 
 router.get('/history', fetchHistory);
+router.get('/reactions', fetchReactions);
 router.post('/reactions', createReaction);
 
 module.exports = router;

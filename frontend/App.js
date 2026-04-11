@@ -7,7 +7,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import MedicineSafetyScreen from './src/screens/MedicineSafetyScreen';
+import MedicineSafetyScreen from './src/screens/MedicineSafetyScreenFixed';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
 

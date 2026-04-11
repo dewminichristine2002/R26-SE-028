@@ -62,6 +62,18 @@ const buildDbConfig = () => {
   };
 };
 
+const ensureMlColumns = async (pool) => {
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS rxnorm_cui TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS ingredient_name TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS therapeutic_class TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS severe_side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS side_effect_match_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS interaction_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS max_interaction_severity TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS knowledge_sources TEXT NOT NULL DEFAULT ''`);
+};
+
 const main = async () => {
   fs.mkdirSync(outputDir, { recursive: true });
 
@@ -69,6 +81,7 @@ const main = async () => {
   const pool = new Pool(buildDbConfig());
 
   try {
+    await ensureMlColumns(pool);
     const result = await pool.query(sql);
     fs.writeFileSync(jsonOutputPath, JSON.stringify(result.rows, null, 2));
     fs.writeFileSync(csvOutputPath, rowsToCsv(result.rows));

@@ -109,6 +109,11 @@ export const allergyService = {
           currentMedicationsText: '',
           emergencyContact: '',
           caregiverDetails: '',
+          profileCompleted: false,
+          reactionSymptomsText: '',
+          suspectedMedicineNamesText: '',
+          avoidedMedicinesText: '',
+          antibioticPainkillerReaction: '',
         });
       }
       throw error;
@@ -185,45 +190,11 @@ export const allergyService = {
       return data;
     } catch (error) {
       if (shouldUseLocalFallback(error)) {
-        const localResult = {
-          title: `${payload.medicineName || 'Medicine'} Safety Check`,
-          medicineName: payload.medicineName || '',
-          normalizedDrugName: payload.normalizedDrugName || payload.medicineName || '',
-          status: 'completed',
-          riskScore: payload.hadReactionBefore ? 65 : 25,
-          riskLevel: payload.hadReactionBefore ? 'Dangerous' : 'Warning',
-          explanation: payload.hadReactionBefore
-            ? 'A past reaction was recorded for this medicine, so this check is marked as high risk.'
-            : 'This check was saved locally while the shared database is unavailable.',
-          recommendation: payload.hadReactionBefore
-            ? 'Do not take this medicine until you speak with a doctor.'
-            : 'Use caution and confirm with a pharmacist or caregiver.',
-          riskFactors: payload.hadReactionBefore
-            ? [{ factorLabel: 'Past reaction reported', score: 25 }]
-            : [{ factorLabel: 'Local offline safety check', score: 10 }],
-          historyEntry: {
-            inputMethod: payload.inputMethod || 'manual',
-            rawInput: payload.notes || payload.medicineName || '',
-            medicineName: payload.medicineName || '',
-            normalizedDrugName: payload.normalizedDrugName || payload.medicineName || '',
-            dose: payload.dose || '',
-            frequency: payload.frequency || '',
-            riskScore: payload.hadReactionBefore ? 65 : 25,
-            riskLevel: payload.hadReactionBefore ? 'Dangerous' : 'Warning',
-          },
-        };
-
-        const card = await createLocalCard(localResult);
-        return {
-          card,
-          analysis: {
-            riskScore: localResult.riskScore,
-            riskLevel: localResult.riskLevel,
-            explanation: localResult.explanation,
-            recommendation: localResult.recommendation,
-            riskFactors: localResult.riskFactors,
-          },
-        };
+        const offlineError = new Error(
+          'Medicine safety analysis needs the backend connection. The app could not reach the server, so no real safety result was generated.'
+        );
+        offlineError.code = 'ANALYSIS_BACKEND_UNAVAILABLE';
+        throw offlineError;
       }
       throw error;
     }
@@ -248,8 +219,37 @@ export const allergyService = {
   },
 
   async saveReaction(payload) {
-    const data = await request('post', '/allergies/reactions', payload);
-    return data.reaction;
+    try {
+      const data = await request('post', '/allergies/reactions', payload);
+      return data.reaction;
+    } catch (error) {
+      if (shouldUseLocalFallback(error)) {
+        const entry = {
+          id: Date.now(),
+          symptoms: payload.symptoms,
+          severity: payload.severity || '',
+          notes: payload.notes || '',
+          createdAt: new Date().toISOString(),
+        };
+        const list = await readLocal('allergy_reactions', []);
+        await writeLocal('allergy_reactions', [entry, ...list]);
+        return entry;
+      }
+      throw error;
+    }
+  },
+
+  async getReactions() {
+    try {
+      const data = await request('get', '/allergies/reactions');
+      await writeLocal('allergy_reactions', data.reactions);
+      return data.reactions;
+    } catch (error) {
+      if (shouldUseLocalFallback(error)) {
+        return readLocal('allergy_reactions', []);
+      }
+      throw error;
+    }
   },
 };
 

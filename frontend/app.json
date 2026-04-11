@@ -15,12 +15,20 @@
     ],
     "ios": {
       "bundleIdentifier": "com.eldermeds.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "ElderMeds reads prescription photos to help check medicine safety.",
+        "NSCameraUsageDescription": "ElderMeds can use the camera to capture a prescription for safety checking."
+      }
     },
     "android": {
       "usesCleartextTraffic": true,
       "package": "com.eldermeds.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

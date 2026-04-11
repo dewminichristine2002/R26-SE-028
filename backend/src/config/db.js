@@ -212,9 +212,18 @@ const initializeDatabase = async () => {
       title TEXT NOT NULL,
       medicine_name TEXT NOT NULL DEFAULT '',
       normalized_drug_name TEXT NOT NULL DEFAULT '',
+      rxnorm_cui TEXT NOT NULL DEFAULT '',
+      ingredient_name TEXT NOT NULL DEFAULT '',
+      therapeutic_class TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'draft',
       risk_score INTEGER,
       risk_level TEXT NOT NULL DEFAULT '',
+      side_effect_count INTEGER NOT NULL DEFAULT 0,
+      severe_side_effect_count INTEGER NOT NULL DEFAULT 0,
+      side_effect_match_count INTEGER NOT NULL DEFAULT 0,
+      interaction_count INTEGER NOT NULL DEFAULT 0,
+      max_interaction_severity TEXT NOT NULL DEFAULT '',
+      knowledge_sources TEXT NOT NULL DEFAULT '',
       explanation TEXT NOT NULL DEFAULT '',
       recommendation TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -242,10 +251,19 @@ const initializeDatabase = async () => {
       raw_input TEXT NOT NULL DEFAULT '',
       medicine_name TEXT NOT NULL DEFAULT '',
       normalized_drug_name TEXT NOT NULL DEFAULT '',
+      rxnorm_cui TEXT NOT NULL DEFAULT '',
+      ingredient_name TEXT NOT NULL DEFAULT '',
+      therapeutic_class TEXT NOT NULL DEFAULT '',
       dose TEXT NOT NULL DEFAULT '',
       frequency TEXT NOT NULL DEFAULT '',
       risk_score INTEGER,
       risk_level TEXT NOT NULL DEFAULT '',
+      side_effect_count INTEGER NOT NULL DEFAULT 0,
+      severe_side_effect_count INTEGER NOT NULL DEFAULT 0,
+      side_effect_match_count INTEGER NOT NULL DEFAULT 0,
+      interaction_count INTEGER NOT NULL DEFAULT 0,
+      max_interaction_severity TEXT NOT NULL DEFAULT '',
+      knowledge_sources TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `;
@@ -268,10 +286,43 @@ const initializeDatabase = async () => {
   await pool.query(createUserAllergyProfilesTableQuery);
   await pool.query(`ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS age TEXT NOT NULL DEFAULT ''`);
   await pool.query(`ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS gender TEXT NOT NULL DEFAULT ''`);
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT FALSE`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS reaction_symptoms_text TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS suspected_medicine_names_text TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS avoided_medicines_text TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS antibiotic_painkiller_reaction TEXT NOT NULL DEFAULT ''`
+  );
   await pool.query(createAllergyQuestionnaireAnswersTableQuery);
   await pool.query(createAllergyCardsTableQuery);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS rxnorm_cui TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS ingredient_name TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS therapeutic_class TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS severe_side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS side_effect_match_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS interaction_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS max_interaction_severity TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS knowledge_sources TEXT NOT NULL DEFAULT ''`);
   await pool.query(createAllergyCardRiskFactorsTableQuery);
   await pool.query(createMedicineCheckHistoryTableQuery);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS rxnorm_cui TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS ingredient_name TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS therapeutic_class TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS severe_side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS side_effect_match_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS interaction_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS max_interaction_severity TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS knowledge_sources TEXT NOT NULL DEFAULT ''`);
   await pool.query(createReactionLogsTableQuery);
 
   const backfillUserRoutines = `

@@ -45,6 +45,14 @@ const formatDate = (value) => {
   return date.toLocaleDateString();
 };
 
+const cleanExplanation = (text) => {
+  if (!text) return 'No explanation available.';
+  return String(text)
+    .replace(/The baseline ML model also estimated [^.]+ reaction risk\./gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 export default function MedicineSafetyScreen({ onBack, onLogout, initialRoute = 'home' }) {
   const [route, setRoute] = useState(initialRoute);
   const [loading, setLoading] = useState(true);
@@ -187,13 +195,47 @@ export default function MedicineSafetyScreen({ onBack, onLogout, initialRoute = 
 
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Why this result?</Text>
-          <Text style={styles.infoText}>{card.explanation || 'No explanation available.'}</Text>
+          <Text style={styles.infoText}>{cleanExplanation(card.explanation)}</Text>
         </View>
 
         <View style={[styles.recommendationCard, warningStyle]}>
           <Text style={[styles.recommendationTitle, warningTextStyle]}>Recommendation</Text>
           <Text style={[styles.recommendationText, warningTextStyle]}>{card.recommendation || 'No recommendation available.'}</Text>
         </View>
+      </>
+    );
+  };
+
+  const renderResultCardWithAnalysis = (card, analysis = null) => {
+    if (!analysis) {
+      return renderResultCard(card);
+    }
+
+    const medicationKnowledge = analysis.medicationKnowledge || null;
+    const mlPrediction = analysis.mlPrediction || medicationKnowledge?.mlPrediction || null;
+
+    return (
+      <>
+        {renderResultCard(card)}
+        {mlPrediction?.available ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>ML Support Score</Text>
+            <Text style={styles.infoText}>{`${mlPrediction.mlRiskScore ?? '--'}/100`}</Text>
+            <Text style={styles.supportText}>Used as a support signal together with the allergy and interaction rules.</Text>
+          </View>
+        ) : null}
+        {medicationKnowledge ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Medicine Knowledge</Text>
+            <Text style={styles.infoText}>
+              {[
+                medicationKnowledge.therapeuticClass ? `Class: ${medicationKnowledge.therapeuticClass}` : null,
+                Number.isFinite(Number(analysis?.interactionCount ?? card.interactionCount)) ? `Interactions: ${analysis?.interactionCount ?? card.interactionCount}` : null,
+                Number.isFinite(Number(analysis?.sideEffectCount ?? card.sideEffectCount)) ? `Side effects: ${analysis?.sideEffectCount ?? card.sideEffectCount}` : null,
+              ].filter(Boolean).join('\n')}
+            </Text>
+          </View>
+        ) : null}
       </>
     );
   };
@@ -371,8 +413,13 @@ export default function MedicineSafetyScreen({ onBack, onLogout, initialRoute = 
           <View style={styles.stepDots}>{[0, 1, 2, 3].map((index) => <View key={index} style={[styles.stepDot, index === 0 && styles.stepDotActive]} />)}</View>
           <View style={styles.questionCard}><Text style={styles.questionSmall}>Question 1 of 4</Text><Text style={styles.questionTitle}>Have you taken {medicineInput.medicineName || 'this medicine'} before?</Text></View>
           {[{ label: 'Yes, I have taken it before', key: true }, { label: 'No, this is new for me', key: false }, { label: 'I am not sure', key: 'unknown' }].map((item) => <TouchableOpacity key={item.label} style={[styles.optionCard, medicineCheck.takenBefore === item.key && styles.optionCardActive]} onPress={() => setMedicineCheck((prev) => ({ ...prev, takenBefore: item.key === 'unknown' ? null : item.key }))}><Text style={[styles.optionText, medicineCheck.takenBefore === item.key && styles.optionTextActive]}>{item.label}</Text></TouchableOpacity>)}
+          <View style={styles.questionCard}><Text style={styles.questionSmall}>Question 2 of 4</Text><Text style={styles.questionTitle}>Have you had a reaction to this medicine before?</Text></View>
+          {[{ label: 'Yes', key: true }, { label: 'No', key: false }, { label: 'I am not sure', key: 'unknown' }].map((item) => <TouchableOpacity key={`reaction-${item.label}`} style={[styles.optionCard, medicineCheck.hadReactionBefore === item.key && styles.optionCardActive]} onPress={() => setMedicineCheck((prev) => ({ ...prev, hadReactionBefore: item.key === 'unknown' ? null : item.key }))}><Text style={[styles.optionText, medicineCheck.hadReactionBefore === item.key && styles.optionTextActive]}>{item.label}</Text></TouchableOpacity>)}
+          <View style={styles.questionCard}><Text style={styles.questionSmall}>Question 3 of 4</Text><Text style={styles.questionTitle}>Symptoms or concerns</Text></View>
           <TextInput style={[styles.input, styles.textArea]} value={medicineCheck.symptomMatch} onChangeText={(v) => setMedicineCheck((prev) => ({ ...prev, symptomMatch: v }))} placeholder="Symptoms or concerns" multiline />
           <View style={styles.choiceRow}>{['mild', 'moderate', 'severe'].map((level) => <TouchableOpacity key={level} style={[styles.choiceChip, medicineCheck.severity === level && styles.choiceChipActive]} onPress={() => setMedicineCheck((prev) => ({ ...prev, severity: level }))}><Text style={[styles.choiceChipText, medicineCheck.severity === level && styles.choiceChipTextActive]}>{level}</Text></TouchableOpacity>)}</View>
+          <View style={styles.questionCard}><Text style={styles.questionSmall}>Question 4 of 4</Text><Text style={styles.questionTitle}>Are you taking other medicines now?</Text></View>
+          {[{ label: 'Yes', key: true }, { label: 'No', key: false }].map((item) => <TouchableOpacity key={`meds-${item.label}`} style={[styles.optionCard, medicineCheck.takingOtherMedicinesNow === item.key && styles.optionCardActive]} onPress={() => setMedicineCheck((prev) => ({ ...prev, takingOtherMedicinesNow: item.key }))}><Text style={[styles.optionText, medicineCheck.takingOtherMedicinesNow === item.key && styles.optionTextActive]}>{item.label}</Text></TouchableOpacity>)}
           <TextInput style={[styles.input, styles.textArea]} value={medicineCheck.notes} onChangeText={(v) => setMedicineCheck((prev) => ({ ...prev, notes: v }))} placeholder="Extra notes" multiline />
           <TouchableOpacity style={styles.secondaryButtonFull} onPress={checkMedicine}><Text style={styles.secondaryButtonFullText}>Next →</Text></TouchableOpacity>
         </ScrollView>
@@ -385,7 +432,7 @@ export default function MedicineSafetyScreen({ onBack, onLogout, initialRoute = 
       <View style={styles.screen}>
         {renderHeader('Safety Result')}
         <ScrollView contentContainerStyle={styles.content}>
-          {latestResult?.card ? renderResultCard(latestResult.card) : null}
+          {latestResult?.card ? renderResultCardWithAnalysis(latestResult.card, latestResult.analysis) : null}
           <TouchableOpacity style={styles.primaryButton} onPress={() => setRoute('history')}><Text style={styles.primaryButtonText}>Save Result</Text></TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButtonFull} onPress={() => setRoute('home')}><Text style={styles.secondaryButtonFullText}>Back to Home</Text></TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButtonFull} onPress={() => setRoute('check-input')}><Text style={styles.secondaryButtonFullText}>Check Another Medicine</Text></TouchableOpacity>

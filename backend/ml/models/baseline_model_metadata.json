@@ -1,0 +1,21 @@
+{
+  "dataset": "medicine_safety_training_dataset.csv",
+  "rows": 122,
+  "target": "has_reaction_log",
+  "numeric_features": [
+    "risk_score",
+    "side_effect_count",
+    "severe_side_effect_count",
+    "side_effect_match_count",
+    "interaction_count"
+  ],
+  "categorical_features": [
+    "gender",
+    "input_method",
+    "risk_level",
+    "max_interaction_severity",
+    "has_medicine_allergy",
+    "has_severe_reaction_log"
+  ],
+  "text_feature_name": "combined_text"
+}

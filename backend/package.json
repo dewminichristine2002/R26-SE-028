@@ -7,7 +7,10 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
-    "ml:export": "node ml/scripts/exportDataset.js"
+    "knowledge:build": "node scripts/buildMedicationKnowledge.js",
+    "ml:export": "node ml/scripts/exportDataset.js",
+    "ml:seed": "node ml/scripts/generateSeedDataset.js",
+    "ml:prepare": "npm run ml:export && npm run ml:seed"
   },
   "keywords": [],
   "author": "",

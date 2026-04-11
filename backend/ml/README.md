@@ -16,6 +16,13 @@ This folder contains the first dataset and ML scaffolding for medicine safety pr
   - `ml/data/medicine_safety_dataset.json`
   - `ml/data/medicine_safety_dataset.csv`
 
+- `scripts/generateSeedDataset.js`
+  Builds a mixed training dataset that keeps the real exported rows and adds
+  synthetic seeded rows for Stage 1 baseline training.
+  It writes:
+  - `ml/data/medicine_safety_training_dataset.json`
+  - `ml/data/medicine_safety_training_dataset.csv`
+
 - `train_baseline.py`
   Trains a first baseline classifier using:
   - tabular profile/check fields
@@ -60,6 +67,31 @@ pip install -r requirements.txt
 python train_baseline.py
 ```
 
+### Recommended Stage 1 workflow
+
+From `backend/`:
+
+```powershell
+npm run ml:prepare
+```
+
+This will:
+
+- export real rows from PostgreSQL
+- keep those real rows in the training dataset
+- add seeded rows so the first baseline has enough data to train
+- include medication knowledge features derived from:
+  - RxNorm-style normalization fields
+  - SIDER-style side effect fields
+  - DDInter-style interaction fields
+
+If you want a different synthetic size:
+
+```powershell
+$env:ML_SEED_ROWS=200
+npm run ml:seed
+```
+
 ### Output files
 
 Training writes to:
@@ -71,3 +103,5 @@ Training writes to:
 
 - This is a research/baseline pipeline, not a medical-grade decision system.
 - Keep the existing rule-based safety logic and use ML as a supporting signal.
+- The seeded dataset is for Stage 1 pipeline validation and baseline experiments.
+  Keep it clearly labeled as synthetic or mixed when you write your report.

@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 
 let allergyProfileColumnsEnsured = false;
+let analysisColumnsEnsured = false;
 
 const ensureAllergyProfileColumns = async () => {
   if (allergyProfileColumnsEnsured) {
@@ -9,7 +10,50 @@ const ensureAllergyProfileColumns = async () => {
 
   await pool.query(`ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS age TEXT NOT NULL DEFAULT ''`);
   await pool.query(`ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS gender TEXT NOT NULL DEFAULT ''`);
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT FALSE`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS reaction_symptoms_text TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS suspected_medicine_names_text TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS avoided_medicines_text TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS antibiotic_painkiller_reaction TEXT NOT NULL DEFAULT ''`
+  );
   allergyProfileColumnsEnsured = true;
+};
+
+const ensureAnalysisColumns = async () => {
+  if (analysisColumnsEnsured) {
+    return;
+  }
+
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS rxnorm_cui TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS ingredient_name TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS therapeutic_class TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS severe_side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS side_effect_match_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS interaction_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS max_interaction_severity TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS knowledge_sources TEXT NOT NULL DEFAULT ''`);
+
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS rxnorm_cui TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS ingredient_name TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS therapeutic_class TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS severe_side_effect_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS side_effect_match_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS interaction_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS max_interaction_severity TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS knowledge_sources TEXT NOT NULL DEFAULT ''`);
+
+  analysisColumnsEnsured = true;
 };
 
 const mapProfileRow = (row) => ({
@@ -23,6 +67,11 @@ const mapProfileRow = (row) => ({
   currentMedicationsText: row.current_medications_text,
   emergencyContact: row.emergency_contact,
   caregiverDetails: row.caregiver_details,
+  profileCompleted: Boolean(row.profile_completed),
+  reactionSymptomsText: row.reaction_symptoms_text || '',
+  suspectedMedicineNamesText: row.suspected_medicine_names_text || '',
+  avoidedMedicinesText: row.avoided_medicines_text || '',
+  antibioticPainkillerReaction: row.antibiotic_painkiller_reaction || '',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -33,9 +82,18 @@ const mapCardRow = (row) => ({
   title: row.title,
   medicineName: row.medicine_name,
   normalizedDrugName: row.normalized_drug_name,
+  rxnormCui: row.rxnorm_cui,
+  ingredientName: row.ingredient_name,
+  therapeuticClass: row.therapeutic_class,
   status: row.status,
   riskScore: row.risk_score,
   riskLevel: row.risk_level,
+  sideEffectCount: row.side_effect_count,
+  severeSideEffectCount: row.severe_side_effect_count,
+  sideEffectMatchCount: row.side_effect_match_count,
+  interactionCount: row.interaction_count,
+  maxInteractionSeverity: row.max_interaction_severity,
+  knowledgeSources: row.knowledge_sources ? row.knowledge_sources.split('|').filter(Boolean) : [],
   explanation: row.explanation,
   recommendation: row.recommendation,
   createdAt: row.created_at,
@@ -105,9 +163,14 @@ const upsertProfile = async (userId, payload) => {
         current_medications_text,
         emergency_contact,
         caregiver_details,
+        profile_completed,
+        reaction_symptoms_text,
+        suspected_medicine_names_text,
+        avoided_medicines_text,
+        antibiotic_painkiller_reaction,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
       ON CONFLICT (user_id)
       DO UPDATE SET
         age = EXCLUDED.age,
@@ -118,6 +181,11 @@ const upsertProfile = async (userId, payload) => {
         current_medications_text = EXCLUDED.current_medications_text,
         emergency_contact = EXCLUDED.emergency_contact,
         caregiver_details = EXCLUDED.caregiver_details,
+        profile_completed = EXCLUDED.profile_completed,
+        reaction_symptoms_text = EXCLUDED.reaction_symptoms_text,
+        suspected_medicine_names_text = EXCLUDED.suspected_medicine_names_text,
+        avoided_medicines_text = EXCLUDED.avoided_medicines_text,
+        antibiotic_painkiller_reaction = EXCLUDED.antibiotic_painkiller_reaction,
         updated_at = NOW()
       RETURNING *
     `,
@@ -131,6 +199,11 @@ const upsertProfile = async (userId, payload) => {
       payload.currentMedicationsText,
       payload.emergencyContact,
       payload.caregiverDetails,
+      payload.profileCompleted,
+      payload.reactionSymptomsText,
+      payload.suspectedMedicineNamesText,
+      payload.avoidedMedicinesText,
+      payload.antibioticPainkillerReaction,
     ]
   );
 
@@ -176,6 +249,8 @@ const replaceQuestionnaireAnswers = async (userId, answers) => {
 };
 
 const listCards = async (userId) => {
+  await ensureAnalysisColumns();
+
   const result = await pool.query(
     `
       SELECT *
@@ -190,6 +265,8 @@ const listCards = async (userId) => {
 };
 
 const getCardById = async (userId, cardId) => {
+  await ensureAnalysisColumns();
+
   const cardResult = await pool.query(
     `
       SELECT *
@@ -227,6 +304,8 @@ const getCardById = async (userId, cardId) => {
 };
 
 const createCard = async (userId, payload) => {
+  await ensureAnalysisColumns();
+
   const client = await pool.connect();
 
   try {
@@ -239,14 +318,23 @@ const createCard = async (userId, payload) => {
           title,
           medicine_name,
           normalized_drug_name,
+          rxnorm_cui,
+          ingredient_name,
+          therapeutic_class,
           status,
           risk_score,
           risk_level,
+          side_effect_count,
+          severe_side_effect_count,
+          side_effect_match_count,
+          interaction_count,
+          max_interaction_severity,
+          knowledge_sources,
           explanation,
           recommendation,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
         RETURNING *
       `,
       [
@@ -254,9 +342,18 @@ const createCard = async (userId, payload) => {
         payload.title,
         payload.medicineName,
         payload.normalizedDrugName,
+        payload.rxnormCui,
+        payload.ingredientName,
+        payload.therapeuticClass,
         payload.status,
         payload.riskScore,
         payload.riskLevel,
+        payload.sideEffectCount || 0,
+        payload.severeSideEffectCount || 0,
+        payload.sideEffectMatchCount || 0,
+        payload.interactionCount || 0,
+        payload.maxInteractionSeverity || '',
+        Array.isArray(payload.knowledgeSources) ? payload.knowledgeSources.join('|') : '',
         payload.explanation,
         payload.recommendation,
       ]
@@ -301,12 +398,21 @@ const createCard = async (userId, payload) => {
             raw_input,
             medicine_name,
             normalized_drug_name,
+            rxnorm_cui,
+            ingredient_name,
+            therapeutic_class,
             dose,
             frequency,
             risk_score,
-            risk_level
+            risk_level,
+            side_effect_count,
+            severe_side_effect_count,
+            side_effect_match_count,
+            interaction_count,
+            max_interaction_severity,
+            knowledge_sources
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
         `,
         [
           userId,
@@ -314,10 +420,19 @@ const createCard = async (userId, payload) => {
           payload.historyEntry.rawInput,
           payload.historyEntry.medicineName,
           payload.historyEntry.normalizedDrugName,
+          payload.historyEntry.rxnormCui,
+          payload.historyEntry.ingredientName,
+          payload.historyEntry.therapeuticClass,
           payload.historyEntry.dose,
           payload.historyEntry.frequency,
           payload.historyEntry.riskScore,
           payload.historyEntry.riskLevel,
+          payload.historyEntry.sideEffectCount || 0,
+          payload.historyEntry.severeSideEffectCount || 0,
+          payload.historyEntry.sideEffectMatchCount || 0,
+          payload.historyEntry.interactionCount || 0,
+          payload.historyEntry.maxInteractionSeverity || '',
+          Array.isArray(payload.historyEntry.knowledgeSources) ? payload.historyEntry.knowledgeSources.join('|') : '',
         ]
       );
     }
@@ -337,6 +452,8 @@ const createCard = async (userId, payload) => {
 };
 
 const updateCard = async (userId, cardId, payload) => {
+  await ensureAnalysisColumns();
+
   const result = await pool.query(
     `
       UPDATE allergy_cards
@@ -344,22 +461,40 @@ const updateCard = async (userId, cardId, payload) => {
         title = COALESCE($1, title),
         medicine_name = COALESCE($2, medicine_name),
         normalized_drug_name = COALESCE($3, normalized_drug_name),
-        status = COALESCE($4, status),
-        risk_score = COALESCE($5, risk_score),
-        risk_level = COALESCE($6, risk_level),
-        explanation = COALESCE($7, explanation),
-        recommendation = COALESCE($8, recommendation),
+        rxnorm_cui = COALESCE($4, rxnorm_cui),
+        ingredient_name = COALESCE($5, ingredient_name),
+        therapeutic_class = COALESCE($6, therapeutic_class),
+        status = COALESCE($7, status),
+        risk_score = COALESCE($8, risk_score),
+        risk_level = COALESCE($9, risk_level),
+        side_effect_count = COALESCE($10, side_effect_count),
+        severe_side_effect_count = COALESCE($11, severe_side_effect_count),
+        side_effect_match_count = COALESCE($12, side_effect_match_count),
+        interaction_count = COALESCE($13, interaction_count),
+        max_interaction_severity = COALESCE($14, max_interaction_severity),
+        knowledge_sources = COALESCE($15, knowledge_sources),
+        explanation = COALESCE($16, explanation),
+        recommendation = COALESCE($17, recommendation),
         updated_at = NOW()
-      WHERE user_id = $9 AND id = $10
+      WHERE user_id = $18 AND id = $19
       RETURNING *
     `,
     [
       payload.title,
       payload.medicineName,
       payload.normalizedDrugName,
+      payload.rxnormCui,
+      payload.ingredientName,
+      payload.therapeuticClass,
       payload.status,
       payload.riskScore,
       payload.riskLevel,
+      payload.sideEffectCount,
+      payload.severeSideEffectCount,
+      payload.sideEffectMatchCount,
+      payload.interactionCount,
+      payload.maxInteractionSeverity,
+      Array.isArray(payload.knowledgeSources) ? payload.knowledgeSources.join('|') : null,
       payload.explanation,
       payload.recommendation,
       userId,
@@ -375,6 +510,8 @@ const updateCard = async (userId, cardId, payload) => {
 };
 
 const listHistory = async (userId) => {
+  await ensureAnalysisColumns();
+
   const result = await pool.query(
     `
       SELECT *
@@ -392,10 +529,42 @@ const listHistory = async (userId) => {
     rawInput: row.raw_input,
     medicineName: row.medicine_name,
     normalizedDrugName: row.normalized_drug_name,
+    rxnormCui: row.rxnorm_cui,
+    ingredientName: row.ingredient_name,
+    therapeuticClass: row.therapeutic_class,
     dose: row.dose,
     frequency: row.frequency,
     riskScore: row.risk_score,
     riskLevel: row.risk_level,
+    sideEffectCount: row.side_effect_count,
+    severeSideEffectCount: row.severe_side_effect_count,
+    sideEffectMatchCount: row.side_effect_match_count,
+    interactionCount: row.interaction_count,
+    maxInteractionSeverity: row.max_interaction_severity,
+    knowledgeSources: row.knowledge_sources ? row.knowledge_sources.split('|').filter(Boolean) : [],
+    createdAt: row.created_at,
+  }));
+};
+
+const listReactionLogs = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT id, user_id, medicine_check_id, symptoms, severity, notes, created_at
+      FROM reaction_logs
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT 100
+    `,
+    [userId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    medicineCheckId: row.medicine_check_id,
+    symptoms: row.symptoms,
+    severity: row.severity,
+    notes: row.notes,
     createdAt: row.created_at,
   }));
 };
@@ -438,5 +607,6 @@ module.exports = {
   createCard,
   updateCard,
   listHistory,
+  listReactionLogs,
   createReactionLog,
 };
