@@ -12,10 +12,12 @@ This service hosts the machine learning layer for the Emotional and Cognitive En
 ## Final Label Space
 
 - `happy`
-- `neutral`
 - `sad`
+- `angry`
+- `anxious`
 - `lonely`
-- `stressed`
+- `confused`
+- `neutral`
 
 ## Recommended Workflow
 
@@ -23,7 +25,7 @@ This service hosts the machine learning layer for the Emotional and Cognitive En
 2. Fine-tune the text model with `training/text/train_text_model.py`
 3. Start the FastAPI app and expose `/predict/text`
 4. Update the Node backend to call this service from `emotionAnalysisService.js`
-5. Add the voice and fusion models next
+5. Keep chatbot replies template-based in the Node emotional-support module
 
 ## Run Locally
 

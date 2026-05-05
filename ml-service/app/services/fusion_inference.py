@@ -21,7 +21,7 @@ def predict_fusion(
             fused_scores[emoji_key] = fused_scores.get(emoji_key, 0) + 0.1
 
     if history_features.get("negativeMoodCount7d", 0) >= 3:
-        fused_scores["stressed"] = fused_scores.get("stressed", 0) + 0.05
+        fused_scores["anxious"] = fused_scores.get("anxious", 0) + 0.05
         fused_scores["lonely"] = fused_scores.get("lonely", 0) + 0.05
 
     emotion = max(fused_scores, key=fused_scores.get)
@@ -33,5 +33,9 @@ def predict_fusion(
         "scores": fused_scores,
         "sentiment_score": float(text_prediction.get("sentiment_score", 0.0)),
         "loneliness_score": float(fused_scores.get("lonely", 0.1)),
-        "stress_score": float(fused_scores.get("stressed", 0.1)),
+        "stress_score": float(max(
+            fused_scores.get("anxious", 0.1),
+            fused_scores.get("angry", 0.1),
+            fused_scores.get("confused", 0.1),
+        )),
     }

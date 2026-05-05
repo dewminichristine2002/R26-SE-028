@@ -10,7 +10,9 @@ function calculateRiskLevel({ detectedEmotion, lonelinessScore, stressScore, neg
   if (
     detectedEmotion === 'sad' ||
     detectedEmotion === 'lonely' ||
-    detectedEmotion === 'stressed' ||
+    detectedEmotion === 'angry' ||
+    detectedEmotion === 'anxious' ||
+    detectedEmotion === 'confused' ||
     stressScore >= 0.45 ||
     lonelinessScore >= 0.45
   ) {

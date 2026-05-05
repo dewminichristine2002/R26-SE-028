@@ -1,4 +1,4 @@
-FINAL_LABELS = ["happy", "neutral", "sad", "lonely", "stressed"]
+FINAL_LABELS = ["happy", "sad", "angry", "anxious", "lonely", "confused", "neutral"]
 LABEL_TO_ID = {label: index for index, label in enumerate(FINAL_LABELS)}
 ID_TO_LABEL = {index: label for label, index in LABEL_TO_ID.items()}
 
@@ -18,19 +18,22 @@ GOEMOTIONS_TO_FINAL = {
     "grief": "sad",
     "remorse": "sad",
     "sadness": "sad",
-    "confusion": "stressed",
-    "fear": "stressed",
-    "nervousness": "stressed",
-    "realization": "stressed",
+    "confusion": "confused",
+    "fear": "anxious",
+    "nervousness": "anxious",
+    "realization": "confused",
+    "anger": "angry",
+    "annoyance": "angry",
+    "disapproval": "angry",
 }
 
 MELD_TO_FINAL = {
     "joy": "happy",
     "neutral": "neutral",
     "sadness": "sad",
-    "fear": "stressed",
-    "anger": "stressed",
-    "disgust": "stressed",
+    "fear": "anxious",
+    "anger": "angry",
+    "disgust": "angry",
 }
 
 RAVDESS_TO_FINAL = {
@@ -38,10 +41,10 @@ RAVDESS_TO_FINAL = {
     "happy": "happy",
     "neutral": "neutral",
     "sad": "sad",
-    "angry": "stressed",
-    "fearful": "stressed",
-    "surprised": "stressed",
-    "disgust": "stressed",
+    "angry": "angry",
+    "fearful": "anxious",
+    "surprised": "confused",
+    "disgust": "angry",
 }
 
 IEMOCAP_TO_FINAL = {
@@ -49,14 +52,18 @@ IEMOCAP_TO_FINAL = {
     "exc": "happy",
     "neu": "neutral",
     "sad": "sad",
-    "ang": "stressed",
-    "fru": "stressed",
-    "fea": "stressed",
+    "ang": "angry",
+    "fru": "angry",
+    "fea": "anxious",
 }
 
 
 def normalize_label(label: str) -> str | None:
     cleaned = label.strip().lower()
+    if cleaned == "stressed":
+        return "anxious"
+    if cleaned == "anger":
+        return "angry"
     if cleaned in FINAL_LABELS:
         return cleaned
     return None

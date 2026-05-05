@@ -7,6 +7,7 @@ const alertController = require('../controllers/alertController');
 const router = express.Router();
 
 router.post('/check-ins', checkInController.createCheckIn);
+router.get('/sessions/:sessionId/chat-logs', checkInController.getChatLogs);
 router.get('/elders/:elderId/history', checkInController.getHistory);
 router.get('/elders/:elderId/trends/summary', checkInController.getTrendSummary);
 router.get('/elders/:elderId/activities/next', activityController.getNextActivity);

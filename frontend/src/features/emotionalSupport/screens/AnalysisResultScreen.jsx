@@ -17,15 +17,23 @@ export default function AnalysisResultScreen({ navigation }) {
         {lastCheckIn ? (
           <>
             <Text style={styles.emotion}>Detected emotion: {lastCheckIn.detectedEmotion}</Text>
-            <Text style={styles.response}>{lastCheckIn.intervention.responseText}</Text>
+            <Text style={styles.response}>
+              {lastCheckIn.chatbotReply || lastCheckIn.intervention.responseText}
+            </Text>
 
-            <ActivityCard
-              title={lastCheckIn.activity.title}
-              type={lastCheckIn.activity.type}
-              prompt={lastCheckIn.activity.prompt}
+            {lastCheckIn.activity ? (
+              <ActivityCard
+                title={lastCheckIn.activity.title}
+                type={lastCheckIn.activity.type}
+                prompt={lastCheckIn.activity.prompt}
+              />
+            ) : null}
+
+            <ActionButton
+              label="Start Memory Activity"
+              onPress={() => navigation.navigate('CognitiveActivity')}
+              disabled={!lastCheckIn.activity}
             />
-
-            <ActionButton label="Start Cognitive Activity" onPress={() => navigation.navigate('CognitiveActivity')} />
             <ActionButton label="Open Support Chat" variant="secondary" onPress={() => navigation.navigate('SupportChat')} />
           </>
         ) : null}

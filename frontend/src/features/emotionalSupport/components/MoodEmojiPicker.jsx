@@ -2,11 +2,13 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 const options = [
-  { label: 'Happy', value: 'happy', icon: '🙂' },
-  { label: 'Neutral', value: 'neutral', icon: '😐' },
-  { label: 'Sad', value: 'sad', icon: '😔' },
-  { label: 'Lonely', value: 'lonely', icon: '🥺' },
-  { label: 'Stressed', value: 'stressed', icon: '😣' },
+  { label: 'Happy', value: 'happy', icon: ':)' },
+  { label: 'Neutral', value: 'neutral', icon: ':|' },
+  { label: 'Sad', value: 'sad', icon: ':(' },
+  { label: 'Lonely', value: 'lonely', icon: 'o' },
+  { label: 'Anxious', value: 'anxious', icon: '!' },
+  { label: 'Confused', value: 'confused', icon: '?' },
+  { label: 'Angry', value: 'angry', icon: '!!' },
 ];
 
 export default function MoodEmojiPicker({ value, onChange }) {
@@ -45,7 +47,7 @@ const styles = StyleSheet.create({
     borderColor: '#446C5E',
     backgroundColor: '#E7F0EA',
   },
-  icon: { fontSize: 24, marginBottom: 6 },
+  icon: { fontSize: 24, marginBottom: 6, fontWeight: '700', color: '#2F3E35' },
   label: { fontSize: 13, color: '#46525E' },
   labelActive: { color: '#23352D', fontWeight: '600' },
 });

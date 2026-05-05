@@ -1,7 +1,7 @@
 function buildTrendSummary({ elderId }) {
   return {
     elderId,
-    dominantEmotion7d: 'stressed',
+    dominantEmotion7d: 'anxious',
     negativeMoodCount7d: 3,
     averageStressScore7d: 0.61,
     averageLonelinessScore7d: 0.39,

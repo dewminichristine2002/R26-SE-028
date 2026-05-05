@@ -39,7 +39,7 @@ export default function MoodCheckInScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>How are you feeling today?</Text>
         <Text style={styles.subtitle}>
-          Capture emoji, text, and later voice input from the elder in this flow.
+          Share a short message so ElderMeds can suggest gentle support and a memory activity.
         </Text>
 
         <MoodEmojiPicker value={selectedMood} onChange={setSelectedMood} />

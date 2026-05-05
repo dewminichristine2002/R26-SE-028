@@ -59,7 +59,7 @@ async function getCaregiverElderDetail(caregiverId, elderId) {
         SELECT
           detected_emotion,
           CASE
-            WHEN detected_emotion IN ('sad', 'lonely', 'stressed') THEN 1
+            WHEN detected_emotion IN ('sad', 'lonely', 'anxious', 'confused', 'angry') THEN 1
             ELSE 0
           END AS is_negative
         FROM emotional_support_emotion_sessions

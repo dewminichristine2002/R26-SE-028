@@ -44,7 +44,7 @@ export default function CognitiveActivityScreen({ navigation }) {
         <Text style={styles.title}>Cognitive activity</Text>
         <StatusMessage empty={!lastCheckIn} emptyText="Complete a check-in first to receive a cognitive activity." />
 
-        {lastCheckIn ? (
+        {lastCheckIn?.activity ? (
           <>
             <ActivityCard
               title={lastCheckIn.activity.title}

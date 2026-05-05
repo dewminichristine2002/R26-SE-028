@@ -6,8 +6,8 @@ This module is intentionally isolated from the shared group application so it ca
 
 - Elder emotional check-ins
 - Emotion detection pipeline
-- Empathetic intervention selection
-- Cognitive activity recommendation
+- Rule-based/template-based empathetic chatbot replies
+- Simple memory activity recommendation
 - Caregiver trend monitoring and alerts
 
 ## Integration Points
@@ -32,4 +32,4 @@ This module is intentionally isolated from the shared group application so it ca
 2. Wire repository layer to the shared DB connection
 3. Mount the router
 4. Connect elder navigation to the frontend screens
-5. Replace rule-based analysis with the trained model API
+5. Train one text emotion model and keep chatbot responses template-based for safety

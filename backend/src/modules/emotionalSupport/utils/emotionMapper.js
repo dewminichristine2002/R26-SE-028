@@ -4,18 +4,37 @@ const emojiEmotionMap = {
   neutral: 'neutral',
   sad: 'sad',
   lonely: 'lonely',
-  stressed: 'stressed',
+  anxious: 'anxious',
+  stressed: 'anxious',
+  worried: 'anxious',
+  confused: 'confused',
+  angry: 'angry',
+  anger: 'angry',
+  frustrated: 'angry',
 };
 
 const emotionKeywords = {
   happy: ['happy', 'good', 'great', 'fine', 'better', 'grateful', 'calm'],
   sad: ['sad', 'down', 'cry', 'upset', 'hurt', 'empty', 'hopeless'],
   lonely: ['alone', 'lonely', 'isolated', 'nobody', 'miss someone', 'left out'],
-  stressed: ['stress', 'worried', 'tired', 'pressure', 'panic', 'anxious', 'overwhelmed'],
+  anxious: ['anxious', 'anxiety', 'worried', 'worry', 'stress', 'pressure', 'panic', 'afraid', 'nervous', 'overwhelmed'],
+  confused: ['confused', 'confusion', 'forget', 'forgot', 'unclear', 'lost', 'do not understand', "don't understand"],
+  angry: ['angry', 'anger', 'mad', 'furious', 'frustrated', 'annoyed', 'irritated'],
+};
+
+const legacyEmotionMap = {
+  stressed: 'anxious',
+  stress: 'anxious',
+  anger: 'angry',
 };
 
 function normalizeText(text = '') {
   return text.trim().toLowerCase();
+}
+
+function normalizeEmotion(emotion = 'neutral') {
+  const normalized = normalizeText(emotion);
+  return legacyEmotionMap[normalized] || normalized || 'neutral';
 }
 
 function inferEmotionFromText(text = '') {
@@ -25,7 +44,9 @@ function inferEmotionFromText(text = '') {
     neutral: 0,
     sad: 0,
     lonely: 0,
-    stressed: 0,
+    anxious: 0,
+    confused: 0,
+    angry: 0,
   };
 
   Object.entries(emotionKeywords).forEach(([emotion, keywords]) => {
@@ -47,5 +68,6 @@ function inferEmotionFromEmoji(emoji) {
 module.exports = {
   inferEmotionFromEmoji,
   inferEmotionFromText,
+  normalizeEmotion,
   normalizeText,
 };

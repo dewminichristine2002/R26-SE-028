@@ -1,12 +1,42 @@
 const { query, withTransaction } = require('../db/postgres');
 
+function buildUserMessage({ inputMode, emoji, text, transcript }) {
+  const mergedText = [text, transcript].filter(Boolean).join(' ').trim();
+
+  if (mergedText) {
+    return mergedText;
+  }
+
+  if (inputMode === 'emoji' && emoji) {
+    return `Mood selected: ${emoji}`;
+  }
+
+  return emoji || 'Check-in submitted';
+}
+
+function mapLogMessageType(inputMode) {
+  if (inputMode === 'voice') {
+    return 'voice_transcript';
+  }
+
+  if (inputMode === 'emoji') {
+    return 'emoji';
+  }
+
+  if (inputMode === 'multimodal') {
+    return 'multimodal';
+  }
+
+  return 'text';
+}
+
 async function getNegativeMoodCount(elderId, days = 7) {
   const result = await query(
     `
       SELECT COUNT(*)::INT AS total
       FROM emotional_support_emotion_sessions
       WHERE elder_user_id = $1
-        AND detected_emotion IN ('sad', 'lonely', 'stressed')
+        AND detected_emotion IN ('sad', 'lonely', 'anxious', 'confused', 'angry')
         AND created_at >= NOW() - ($2::TEXT || ' days')::INTERVAL
     `,
     [elderId, String(days)]
@@ -85,6 +115,7 @@ async function createCheckInRecord({
         INSERT INTO emotional_support_interventions (
           session_id,
           elder_user_id,
+          response_bank_id,
           response_type,
           response_text,
           response_source,
@@ -93,9 +124,10 @@ async function createCheckInRecord({
           selected_because,
           follow_up_prompt
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
         RETURNING
           id,
+          response_bank_id AS "responseBankId",
           response_type AS "responseType",
           response_text AS "responseText",
           response_source AS "responseSource",
@@ -104,6 +136,7 @@ async function createCheckInRecord({
       [
         session.id,
         elderId,
+        intervention.responseBankId || null,
         intervention.responseType,
         intervention.responseText,
         intervention.responseSource,
@@ -115,6 +148,65 @@ async function createCheckInRecord({
     );
 
     const storedIntervention = interventionResult.rows[0];
+
+    await client.query(
+      `
+        INSERT INTO chat_logs (
+          session_id,
+          elder_user_id,
+          actor_type,
+          message_type,
+          message_text,
+          detected_emotion,
+          metadata
+        )
+        VALUES ($1, $2, 'elder', $3, $4, $5, $6::jsonb)
+      `,
+      [
+        session.id,
+        elderId,
+        mapLogMessageType(inputMode),
+        buildUserMessage({ inputMode, emoji, text, transcript }),
+        analysis.detectedEmotion,
+        JSON.stringify({
+          checkInType,
+          emoji: emoji || null,
+          rawText: text || null,
+          transcript: transcript || null,
+          audioUrl: audioUrl || null,
+        }),
+      ]
+    );
+
+    await client.query(
+      `
+        INSERT INTO chat_logs (
+          session_id,
+          elder_user_id,
+          actor_type,
+          message_type,
+          message_text,
+          detected_emotion,
+          response_bank_id,
+          intervention_id,
+          metadata
+        )
+        VALUES ($1, $2, 'system', 'response', $3, $4, $5, $6, $7::jsonb)
+      `,
+      [
+        session.id,
+        elderId,
+        storedIntervention.responseText,
+        analysis.detectedEmotion,
+        storedIntervention.responseBankId || null,
+        storedIntervention.id,
+        JSON.stringify({
+          responseType: storedIntervention.responseType,
+          responseSource: storedIntervention.responseSource,
+          followUpPrompt: storedIntervention.followUpPrompt || null,
+        }),
+      ]
+    );
 
     await client.query(
       `
@@ -167,6 +259,31 @@ async function getHistory(elderId, limit = 20) {
   return result.rows;
 }
 
+async function getChatLogs(sessionId) {
+  const result = await query(
+    `
+      SELECT
+        id,
+        session_id AS "sessionId",
+        elder_user_id AS "elderId",
+        actor_type AS "actorType",
+        message_type AS "messageType",
+        message_text AS "messageText",
+        detected_emotion AS "detectedEmotion",
+        response_bank_id AS "responseBankId",
+        intervention_id AS "interventionId",
+        metadata,
+        created_at AS "createdAt"
+      FROM chat_logs
+      WHERE session_id = $1
+      ORDER BY created_at ASC, id ASC
+    `,
+    [sessionId]
+  );
+
+  return result.rows;
+}
+
 async function getTrendSummary(elderId) {
   const result = await query(
     `
@@ -176,7 +293,7 @@ async function getTrendSummary(elderId) {
           stress_score::FLOAT AS stress_score,
           loneliness_score::FLOAT AS loneliness_score,
           CASE
-            WHEN detected_emotion IN ('sad', 'lonely', 'stressed') THEN 1
+            WHEN detected_emotion IN ('sad', 'lonely', 'anxious', 'confused', 'angry') THEN 1
             ELSE 0
           END AS is_negative
         FROM emotional_support_emotion_sessions
@@ -217,6 +334,7 @@ async function getTrendSummary(elderId) {
 
 module.exports = {
   createCheckInRecord,
+  getChatLogs,
   getHistory,
   getNegativeMoodCount,
   getTrendSummary,

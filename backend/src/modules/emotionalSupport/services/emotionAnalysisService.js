@@ -3,6 +3,7 @@ const axios = require('axios');
 const {
   inferEmotionFromEmoji,
   inferEmotionFromText,
+  normalizeEmotion,
   normalizeText,
 } = require('../utils/emotionMapper');
 
@@ -14,26 +15,33 @@ function buildProbabilities(primaryEmotion) {
     neutral: 0.12,
     sad: 0.06,
     lonely: 0.06,
-    stressed: 0.06,
+    anxious: 0.06,
+    confused: 0.06,
+    angry: 0.06,
   };
 
-  base[primaryEmotion] = 0.7;
+  base[normalizeEmotion(primaryEmotion)] = 0.7;
   return base;
 }
 
 function deriveScores(text, emotion) {
   const normalized = normalizeText(text);
-  const sentimentScore = emotion === 'happy' ? 0.72 : emotion === 'neutral' ? 0.1 : -0.58;
+  const normalizedEmotion = normalizeEmotion(emotion);
+  const sentimentScore = normalizedEmotion === 'happy' ? 0.72 : normalizedEmotion === 'neutral' ? 0.1 : -0.58;
   const stressScore =
-    emotion === 'stressed' ? 0.82 : normalized.includes('worried') || normalized.includes('tired') ? 0.63 : 0.18;
+    normalizedEmotion === 'anxious' || normalizedEmotion === 'angry'
+      ? 0.82
+      : normalized.includes('worried') || normalized.includes('tired') || normalized.includes('confused')
+        ? 0.63
+        : 0.18;
   const lonelinessScore =
-    emotion === 'lonely' ? 0.84 : normalized.includes('alone') || normalized.includes('lonely') ? 0.71 : 0.14;
+    normalizedEmotion === 'lonely' ? 0.84 : normalized.includes('alone') || normalized.includes('lonely') ? 0.71 : 0.14;
 
   return {
     sentimentScore,
     stressScore,
     lonelinessScore,
-    confidence: emotion === 'neutral' ? 0.58 : 0.84,
+    confidence: normalizedEmotion === 'neutral' ? 0.58 : 0.84,
   };
 }
 
@@ -46,7 +54,7 @@ function buildFallbackAnalysis({ emoji, text, transcript }) {
   const scores = deriveScores(mergedText, detectedEmotion);
 
   return {
-    detectedEmotion,
+    detectedEmotion: normalizeEmotion(detectedEmotion),
     emotionProbabilities: buildProbabilities(detectedEmotion),
     ...scores,
   };
@@ -62,9 +70,16 @@ async function analyzeWithMlService({ text, transcript }) {
   );
 
   const data = response.data;
+  const detectedEmotion = normalizeEmotion(data.emotion);
+  const rawScores = data.scores || buildProbabilities(detectedEmotion);
+  const emotionProbabilities = Object.entries(rawScores).reduce((scores, [emotion, score]) => {
+    scores[normalizeEmotion(emotion)] = Math.max(scores[normalizeEmotion(emotion)] || 0, score);
+    return scores;
+  }, {});
+
   return {
-    detectedEmotion: data.emotion,
-    emotionProbabilities: data.scores || buildProbabilities(data.emotion),
+    detectedEmotion,
+    emotionProbabilities,
     sentimentScore: data.sentiment_score,
     stressScore: data.stress_score,
     lonelinessScore: data.loneliness_score,

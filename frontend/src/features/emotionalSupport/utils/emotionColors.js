@@ -3,5 +3,7 @@ export const emotionColors = {
   neutral: '#6D7C8C',
   sad: '#5271A5',
   lonely: '#7B5FA8',
-  stressed: '#C46A3A',
+  anxious: '#C46A3A',
+  confused: '#8A7B3E',
+  angry: '#B34A3C',
 };

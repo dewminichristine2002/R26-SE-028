@@ -4,6 +4,7 @@ const { calculateRiskLevel } = require('../utils/riskCalculator');
 const { validateCheckInPayload } = require('../validators/checkInValidator');
 const {
   createCheckInRecord,
+  getChatLogs: fetchChatLogs,
   getHistory: fetchEmotionHistory,
   getNegativeMoodCount,
   getTrendSummary: fetchTrendSummary,
@@ -30,7 +31,7 @@ async function createCheckIn(req, res) {
       negativeMoodCount7d,
     });
     const activity = await getNextActivityByEmotion(analysis.detectedEmotion);
-    const recommendation = selectIntervention({
+    const recommendation = await selectIntervention({
       detectedEmotion: analysis.detectedEmotion,
       riskLevel,
     });
@@ -85,6 +86,7 @@ async function createCheckIn(req, res) {
         lonelinessScore: analysis.lonelinessScore,
       },
       riskLevel,
+      chatbotReply: created.intervention.responseText,
       intervention: created.intervention,
       activity,
       alertsCreated: createdAlerts.length,
@@ -128,8 +130,26 @@ async function getTrendSummary(req, res) {
   }
 }
 
+async function getChatLogs(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const items = await fetchChatLogs(sessionId);
+
+    return res.json({
+      sessionId,
+      items,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to fetch chat logs.',
+      details: error.message,
+    });
+  }
+}
+
 module.exports = {
   createCheckIn,
+  getChatLogs,
   getHistory,
   getTrendSummary,
 };

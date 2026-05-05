@@ -6,6 +6,8 @@ Base path: `/api/emotional-support`
 
 Create an elder emotional check-in and return the detected emotion, recommended intervention, and suggested cognitive activity.
 
+Supported detected emotions: `happy`, `sad`, `angry`, `anxious`, `lonely`, `confused`, `neutral`.
+
 Request body:
 
 ```json
@@ -28,10 +30,11 @@ Response:
   "confidence": 0.84,
   "scores": {
     "sentimentScore": -0.62,
-    "stressScore": 0.41,
-    "lonelinessScore": 0.81
+      "stressScore": 0.41,
+      "lonelinessScore": 0.81
   },
   "riskLevel": "medium",
+  "chatbotReply": "It sounds like today feels heavy. Let us take one small step together.",
   "intervention": {
     "responseType": "empathetic_reply",
     "responseText": "It sounds like today feels heavy. Let us take one small step together."

@@ -9,6 +9,8 @@ const emotionalSupportApi = axios.create({
 });
 
 export const createCheckIn = (payload) => emotionalSupportApi.post('/check-ins', payload);
+export const getChatLogs = (sessionId) =>
+  emotionalSupportApi.get(`/sessions/${sessionId}/chat-logs`);
 export const getEmotionHistory = (elderId, limit = 20) =>
   emotionalSupportApi.get(`/elders/${elderId}/history`, { params: { limit } });
 export const getTrendSummary = (elderId) =>
