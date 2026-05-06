@@ -45,25 +45,15 @@ const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, lau
   };
 
   const menuItems = [
-    { id: 1, label: 'home.reminder', icon: '🔔' },
-    { id: 2, label: 'home.allergies', icon: '⚠️' },
-    { id: 3, label: 'home.emotions', icon: '😊' },
-    { id: 4, label: 'home.dashboard', icon: '📊' },
-  ];
-
-  const reminderMenuItems = [
-    { title: 'Routine Setup', subtitle: 'Create daily reminder times', icon: '⏰' },
-    { title: 'Schedule Board', subtitle: 'View today and weekly plans', icon: '🗓️' },
-    { title: 'Add Medicine', subtitle: 'Register a new medication', icon: '💊' },
-    { title: 'Medicine List', subtitle: 'See all active medicines', icon: '📋' },
-    { title: 'Medicine Stock', subtitle: 'Track remaining quantities', icon: '📦' },
-    { title: 'Safety Center', subtitle: 'Warnings and safe-use tips', icon: '🛡️' },
+    { id: 1, label: 'Reminder', icon: '\u{1F514}' },
+    { id: 2, label: 'Allergy', icon: '\u26A0\uFE0F' },
+    { id: 3, label: 'Emotions', icon: '\u{1F60A}' },
+    { id: 4, label: 'Dashboard', icon: '\u{1F4CA}' },
   ];
 
   const handleButtonPress = (item) => {
-    if (item.label === 'home.reminder') {
-      setActiveReminderView('menu');
-      setShowReminderMenu(true);
+    if (item.label === 'Allergy') {
+      onOpenAllergies();
       return;
     }
 
@@ -749,9 +739,18 @@ const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, lau
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>{t('home.title')}</Text>
-      <Text style={styles.welcome}>{t('home.welcome')}</Text>
+      <Text style={styles.title}>Home</Text>
+      <Text style={styles.welcome}>Welcome back!</Text>
       <Text style={styles.userName}>Signed in as {user?.fullName || 'User'}</Text>
+
+      {isLocalMode ? (
+        <View style={styles.localModeBanner}>
+          <Text style={styles.localModeTitle}>Saved On This Device</Text>
+          <Text style={styles.localModeText}>
+            The shared database is unavailable right now, so this account and its new changes are being stored on this phone.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.quickActionRow}>
         <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
@@ -764,13 +763,9 @@ const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, lau
 
       <View style={styles.grid}>
         {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.button}
-            onPress={() => handleButtonPress(item)}
-          >
+          <TouchableOpacity key={item.id} style={styles.button} onPress={() => handleButtonPress(item)}>
             <Text style={styles.icon}>{item.icon}</Text>
-            <Text style={styles.buttonLabel}>{t(item.label)}</Text>
+            <Text style={styles.buttonLabel}>{item.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -800,6 +795,25 @@ const styles = StyleSheet.create({
     color: '#1f6894',
     fontWeight: '600',
     marginBottom: 12,
+  },
+  localModeBanner: {
+    backgroundColor: '#fff6da',
+    borderColor: '#efd28a',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  localModeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#7b5700',
+  },
+  localModeText: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6d5a24',
   },
   quickActionRow: {
     flexDirection: 'row',

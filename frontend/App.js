@@ -9,6 +9,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import MedicineSafetyScreen from './src/screens/MedicineSafetyScreenFixed';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
 import { reminderNotificationService } from './src/services/reminderNotificationService';
@@ -58,6 +59,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState('home');
   const [currentUser, setCurrentUser] = useState(null);
+  const [isLocalMode, setIsLocalMode] = useState(false);
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
 
   useEffect(() => {
@@ -71,9 +73,29 @@ export default function App() {
           const profile = await userService.getMyProfile();
           setCurrentUser(profile);
           setIsAuthenticated(true);
+          setIsLocalMode(await authService.isUsingLocalMode());
         } catch (error) {
-          console.log('[App] Session restore failed, clearing local auth:', error.message);
-          await authService.logout();
+          const status = error.response?.status;
+          const storedUser = await authService.getStoredUser();
+
+          if (status === 401) {
+            console.log('[App] Session restore failed with 401, clearing local auth.');
+            await authService.logout();
+          } else if (status === 503) {
+            console.log('[App] Session restore skipped because database is unavailable:', error.response?.data?.error);
+            if (storedUser) {
+              setCurrentUser(storedUser);
+            }
+            setIsAuthenticated(true);
+            setIsLocalMode(await authService.isUsingLocalMode());
+          } else {
+            console.log('[App] Session restore skipped because backend is unreachable:', error.message);
+            if (storedUser) {
+              setCurrentUser(storedUser);
+            }
+            setIsAuthenticated(true);
+            setIsLocalMode(await authService.isUsingLocalMode());
+          }
         }
       }
 
@@ -154,6 +176,7 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveScreen('home');
+    setIsLocalMode(await authService.isUsingLocalMode());
   };
 
   const handleLogout = async () => {
@@ -162,6 +185,7 @@ export default function App() {
     setIsAuthenticated(false);
     setAuthMode('login');
     setActiveScreen('home');
+    setIsLocalMode(false);
   };
 
   const handleProfileUpdated = (updatedUser) => {
@@ -191,7 +215,7 @@ export default function App() {
       );
     }
 
-    if (activeScreen === 'profile') {
+    if (activeScreen === 'account') {
       return (
         <ProfileScreen
           user={currentUser}
@@ -202,6 +226,20 @@ export default function App() {
       );
     }
 
+    if (activeScreen === 'allergies' || activeScreen === 'history' || activeScreen === 'medicine-profile') {
+      return (
+        <MedicineSafetyScreen
+          onBack={() => setActiveScreen('home')}
+          onLogout={handleLogout}
+          initialRoute={
+            activeScreen === 'history'
+              ? 'history'
+              : activeScreen === 'medicine-profile'
+                ? 'profile-view'
+                : 'home'
+          }
+        />
+      );
     if (activeScreen === 'emotional-support') {
       return <EmotionalSupportNavigator />;
     }
@@ -209,6 +247,11 @@ export default function App() {
     return (
       <HomeScreen
         user={currentUser}
+        isLocalMode={isLocalMode}
+        onOpenProfile={() => setActiveScreen('medicine-profile')}
+        onOpenAllergies={() => setActiveScreen('allergies')}
+        onOpenMedicine={() => setActiveScreen('allergies')}
+        onOpenHistory={() => setActiveScreen('history')}
         launchIntent={homeLaunchIntent}
         onOpenProfile={() => setActiveScreen('profile')}
         onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}

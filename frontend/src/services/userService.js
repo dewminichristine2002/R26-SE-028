@@ -12,16 +12,39 @@ const userClient = axios.create({
 
 export const userService = {
   async getMyProfile() {
-    const headers = await getAuthHeaders();
-    const response = await userClient.get('/users/me', { headers });
-    await authService.setStoredUser(response.data.user);
-    return response.data.user;
+    try {
+      const headers = await getAuthHeaders();
+      const response = await userClient.get('/users/me', { headers });
+      await authService.setStoredUser(response.data.user);
+      return response.data.user;
+    } catch (error) {
+      if (error.response?.status === 503 || error.message === 'Network Error') {
+        const storedUser = await authService.getStoredUser();
+        if (storedUser) {
+          return storedUser;
+        }
+      }
+      throw error;
+    }
   },
 
   async updateMyProfile(payload) {
-    const headers = await getAuthHeaders();
-    const response = await userClient.put('/users/me', payload, { headers });
-    await authService.setStoredUser(response.data.user);
-    return response.data.user;
+    try {
+      const headers = await getAuthHeaders();
+      const response = await userClient.put('/users/me', payload, { headers });
+      await authService.setStoredUser(response.data.user);
+      return response.data.user;
+    } catch (error) {
+      if (error.response?.status === 503 || error.message === 'Network Error') {
+        const storedUser = await authService.getStoredUser();
+        const mergedUser = {
+          ...storedUser,
+          ...payload,
+        };
+        await authService.setStoredUser(mergedUser);
+        return mergedUser;
+      }
+      throw error;
+    }
   },
 };
