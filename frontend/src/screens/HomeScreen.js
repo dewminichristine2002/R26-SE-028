@@ -11,7 +11,7 @@ import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
@@ -64,6 +64,11 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
     if (item.label === 'home.reminder') {
       setActiveReminderView('menu');
       setShowReminderMenu(true);
+      return;
+    }
+
+    if (item.label === 'home.emotions') {
+      onOpenEmotionalSupport?.();
       return;
     }
 

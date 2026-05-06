@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BackHandler, Platform } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './src/i18n/config';
+import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
 import { languageService } from './src/services/languageService';
 import HomeScreen from './src/screens/HomeScreen';
 import SplashScreen from './src/screens/SplashScreen';
@@ -201,11 +202,16 @@ export default function App() {
       );
     }
 
+    if (activeScreen === 'emotional-support') {
+      return <EmotionalSupportNavigator />;
+    }
+
     return (
       <HomeScreen
         user={currentUser}
         launchIntent={homeLaunchIntent}
         onOpenProfile={() => setActiveScreen('profile')}
+        onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
         onLogout={handleLogout}
       />
     );
