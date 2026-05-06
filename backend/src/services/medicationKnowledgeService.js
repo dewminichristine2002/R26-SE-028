@@ -139,6 +139,7 @@ const enrichMedication = ({ medicineName, currentMedicationsText, symptomMatch }
     normalizedDrugName: drug.normalizedName,
     ingredientName: drug.ingredientName,
     therapeuticClass: drug.therapeuticClass,
+    matched: drug.matched !== false,
     commonSideEffects: drug.sideEffects,
     severeSideEffects: drug.severeSideEffects,
     sideEffectCount: drug.sideEffects.length,

@@ -509,6 +509,29 @@ const updateCard = async (userId, cardId, payload) => {
   return mapCardRow(result.rows[0]);
 };
 
+const mapHistoryRow = (row) => ({
+  id: row.id,
+  userId: row.user_id,
+  inputMethod: row.input_method,
+  rawInput: row.raw_input,
+  medicineName: row.medicine_name,
+  normalizedDrugName: row.normalized_drug_name,
+  rxnormCui: row.rxnorm_cui,
+  ingredientName: row.ingredient_name,
+  therapeuticClass: row.therapeutic_class,
+  dose: row.dose,
+  frequency: row.frequency,
+  riskScore: row.risk_score,
+  riskLevel: row.risk_level,
+  sideEffectCount: row.side_effect_count,
+  severeSideEffectCount: row.severe_side_effect_count,
+  sideEffectMatchCount: row.side_effect_match_count,
+  interactionCount: row.interaction_count,
+  maxInteractionSeverity: row.max_interaction_severity,
+  knowledgeSources: row.knowledge_sources ? row.knowledge_sources.split('|').filter(Boolean) : [],
+  createdAt: row.created_at,
+});
+
 const listHistory = async (userId) => {
   await ensureAnalysisColumns();
 
@@ -522,28 +545,47 @@ const listHistory = async (userId) => {
     [userId]
   );
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    userId: row.user_id,
-    inputMethod: row.input_method,
-    rawInput: row.raw_input,
-    medicineName: row.medicine_name,
-    normalizedDrugName: row.normalized_drug_name,
-    rxnormCui: row.rxnorm_cui,
-    ingredientName: row.ingredient_name,
-    therapeuticClass: row.therapeutic_class,
-    dose: row.dose,
-    frequency: row.frequency,
-    riskScore: row.risk_score,
-    riskLevel: row.risk_level,
-    sideEffectCount: row.side_effect_count,
-    severeSideEffectCount: row.severe_side_effect_count,
-    sideEffectMatchCount: row.side_effect_match_count,
-    interactionCount: row.interaction_count,
-    maxInteractionSeverity: row.max_interaction_severity,
-    knowledgeSources: row.knowledge_sources ? row.knowledge_sources.split('|').filter(Boolean) : [],
-    createdAt: row.created_at,
-  }));
+  return result.rows.map(mapHistoryRow);
+};
+
+/**
+ * Prior checks for the same medicine (normalized name, RxCUI, or name prefix) — used to align with user history + public KB context.
+ */
+const listHistoryMatchesForMedicine = async (userId, { normalizedDrugName, rxnormCui, medicineName }) => {
+  await ensureAnalysisColumns();
+
+  const norm = String(normalizedDrugName || '').trim().toLowerCase();
+  const rx = String(rxnormCui || '').trim();
+  const token = String(medicineName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .split(/\s+/)[0] || '';
+  const likePrefix = token ? `${token}%` : '';
+
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM medicine_check_history
+      WHERE user_id = $1
+        AND (
+          ($2::text <> '' AND LOWER(TRIM(COALESCE(normalized_drug_name, ''))) = $2)
+          OR ($3::text <> '' AND TRIM(COALESCE(rxnorm_cui, '')) = $3)
+          OR (
+            $4::text <> ''
+            AND (
+              LOWER(TRIM(medicine_name)) LIKE $4
+              OR LOWER(TRIM(COALESCE(normalized_drug_name, ''))) LIKE $4
+            )
+          )
+        )
+      ORDER BY created_at DESC, id DESC
+      LIMIT 25
+    `,
+    [userId, norm, rx, likePrefix]
+  );
+
+  return result.rows.map(mapHistoryRow);
 };
 
 const listReactionLogs = async (userId) => {
@@ -607,6 +649,7 @@ module.exports = {
   createCard,
   updateCard,
   listHistory,
+  listHistoryMatchesForMedicine,
   listReactionLogs,
   createReactionLog,
 };

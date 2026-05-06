@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const readline = require('readline');
+const { parseCsvLine } = require('./csvLine');
 
 const projectRoot = path.resolve(__dirname, '..');
 const outputDir = path.join(projectRoot, 'src', 'data', 'generated');
@@ -184,7 +185,13 @@ const loadDdinter = async () => {
         continue;
       }
 
-      const [ , drugA, , drugB, level ] = line.split(',');
+      const parts = parseCsvLine(line);
+      if (parts.length < 5) {
+        continue;
+      }
+      const drugA = parts[1];
+      const drugB = parts[3];
+      const level = parts[4];
       const normalizedA = normalizeDrugName(drugA);
       const normalizedB = normalizeDrugName(drugB);
       const severity = levelMap[normalizeText(level)] || 'low';

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { allergyService } from '../services/allergyService';
 import { searchMedications } from '../services/medicationService';
+import { extractPrescriptionTextFromImage } from '../services/prescriptionOcrService';
 import { authService } from '../services/authService';
 import {
   cleanExplanationText,
@@ -511,37 +512,71 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     if (!ImagePicker) {
       Alert.alert(
         'Rebuild app for photos',
-        'This install does not include the photo library module yet. Rebuild the Android app (expo run:android or EAS) after adding expo-image-picker. For now, type or paste prescription text on the next screen.',
+        'This install does not include the photo library native module (ExponentImagePicker). Run a new native build: npx expo prebuild (if needed) then npx expo run:android, or eas build --profile development. Expo Go on SDK 50 normally includes it; custom dev clients must be rebuilt after adding expo-image-picker. For now, type or paste prescription text on the next screen.',
         [{ text: 'Continue', onPress: () => setRoute('scan-text') }]
       );
       return;
     }
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Please allow photo access to scan a prescription image.');
-      return;
-    }
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85,
-      allowsEditing: false,
-    });
-    if (picked.canceled) return;
-    setScanRawText('');
-    setOcrPhase(0);
-    setRoute('scan-process');
-    const phases = [1, 2, 3];
-    let i = 0;
-    const tick = () => {
-      if (i >= phases.length) {
-        setRoute('scan-text');
+    let picked;
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Please allow photo access to scan a prescription image.');
         return;
       }
-      setOcrPhase(phases[i]);
-      i += 1;
-      setTimeout(tick, 700);
-    };
-    setTimeout(tick, 400);
+      picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.85,
+        allowsEditing: false,
+      });
+    } catch (e) {
+      const msg = errorText(e, '');
+      if (/ExponentImagePicker|native module/i.test(msg)) {
+        Alert.alert(
+          'Photo library unavailable',
+          'Rebuild the app with expo-image-picker linked (expo run:android or EAS dev build). You can enter prescription text manually on the next screen.',
+          [{ text: 'OK', onPress: () => setRoute('scan-text') }]
+        );
+        return;
+      }
+      Alert.alert('Could not open photos', errorText(e, 'Try again or enter text manually.'));
+      return;
+    }
+    if (picked.canceled) return;
+    const asset = picked.assets?.[0];
+    const uri = asset?.uri;
+    if (!uri) {
+      Alert.alert('No image', 'Could not read the selected photo. Try another image.');
+      return;
+    }
+    setScanRawText('');
+    setOcrPhase(1);
+    setRoute('scan-process');
+    const phaseTimer = setTimeout(() => setOcrPhase(2), 1500);
+    try {
+      const mimeType = asset.mimeType || 'image/jpeg';
+      const { rawText, message, preprocessing } = await extractPrescriptionTextFromImage(uri, mimeType);
+      setScanRawText(rawText);
+      setOcrPhase(3);
+      if (Array.isArray(preprocessing?.applied) && preprocessing.applied.length > 0) {
+        Alert.alert(
+          'OCR preprocessing applied',
+          `Image steps: ${preprocessing.applied.join(', ')}. Please review and correct extracted text before continuing.`
+        );
+      }
+      if (!String(rawText || '').trim() && message) {
+        Alert.alert('No text found', `${message} You can type the prescription below.`);
+      }
+    } catch (e) {
+      Alert.alert(
+        'OCR unavailable',
+        `${errorText(e, 'Could not reach the server or process the image.')} You can type or paste the prescription text on the next screen.`
+      );
+      setScanRawText('');
+    } finally {
+      clearTimeout(phaseTimer);
+      setRoute('scan-text');
+    }
   };
 
   const applyParsedPrescription = () => {
@@ -592,6 +627,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           pill: s.pillDanger,
           pillText: s.pillDangerText,
           sub: 'Do not take without speaking to your doctor',
+          barFill: palette.danger,
         }
       : risk === 'Safe'
         ? {
@@ -601,6 +637,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             pill: s.pillSafe,
             pillText: s.pillSafeText,
             sub: 'Lower concern on this check — still follow your prescriber',
+            barFill: palette.safe,
           }
         : {
             box: s.warn,
@@ -609,6 +646,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             pill: s.pillWarn,
             pillText: s.pillWarnText,
             sub: 'Extra caution — confirm with pharmacist or doctor',
+            barFill: palette.warn,
           };
 
   const displaySideEffects = (effects = [], limit = 6) => (Array.isArray(effects) ? effects.filter(Boolean).slice(0, limit) : []);
@@ -660,14 +698,35 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           <Text style={s.scoreLine}>Final score: {finalScore ?? '--'} / 100</Text>
           <Text style={s.scoreHint}>Levels: 0–24 Safe · 25–59 Warning · 60–100 Dangerous</Text>
           {ruleScore != null ? <Text style={s.scoreLine}>Rule-based clinical score: {ruleScore} / 100</Text> : null}
-          {mlScore != null ? <Text style={s.scoreLine}>ML risk score (dangerous signal): {mlScore} / 100</Text> : null}
-          <Text style={s.scoreHint}>Final blend uses clinical rules first, then ML (about 60% rules, 40% ML), with safety guardrails.</Text>
+          {mlScore != null ? (
+            <Text style={s.scoreLine}>ML score — P(Dangerous) × 100: {mlScore} / 100</Text>
+          ) : null}
+          <Text style={s.scoreHint}>
+            Final blend uses clinical rules and ML P(Dangerous) (about 55% rules, 45% ML), with safety guardrails.
+          </Text>
+          {Number(dataUsed.historyPriorCheckCount) > 0 ? (
+            <Text style={s.scoreHint}>
+              Your saved history for this drug: {dataUsed.historyPriorCheckCount} prior check(s) — latest was{' '}
+              {dataUsed.historyLatestRiskLevel || 'unknown'}
+              {Number(dataUsed.historyDangerousCount) > 0
+                ? ` (${dataUsed.historyDangerousCount} marked Dangerous)`
+                : Number(dataUsed.historyWarningCount) > 0
+                  ? ` (${dataUsed.historyWarningCount} marked Warning)`
+                  : ''}
+              .
+            </Text>
+          ) : null}
+          {dataUsed.knowledgeMatched === false ? (
+            <Text style={s.scoreHint}>
+              Public drug knowledge matched weakly for this name — fix spelling or add strength so interactions and side effects are complete.
+            </Text>
+          ) : null}
         </View>
 
         <View style={s.scoreRow}>
           <Text style={s.scoreLabel}>Final bar</Text>
           <View style={s.track}>
-            <View style={[s.fill, { width: `${Math.max(8, Number(card.riskScore || 0))}%` }]} />
+            <View style={[s.fill, { width: `${Math.max(8, Number(card.riskScore || 0))}%`, backgroundColor: t.barFill }]} />
           </View>
           <Text style={s.scoreValue}>{card.riskScore ?? '--'}/100</Text>
         </View>
@@ -912,7 +971,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'medicine-hub') {
-    const hubRead = 'Choose how to enter the medicine. Type the name, scan a prescription photo, or use voice and typing.';
+    const hubRead = 'Choose how to enter the medicine. Type medicine name, scan a prescription image, or speak medicine name.';
     return (
       <View style={s.screen}>
         {header('How do you want to enter the medicine?', hubRead)}
@@ -924,7 +983,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </View>
             <View style={s.hubRowBody}>
               <Text style={s.hubRowTitle}>Type medicine</Text>
-              <Text style={s.hubRowSub}>Search with smart suggestions</Text>
+              <Text style={s.hubRowSub}>Type medicine name with smart suggestions</Text>
             </View>
             <Text style={s.hubChevron}>›</Text>
           </TouchableOpacity>
@@ -934,7 +993,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </View>
             <View style={s.hubRowBody}>
               <Text style={s.hubRowTitle}>Scan prescription</Text>
-              <Text style={s.hubRowSub}>Photo → text → dose & frequency</Text>
+              <Text style={s.hubRowSub}>Prescription image → OCR text → parse dose/frequency</Text>
             </View>
             <Text style={s.hubChevron}>›</Text>
           </TouchableOpacity>
@@ -944,7 +1003,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </View>
             <View style={s.hubRowBody}>
               <Text style={s.hubRowTitle}>Voice input</Text>
-              <Text style={s.hubRowSub}>Hear steps, then speak or type</Text>
+              <Text style={s.hubRowSub}>Speak medicine name (or type with keyboard mic)</Text>
             </View>
             <Text style={s.hubChevron}>›</Text>
           </TouchableOpacity>
@@ -957,7 +1016,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'scan-process') {
-    const labels = ['', 'Removing noise and straightening', 'Improving contrast', 'Reading text (OCR)'];
+    const labels = ['', 'Sending photo securely…', 'Extracting text (OCR)…', 'Almost done…'];
     return (
       <View style={s.screen}>
         {header('Reading prescription', 'We are processing your prescription photo.')}
@@ -965,7 +1024,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           <ActivityIndicator size="large" color={palette.primary} />
           <Text style={s.loadTitle}>Processing image…</Text>
           <Text style={s.loadText}>{labels[ocrPhase] || 'Preparing…'}</Text>
-          <Text style={s.helpSmall}>In production this uses on-device or server OCR. Here you confirm the text next.</Text>
+          <Text style={s.helpSmall}>
+            The server runs optical character recognition (Tesseract). Please wait—first run can take longer while language data loads. You will review every word before validation or safety checks.
+          </Text>
         </View>
       </View>
     );
@@ -977,7 +1038,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         {header('Prescription text', 'Check the text from your prescription. Edit it if needed, then parse.')}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={s.content}>
-            <Text style={s.lead}>If the text is empty, type what you see on the paper or use the sample to try the flow.</Text>
+            <Text style={s.lead}>
+              OCR may misread handwriting—correct any mistakes here. If the box is empty, type what is on the prescription or use the sample to try the flow.
+            </Text>
             <TextInput
               style={[s.input, s.areaLarge]}
               value={scanRawText}

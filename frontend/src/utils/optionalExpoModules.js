@@ -1,15 +1,24 @@
+import { Platform } from 'react-native';
+
 let imagePickerModule;
 let speechModule;
 
 /**
- * Dev clients built before a native dependency was added do not include modules like
- * ExponentImagePicker. Static `import 'expo-image-picker'` crashes at load time;
- * require inside try/catch defers that until first use and lets the app register.
+ * Dev clients built before expo-image-picker was added have no native ExponentImagePicker.
+ * Loading `expo-image-picker` still evaluates `requireNativeModule('ExponentImagePicker')` and throws.
+ * Check optional native registration first (same logic as expo-modules-core), then require JS.
  */
 export function getExpoImagePicker() {
   if (imagePickerModule === false) return null;
   if (imagePickerModule) return imagePickerModule;
   try {
+    if (Platform.OS !== 'web') {
+      const { requireOptionalNativeModule } = require('expo-modules-core');
+      if (!requireOptionalNativeModule('ExponentImagePicker')) {
+        imagePickerModule = false;
+        return null;
+      }
+    }
     imagePickerModule = require('expo-image-picker');
     return imagePickerModule;
   } catch {

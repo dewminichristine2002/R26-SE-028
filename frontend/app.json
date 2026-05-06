@@ -30,6 +30,15 @@
         "READ_MEDIA_IMAGES"
       ]
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ElderMeds reads prescription photos to help check medicine safety.",
+          "cameraPermission": "ElderMeds can use the camera to capture a prescription for safety checking."
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

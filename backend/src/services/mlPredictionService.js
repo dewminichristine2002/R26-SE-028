@@ -61,14 +61,12 @@ const buildPredictionPayload = ({ analysisPayload, profile, questionnaireAnswers
   };
 
   return {
-    risk_score: Number(analysisPayload.riskScore || 0),
     side_effect_count: Number(analysisPayload.sideEffectCount || 0),
     severe_side_effect_count: Number(analysisPayload.severeSideEffectCount || 0),
     side_effect_match_count: Number(analysisPayload.sideEffectMatchCount || 0),
     interaction_count: Number(analysisPayload.interactionCount || 0),
     gender: profile?.gender || 'missing',
     input_method: analysisPayload.historyEntry?.inputMethod || 'manual',
-    risk_level: analysisPayload.riskLevel || 'Safe',
     max_interaction_severity: analysisPayload.maxInteractionSeverity || 'none',
     has_medicine_allergy: String(profile?.hasMedicineAllergy ?? 'missing'),
     has_severe_reaction_log: '0',
@@ -76,19 +74,21 @@ const buildPredictionPayload = ({ analysisPayload, profile, questionnaireAnswers
   };
 };
 
-const mapPredictionToRisk = (probability) => {
-  const score = Math.max(0, Math.min(100, Math.round(Number(probability || 0) * 100)));
-  let riskLevel = 'Safe';
-
-  if (score >= 60) {
-    riskLevel = 'Dangerous';
-  } else if (score >= 25) {
-    riskLevel = 'Warning';
-  }
+const mapPredictionToRisk = (parsed) => {
+  const label = parsed.risk_level_label || 'Safe';
+  const dangerProb = Number(
+    parsed.probability_dangerous != null ? parsed.probability_dangerous : parsed.probability || 0
+  );
+  const classProb = Number(parsed.probability || 0);
+  const mlDangerScore = Math.max(0, Math.min(100, Math.round(dangerProb * 100)));
+  const mlClassConfidence = Math.max(0, Math.min(100, Math.round(classProb * 100)));
 
   return {
-    mlRiskScore: score,
-    mlRiskLevel: riskLevel,
+    mlRiskScore: mlDangerScore,
+    mlRiskLevel: label,
+    mlDangerProbability: dangerProb,
+    mlClassProbability: classProb,
+    mlClassConfidenceScore: mlClassConfidence,
   };
 };
 
@@ -143,7 +143,12 @@ const predictMedicineRisk = async ({ analysisPayload, profile, questionnaireAnsw
           target: parsed.target,
           prediction: parsed.prediction,
           probability: parsed.probability,
-          ...mapPredictionToRisk(parsed.probability),
+          probabilityDangerous: parsed.probability_dangerous,
+          probabilityWarning: parsed.probability_warning,
+          probabilitySafe: parsed.probability_safe,
+          probabilities: parsed.probabilities,
+          riskLevelLabel: parsed.risk_level_label,
+          ...mapPredictionToRisk(parsed),
           modelPath: parsed.model_path,
         });
       } catch (error) {

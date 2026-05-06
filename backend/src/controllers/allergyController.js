@@ -144,6 +144,43 @@ const compareRiskLevel = (left, right) => {
   return (weights[left] || 0) - (weights[right] || 0);
 };
 
+/**
+ * Low/minor DDInter-only context: no allergy / dangerous combo / high-severity interaction.
+ * Prevents "Dangerous" from stacking polypharmacy, age, and prior check scores alone (e.g. second-gen antihistamines).
+ */
+const isBenignLowSeverityOnlyInteractionContext = ({
+  medicationKnowledge,
+  riskFactors,
+  hasDirectAllergyMatch,
+  hasClassAllergyMatch,
+  hasNsaidAspirinCross,
+  hasDangerousCombination,
+  hasHighInteraction,
+}) => {
+  if (hasDirectAllergyMatch || hasClassAllergyMatch || hasNsaidAspirinCross || hasDangerousCombination || hasHighInteraction) {
+    return false;
+  }
+  const n = Number(medicationKnowledge?.interactionCount || 0);
+  if (n <= 0) {
+    return false;
+  }
+  if (String(medicationKnowledge?.maxInteractionSeverity || '').toLowerCase() !== 'low') {
+    return false;
+  }
+  return !(riskFactors || []).some((f) => f.factorType === 'ddinter_interaction' && f.severity === 'high');
+};
+
+const isBenignLowSeverityOnlyInteractionAnalysis = (analysisPayload) =>
+  isBenignLowSeverityOnlyInteractionContext({
+    medicationKnowledge: analysisPayload?.medicationKnowledge,
+    riskFactors: analysisPayload?.riskFactors,
+    hasDirectAllergyMatch: (analysisPayload?.riskFactors || []).some((f) => f.factorType === 'allergy_match'),
+    hasClassAllergyMatch: (analysisPayload?.riskFactors || []).some((f) => f.factorType === 'allergy_class_match'),
+    hasNsaidAspirinCross: (analysisPayload?.riskFactors || []).some((f) => f.factorType === 'nsaid_aspirin_cross_allergy'),
+    hasDangerousCombination: (analysisPayload?.riskFactors || []).some((f) => f.factorType === 'dangerous_combination'),
+    hasHighInteraction: analysisPayload?.medicationKnowledge?.maxInteractionSeverity === 'high',
+  });
+
 const includesAnyTerm = (haystack, terms = []) => {
   const normalizedHaystack = normalizeText(haystack).toLowerCase();
   if (!normalizedHaystack) {
@@ -161,6 +198,17 @@ const countListedItems = (value) =>
     .split(/[,/;\n]+/)
     .map((item) => item.trim())
     .filter(Boolean).length;
+
+const ASPIRIN_SALICYLATE_ALLERGY_TERMS = [
+  'aspirin',
+  'acetylsalicylic',
+  'salicylate',
+  'asa',
+  'disprin',
+  'ecosprin',
+  'bayer',
+  'asasantin',
+];
 
 const FAMILY_TERM_MAP = [
   {
@@ -240,6 +288,27 @@ const hasChronicContraindicationRisk = ({ chronicDiseasesText, therapeuticClass,
   return false;
 };
 
+const hasDangerousMedicationCombination = ({ medicineFlags, currentMedicationsText }) => {
+  const currentText = normalizeText(currentMedicationsText).toLowerCase();
+  const currentFlags = getMedicationFlags(currentText);
+  const hasBenzodiazepineNow = ['diazepam', 'lorazepam', 'alprazolam', 'clonazepam', 'midazolam'].some((term) =>
+    currentText.includes(term)
+  );
+
+  // Typical high-caution combinations for elderly safety triage.
+  if ((medicineFlags.isAnticoagulant && currentFlags.isNsaid) || (medicineFlags.isNsaid && currentFlags.isAnticoagulant)) {
+    return true;
+  }
+  if ((medicineFlags.isAnticoagulant && currentFlags.isAntiplatelet) || (medicineFlags.isAntiplatelet && currentFlags.isAnticoagulant)) {
+    return true;
+  }
+  if (medicineFlags.isOpioidLike && hasBenzodiazepineNow) {
+    return true;
+  }
+
+  return false;
+};
+
 const buildMedicationAllergyTerms = (payload, medicationKnowledge, fallbackMedication) => {
   const terms = new Set();
   const addTerm = (value) => {
@@ -288,6 +357,19 @@ const buildMedicationAllergyTerms = (payload, medicationKnowledge, fallbackMedic
     fallbackMedication.ingredientName,
     fallbackMedication.therapeuticClass
   ).forEach(addTerm);
+
+  const blobForClass = [
+    payload.medicineName,
+    payload.normalizedDrugName,
+    medicationKnowledge.ingredientName,
+    medicationKnowledge.therapeuticClass,
+    fallbackMedication.ingredientName,
+    fallbackMedication.therapeuticClass,
+  ].join(' ');
+  if (getMedicationFlags(blobForClass).isNsaid || therapeuticText.includes('nsaid')) {
+    ASPIRIN_SALICYLATE_ALLERGY_TERMS.forEach(addTerm);
+    ['nsaid', 'nonsteroidal anti-inflammatory', 'non steroidal anti inflammatory'].forEach(addTerm);
+  }
 
   return Array.from(terms);
 };
@@ -344,7 +426,7 @@ const sanitizeAnalysisPayload = (body) => ({
   notes: normalizeText(body.notes),
 });
 
-const buildAnalysis = (payload, profile, questionnaireAnswers) => {
+const buildAnalysis = (payload, profile, questionnaireAnswers, medicineHistory = []) => {
   const medicationKnowledge = enrichMedication({
     medicineName: payload.normalizedDrugName || payload.medicineName,
     currentMedicationsText: profile?.currentMedicationsText,
@@ -387,7 +469,24 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
   };
 
   if (userAllergyEvidence) {
-    addFactor('allergy_match', 'This medicine matches a known allergy in the profile.', 'high', 40);
+    addFactor('allergy_match', 'This medicine directly matches a known allergy in the profile.', 'high', 80);
+  }
+
+  const aspirinSalicylateInProfile =
+    includesAnyTerm(knownAllergiesText, ASPIRIN_SALICYLATE_ALLERGY_TERMS) ||
+    includesAnyTerm(questionnaireText, ASPIRIN_SALICYLATE_ALLERGY_TERMS);
+
+  if (
+    !riskFactors.some((factor) => factor.factorType === 'allergy_match') &&
+    medicationFlags.isNsaid &&
+    aspirinSalicylateInProfile
+  ) {
+    addFactor(
+      'nsaid_aspirin_cross_allergy',
+      'Aspirin/salicylate allergy with another NSAID (e.g. naproxen): high cross-reactivity — treat like a strong class-related allergy risk.',
+      'high',
+      60
+    );
   }
 
   if (
@@ -395,19 +494,19 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
     includesAnyTerm(knownAllergiesText, [medicationKnowledge.therapeuticClass]) &&
     !riskFactors.some((factor) => factor.factorType === 'allergy_match')
   ) {
-    addFactor('allergy_class_match', 'This medicine belongs to the same drug class as a previous allergy in the profile.', 'high', 25);
+    addFactor('allergy_class_match', 'This medicine belongs to the same drug class as a previous allergy in the profile.', 'high', 60);
   }
 
   if (payload.hadReactionBefore === true || questionnaireAllergyEvidence) {
-    addFactor('past_reaction', 'Past medicine reaction history suggests extra caution.', 'medium', 25);
+    addFactor('past_reaction', 'Past reaction symptom match suggests extra caution.', 'medium', 20);
   }
 
   if (medicationKnowledge.interactionCount > 0) {
     const severityScore = medicationKnowledge.maxInteractionSeverity === 'high'
-      ? 25
+      ? 60
       : medicationKnowledge.maxInteractionSeverity === 'medium'
-        ? 15
-        : 5;
+        ? 30
+        : 10;
 
     if (severityScore > 0) {
       addFactor(
@@ -424,7 +523,7 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
       'sider_symptom_match',
       `SIDER-style side-effect matching found ${medicationKnowledge.sideEffectMatchCount} overlap(s) with reported symptoms.`,
       'medium',
-      10
+      12
     );
   }
 
@@ -433,7 +532,7 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
       'high_caution_medicine',
       'This medicine is in a higher-caution blood-thinner or antiplatelet category and should be reviewed carefully before use.',
       'medium',
-      15
+      18
     );
   }
 
@@ -442,7 +541,7 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
       'elder_high_caution_medicine',
       'Older age increases caution for this blood-thinner or antiplatelet medicine.',
       'medium',
-      10
+      12
     );
   }
 
@@ -451,7 +550,7 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
       'elder_sedation_risk',
       'This medicine can cause dizziness, drowsiness, or falls more easily in older adults.',
       'medium',
-      15
+      18
     );
   }
 
@@ -461,38 +560,173 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
     ingredientName: medicationKnowledge.ingredientName || fallbackMedication.ingredientName,
     medicineName: payload.medicineName,
   })) {
-    addFactor('chronic_condition', 'Chronic disease history may create a contraindication or extra medicine risk.', 'medium', 20);
+    addFactor('chronic_condition', 'Hypertension/chronic condition plus NSAID class may increase medicine risk.', 'medium', 25);
+  }
+
+  if (hasDangerousMedicationCombination({
+    medicineFlags: medicationFlags,
+    currentMedicationsText: profile?.currentMedicationsText,
+  })) {
+    addFactor(
+      'dangerous_combination',
+      'A high-risk medicine combination pattern was detected (for example blood thinner with NSAID/antiplatelet, or opioid with sedative).',
+      'high',
+      32
+    );
   }
 
   if (currentMedicationCount >= 5 || (payload.takingOtherMedicinesNow === true && currentMedicationCount >= 3)) {
-    addFactor('polypharmacy_risk', 'Multiple current medicines increase polypharmacy risk.', 'medium', 10);
+    addFactor('polypharmacy_risk', 'Multiple current medicines increase polypharmacy risk.', 'medium', 14);
   }
 
   if (Number.isFinite(ageValue) && ageValue >= 65) {
-    addFactor('elder_risk', 'Older age may increase sensitivity to medicine risks and interactions.', 'medium', 10);
+    addFactor('elder_risk', 'Elderly age may increase sensitivity to medicine risks and interactions.', 'medium', 10);
   }
 
-  const hasAllergyMatch = riskFactors.some((factor) => factor.factorType === 'allergy_match' || factor.factorType === 'allergy_class_match');
+  if (medicationKnowledge.matched === false) {
+    addFactor(
+      'knowledge_gap',
+      'This name did not match the local RxNorm/SIDER dictionary well — side effects and interactions may be incomplete until the spelling or strength is corrected.',
+      'medium',
+      12
+    );
+  }
+
+  const historyRows = Array.isArray(medicineHistory) ? medicineHistory : [];
+  let historyDangerousCount = 0;
+  let historyWarningCount = 0;
+  let historySafeCount = 0;
+  if (historyRows.length > 0) {
+    historyDangerousCount = historyRows.filter((h) => h.riskLevel === 'Dangerous').length;
+    historyWarningCount = historyRows.filter((h) => h.riskLevel === 'Warning').length;
+    historySafeCount = historyRows.filter((h) => h.riskLevel === 'Safe').length;
+    const latest = historyRows[0];
+    let histScore = 0;
+    if (latest?.riskLevel === 'Dangerous') {
+      histScore += 30;
+    } else if (latest?.riskLevel === 'Warning') {
+      histScore += 18;
+    } else if (latest?.riskLevel === 'Safe') {
+      histScore += 4;
+    }
+    if (historyDangerousCount >= 2) {
+      histScore += 25;
+    } else if (historyDangerousCount === 1 && historyWarningCount >= 1) {
+      histScore += 12;
+    }
+    if (historyWarningCount >= 3 && historyDangerousCount === 0) {
+      histScore += 14;
+    }
+    histScore = Math.min(45, histScore);
+    const histSeverity =
+      latest?.riskLevel === 'Dangerous' || historyDangerousCount >= 2
+        ? 'high'
+        : latest?.riskLevel === 'Warning'
+          ? 'medium'
+          : 'low';
+    addFactor(
+      'medicine_history',
+      `Your medicine history includes ${historyRows.length} prior check(s) for this drug: ${historyDangerousCount} Dangerous, ${historyWarningCount} Warning, ${historySafeCount} Safe (latest: ${latest?.riskLevel || 'unknown'}).`,
+      histSeverity,
+      histScore
+    );
+  }
+
+  const hasDirectAllergyMatch = riskFactors.some((factor) => factor.factorType === 'allergy_match');
+  const hasNsaidAspirinCross = riskFactors.some((factor) => factor.factorType === 'nsaid_aspirin_cross_allergy');
+  const hasClassAllergyMatch = riskFactors.some((factor) => factor.factorType === 'allergy_class_match');
+  const hasAllergyMatch = hasDirectAllergyMatch || hasClassAllergyMatch || hasNsaidAspirinCross;
   const hasPastReaction = riskFactors.some((factor) => factor.factorType === 'past_reaction');
   const hasHighInteraction = medicationKnowledge.maxInteractionSeverity === 'high';
   const hasMediumOrHighInteraction = ['high', 'medium'].includes(medicationKnowledge.maxInteractionSeverity);
   const hasAnyInteraction = medicationKnowledge.interactionCount > 0;
+  const hasDangerousCombination = riskFactors.some((factor) => factor.factorType === 'dangerous_combination');
+  const hasChronicRisk = riskFactors.some((factor) => factor.factorType === 'chronic_condition');
   const hasGeneralCautionMedicine =
     medicationFlags.isNsaid ||
     medicationFlags.isAnticoagulant ||
     medicationFlags.isAntiplatelet ||
     medicationFlags.isOpioidLike;
 
-  if (hasAllergyMatch && (hasPastReaction || severeReactionSignal)) {
-    ruleScore = Math.max(ruleScore, 70);
+  if (hasDirectAllergyMatch && (hasPastReaction || severeReactionSignal)) {
+    ruleScore = Math.max(ruleScore, 95);
+  } else if (hasDirectAllergyMatch) {
+    ruleScore = Math.max(ruleScore, 85);
   }
 
-  if (hasHighInteraction) {
+  if (hasClassAllergyMatch && (hasPastReaction || severeReactionSignal)) {
+    ruleScore = Math.max(ruleScore, 70);
+  } else if (hasClassAllergyMatch) {
     ruleScore = Math.max(ruleScore, 60);
+  }
+
+  if (hasNsaidAspirinCross) {
+    ruleScore = Math.max(ruleScore, 65);
+  }
+
+  if (hasDirectAllergyMatch && hasHighInteraction) {
+    ruleScore = Math.max(ruleScore, 100);
+  }
+
+  if (hasAllergyMatch && (hasPastReaction || severeReactionSignal)) {
+    ruleScore = Math.max(ruleScore, 75);
+  }
+
+  if (hasHighInteraction && (hasGeneralCautionMedicine || hasChronicRisk)) {
+    ruleScore = Math.max(ruleScore, 70);
+  } else if (hasHighInteraction) {
+    ruleScore = Math.max(ruleScore, 60);
+  }
+
+  if (hasDangerousCombination) {
+    ruleScore = Math.max(ruleScore, 72);
+  }
+
+  // Past severe symptoms + interactions deserve extra caution, but minor-only DDInter rows
+  // should not pin the rule score near maximum (e.g. antihistamine + metformin "low").
+  if (severeReactionSignal && hasAnyInteraction) {
+    if (hasHighInteraction) {
+      ruleScore = Math.max(ruleScore, 78);
+    } else if (hasMediumOrHighInteraction) {
+      ruleScore = Math.max(ruleScore, 66);
+    } else {
+      ruleScore = Math.max(ruleScore, 44);
+    }
+  }
+
+  if (Number.isFinite(ageValue) && ageValue >= 75 && (hasGeneralCautionMedicine || hasMediumOrHighInteraction)) {
+    ruleScore = Math.max(ruleScore, 45);
+  }
+
+  if (severeReactionSignal && !hasAllergyMatch) {
+    ruleScore = Math.max(ruleScore, 40);
+  }
+
+  if (historyRows.length > 0) {
+    if (historyDangerousCount >= 2) {
+      ruleScore = Math.max(ruleScore, 68);
+    } else if (historyDangerousCount >= 1) {
+      ruleScore = Math.max(ruleScore, 52);
+    } else if (historyWarningCount >= 2 && historyDangerousCount === 0) {
+      ruleScore = Math.max(ruleScore, 38);
+    }
   }
 
   if ((hasMediumOrHighInteraction || hasGeneralCautionMedicine || severeReactionSignal) && ruleScore < 25) {
     ruleScore = 25;
+  }
+
+  const benignLowOnly = isBenignLowSeverityOnlyInteractionContext({
+    medicationKnowledge,
+    riskFactors,
+    hasDirectAllergyMatch,
+    hasClassAllergyMatch,
+    hasNsaidAspirinCross,
+    hasDangerousCombination,
+    hasHighInteraction,
+  });
+  if (benignLowOnly && ruleScore >= 60) {
+    ruleScore = Math.min(ruleScore, 58);
   }
 
   ruleScore = Math.min(ruleScore, 100);
@@ -589,6 +823,12 @@ const buildAnalysis = (payload, profile, questionnaireAnswers) => {
       ],
       questionnaireAnswerCount: questionnaireAnswers.length,
       medicationKnowledgeSources: medicationKnowledge.knowledgeSources,
+      knowledgeMatched: medicationKnowledge.matched !== false,
+      historyPriorCheckCount: historyRows.length,
+      historyDangerousCount,
+      historyWarningCount,
+      historySafeCount,
+      historyLatestRiskLevel: historyRows[0]?.riskLevel || null,
       ruleScore,
       currentCheckFields: [
         'medicineName',
@@ -612,8 +852,22 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
 
   const ruleScore = Number(analysisPayload.riskScore || 0);
   const ruleRiskLevel = analysisPayload.riskLevel || 'Safe';
-  const mlScore = Math.max(0, Math.min(100, Math.round(Number(mlPrediction.probability || 0) * 100)));
-  let combinedRiskScore = Math.round((0.6 * ruleScore) + (0.4 * mlScore));
+  const mlDangerScore = Number.isFinite(Number(mlPrediction.mlRiskScore))
+    ? Number(mlPrediction.mlRiskScore)
+    : Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(Number(mlPrediction.probabilityDangerous ?? mlPrediction.probability ?? 0) * 100)
+        )
+      );
+  const mlClassConf = Number.isFinite(Number(mlPrediction.mlClassConfidenceScore))
+    ? Number(mlPrediction.mlClassConfidenceScore)
+    : Math.max(0, Math.min(100, Math.round(Number(mlPrediction.probability || 0) * 100)));
+  let combinedRiskScore = Math.round((0.55 * ruleScore) + (0.45 * mlDangerScore));
+  if (mlDangerScore >= 50 && ruleScore >= 20) {
+    combinedRiskScore = Math.max(combinedRiskScore, Math.round(0.5 * ruleScore + 0.5 * mlDangerScore) + 3);
+  }
   let combinedRiskLevel = 'Safe';
   if (combinedRiskScore >= 60) {
     combinedRiskLevel = 'Dangerous';
@@ -630,23 +884,69 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     }
   }
 
+  const hasDirectAllergyFactor = (analysisPayload.riskFactors || []).some((factor) => factor.factorType === 'allergy_match');
+  const hasNsaidAspirinCrossFactor = (analysisPayload.riskFactors || []).some(
+    (factor) => factor.factorType === 'nsaid_aspirin_cross_allergy'
+  );
+  const hasDangerousComboFactor = (analysisPayload.riskFactors || []).some((factor) => factor.factorType === 'dangerous_combination');
+  const hasHighInteractionFactor = (analysisPayload.riskFactors || []).some(
+    (factor) => factor.factorType === 'ddinter_interaction' && factor.severity === 'high'
+  );
+
+  // Safety-first rule: ML must not downgrade clearly high-risk clinical triggers.
+  if (hasDirectAllergyFactor || hasNsaidAspirinCrossFactor || hasHighInteractionFactor) {
+    combinedRiskLevel = 'Dangerous';
+    combinedRiskScore = Math.max(combinedRiskScore, 75);
+  } else if (hasDangerousComboFactor && compareRiskLevel(combinedRiskLevel, 'Warning') < 0) {
+    combinedRiskLevel = 'Warning';
+    combinedRiskScore = Math.max(combinedRiskScore, 35);
+  }
+
+  const histDangerous = Number(analysisPayload.dataUsed?.historyDangerousCount || 0);
+  const histWarning = Number(analysisPayload.dataUsed?.historyWarningCount || 0);
+  if (histDangerous >= 2 && !isBenignLowSeverityOnlyInteractionAnalysis(analysisPayload)) {
+    combinedRiskLevel = 'Dangerous';
+    combinedRiskScore = Math.max(combinedRiskScore, 72);
+  } else if (histDangerous >= 1) {
+    combinedRiskScore = Math.max(combinedRiskScore, 40);
+    if (compareRiskLevel(combinedRiskLevel, 'Warning') < 0) {
+      combinedRiskLevel = 'Warning';
+    }
+  } else if (histWarning >= 2 && histDangerous === 0 && compareRiskLevel(combinedRiskLevel, 'Warning') < 0) {
+    combinedRiskLevel = 'Warning';
+    combinedRiskScore = Math.max(combinedRiskScore, 28);
+  }
+
   const riskFactors = [...analysisPayload.riskFactors];
   riskFactors.push({
     factorType: 'ml_prediction',
-    factorLabel: `Baseline ML model estimated dangerous-risk probability at ${mlScore}/100.`,
+    factorLabel: `Baseline ML model: P(Dangerous) ≈ ${mlDangerScore}/100; predicted class ${mlPrediction.mlRiskLevel || 'n/a'} (confidence ≈ ${mlClassConf}/100).`,
     severity: mlPrediction.mlRiskLevel === 'Dangerous' ? 'high' : mlPrediction.mlRiskLevel === 'Warning' ? 'medium' : 'low',
-    score: mlScore,
+    score: mlDangerScore,
   });
 
-  let mlExplanation = `Rule score was ${ruleScore}/100 and ML score was ${mlScore}/100. The combined weighted score is ${combinedRiskScore}/100.`;
+  let mlExplanation = `Rule score was ${ruleScore}/100. ML dangerous-class probability was ${mlDangerScore}/100 (predicted ${mlPrediction.mlRiskLevel || 'n/a'} with ~${mlClassConf}/100 class confidence). The combined weighted score is ${combinedRiskScore}/100.`;
+  const mlLevel = mlPrediction.mlRiskLevel || 'Safe';
   if (compareRiskLevel(ruleRiskLevel, combinedRiskLevel) > 0) {
     mlExplanation += ` Clinical safety guardrails kept the final result at ${combinedRiskLevel.toLowerCase()} instead of allowing the ML blend to downgrade it.`;
-  } else if (mlPrediction.mlRiskLevel === combinedRiskLevel) {
-    mlExplanation += ` It agrees with the final ${combinedRiskLevel.toLowerCase()} result.`;
-  } else if (compareRiskLevel(mlPrediction.mlRiskLevel, combinedRiskLevel) > 0) {
-    mlExplanation += ' The rule-based clinical checks kept the final result more cautious than the standalone ML estimate.';
+  } else if (mlLevel === combinedRiskLevel) {
+    mlExplanation += ` The ML predicted class (${mlLevel}) matches the final ${combinedRiskLevel.toLowerCase()} band.`;
+  } else if (compareRiskLevel(ruleRiskLevel, mlLevel) > 0) {
+    mlExplanation +=
+      ' The clinical rule-based factors showed higher concern than the ML model; when they disagree, the stricter clinical side drives the risk band.';
+  } else if (compareRiskLevel(mlLevel, ruleRiskLevel) > 0) {
+    mlExplanation +=
+      ' The ML model showed higher concern than the rule-only factors; the blended score partly reflects that signal.';
   } else {
-    mlExplanation += ' The ML dangerous-risk probability raised the final result above the rule-only score.';
+    mlExplanation += ' Rule-based and ML estimates were in a similar range; the blended score combines both.';
+  }
+
+  const priorN = Number(analysisPayload.dataUsed?.historyPriorCheckCount || 0);
+  if (priorN > 0) {
+    mlExplanation += ` Prior checks you saved for this medicine (${priorN}) were folded into the clinical rule score and can lift the final level when they were high risk.`;
+  }
+  if (analysisPayload.dataUsed?.knowledgeMatched === false) {
+    mlExplanation += ' The name did not match our local drug dictionary strongly — confirm spelling or strength so public interaction data applies.';
   }
 
   return {
@@ -660,7 +960,11 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
       mlPrediction: {
         target: mlPrediction.target,
         probability: mlPrediction.probability,
-        mlRiskScore: mlScore,
+        probabilityDangerous: mlPrediction.probabilityDangerous,
+        probabilityWarning: mlPrediction.probabilityWarning,
+        probabilitySafe: mlPrediction.probabilitySafe,
+        mlRiskScore: mlDangerScore,
+        mlClassConfidenceScore: mlClassConf,
         mlRiskLevel: mlPrediction.mlRiskLevel,
       },
     },
@@ -672,7 +976,8 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     dataUsed: {
       ...(analysisPayload.dataUsed || {}),
       mlEnabled: true,
-      mlScore,
+      mlScore: mlDangerScore,
+      mlClassConfidenceScore: mlClassConf,
     },
   };
 };
@@ -822,12 +1127,19 @@ const analyzeMedicine = async (req, res, next) => {
       return res.status(400).json({ error: 'medicineName is required' });
     }
 
-    const [profile, questionnaireAnswers] = await Promise.all([
+    const prelimDrug = resolveMedication(payload.normalizedDrugName || payload.medicineName);
+
+    const [profile, questionnaireAnswers, medicineHistory] = await Promise.all([
       allergyModel.getProfile(req.user.id),
       allergyModel.listQuestionnaireAnswers(req.user.id),
+      allergyModel.listHistoryMatchesForMedicine(req.user.id, {
+        normalizedDrugName: prelimDrug.normalizedName,
+        rxnormCui: prelimDrug.rxnormCui,
+        medicineName: payload.medicineName,
+      }),
     ]);
 
-    const ruleAnalysis = buildAnalysis(payload, profile, questionnaireAnswers);
+    const ruleAnalysis = buildAnalysis(payload, profile, questionnaireAnswers, medicineHistory);
     const mlPrediction = await predictMedicineRisk({
       analysisPayload: ruleAnalysis,
       profile,

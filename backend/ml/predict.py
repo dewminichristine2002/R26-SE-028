@@ -30,9 +30,9 @@ def build_dataframe(payload: dict, metadata: dict) -> pd.DataFrame:
 
     row = {}
     for key in numeric_features:
-      row[key] = payload.get(key, 0)
+        row[key] = payload.get(key, 0)
     for key in categorical_features:
-      row[key] = payload.get(key, "missing")
+        row[key] = payload.get(key, "missing")
     row[text_feature_name] = payload.get(text_feature_name, "")
 
     return pd.DataFrame([row])
@@ -46,26 +46,48 @@ def main() -> None:
 
     payload = read_payload()
     metadata = json.loads(METADATA_PATH.read_text(encoding="utf8"))
+    class_names = metadata.get("risk_level_classes", ["Safe", "Warning", "Dangerous"])
     model = joblib.load(MODEL_PATH)
     frame = build_dataframe(payload, metadata)
 
     prediction = int(model.predict(frame)[0])
     probabilities = model.predict_proba(frame)[0].tolist() if hasattr(model, "predict_proba") else []
 
-    probability_positive = 0.0
-    if probabilities:
-        classes = list(model.classes_)
-        if 1 in classes:
-            probability_positive = float(probabilities[classes.index(1)])
-        elif len(probabilities) > 1:
-            probability_positive = float(probabilities[1])
+    classes = list(getattr(model, "classes_", []))
+    label = class_names[prediction] if prediction < len(class_names) else "Safe"
 
-    print(json.dumps({
-        "prediction": prediction,
-        "probability": probability_positive,
-        "model_path": str(MODEL_PATH),
-        "target": metadata.get("target", "has_reaction_log"),
-    }))
+    def prob_for_class_idx(class_idx: int) -> float:
+        if not probabilities or class_idx not in classes:
+            return 0.0
+        try:
+            return float(probabilities[classes.index(class_idx)])
+        except (ValueError, IndexError):
+            return 0.0
+
+    # Training uses Safe=0, Warning=1, Dangerous=2
+    probability_safe = prob_for_class_idx(0)
+    probability_warning = prob_for_class_idx(1)
+    probability_dangerous = prob_for_class_idx(2)
+
+    probability_predicted = prob_for_class_idx(prediction)
+    if probability_predicted == 0.0 and probabilities and prediction < len(probabilities):
+        probability_predicted = float(probabilities[prediction])
+
+    print(
+        json.dumps(
+            {
+                "prediction": prediction,
+                "risk_level_label": label,
+                "probability": probability_predicted,
+                "probability_safe": probability_safe,
+                "probability_warning": probability_warning,
+                "probability_dangerous": probability_dangerous,
+                "probabilities": probabilities,
+                "model_path": str(MODEL_PATH),
+                "target": metadata.get("target", "risk_level"),
+            }
+        )
+    )
 
 
 if __name__ == "__main__":
