@@ -259,14 +259,13 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
       </View>
 
       <View style={styles.helperCard}>
-        <Text style={[styles.helperIcon, { fontSize: 24 * textScale }]}>1</Text>
         <View style={styles.helperTextWrap}>
-          <Text style={[styles.helperTitle, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Medicine name</Text>
-          <Text style={[styles.helperText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>Type and select your medicine.</Text>
+          <Text style={[styles.helperTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Medicine name</Text>
+          <Text style={[styles.helperText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}>Type and select your medicine.</Text>
         </View>
       </View>
 
-      <Text style={[styles.fieldLabel, { fontSize: 15 * textScale }]}>Medicine name</Text>
+      <Text style={[styles.fieldLabel, { fontSize: 18 * textScale }]}>Medicine name</Text>
       <TextInput
         value={medicineQuery}
         onChangeText={(value) => {
@@ -517,40 +516,40 @@ const styles = StyleSheet.create({
     height: 46,
   },
   helperCard: {
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: '#eadcca',
     backgroundColor: '#fffdf8',
-    padding: 14,
-    marginBottom: 14,
+    padding: 16,
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
   helperIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     backgroundColor: '#f8d978',
     color: '#2d241d',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '900',
     textAlign: 'center',
     textAlignVertical: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   helperTextWrap: {
     flex: 1,
   },
   helperTitle: {
-    fontSize: 20,
-    lineHeight: 25,
+    fontSize: 22,
+    lineHeight: 28,
     color: '#2d241d',
     fontWeight: '900',
   },
   helperText: {
-    marginTop: 3,
-    fontSize: 14,
-    lineHeight: 20,
+    marginTop: 4,
+    fontSize: 16,
+    lineHeight: 22,
     color: '#74665b',
     fontWeight: '700',
   },

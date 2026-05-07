@@ -294,24 +294,26 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
         <View style={styles.detectedListCard}>
           <Text style={[styles.detectedListTitle, { fontSize: 20 * textScale, lineHeight: 26 * textScale }]}>Found Medicines ({detectedMedicines.length})</Text>
           <Text style={[styles.detectedListSubtitle, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>Check details before saving.</Text>
-          <TouchableOpacity
-            style={styles.fillAllButton}
-            onPress={() => onDetectedMany?.(detectedMedicines.map((item) => ({
-              medicineName: item.medicineName || '',
-              dosageMg: item.dosageMg || '20',
-              totalQuantity: item.totalQuantity || '30',
-              dailyAmount: item.dailyAmount || '1',
-            })))}
-          >
-            <Text style={[styles.fillAllButtonText, { fontSize: 14 * textScale }]}>Use All</Text>
-          </TouchableOpacity>
+          <View style={styles.detectedButtonsRow}>
+            <TouchableOpacity
+              style={styles.fillAllButton}
+              onPress={() => onDetectedMany?.(detectedMedicines.map((item) => ({
+                medicineName: item.medicineName || '',
+                dosageMg: item.dosageMg || '20',
+                totalQuantity: item.totalQuantity || '30',
+                dailyAmount: item.dailyAmount || '1',
+              })))}
+            >
+              <Text style={[styles.fillAllButtonText, { fontSize: 14 * textScale }]}>Use All</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.clearCapturedButton}
-            onPress={handleClearCapturedData}
-          >
-            <Text style={[styles.clearCapturedButtonText, { fontSize: 14 * textScale }]}>Clear</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.clearCapturedButton}
+              onPress={handleClearCapturedData}
+            >
+              <Text style={[styles.clearCapturedButtonText, { fontSize: 14 * textScale }]}>Clear</Text>
+            </TouchableOpacity>
+          </View>
 
           {detectedMedicines.map((item, index) => (
             <View key={`${item.medicineName || 'medicine'}-${index}`} style={styles.detectedItemCard}>
@@ -401,8 +403,13 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
 
       {!!rawTextPreview && (
         <View style={styles.rawTextCard}>
-          <Text style={[styles.rawTextTitle, { fontSize: 18 * textScale }]}>Detected Text</Text>
-          <Text style={[styles.rawTextBody, { fontSize: 13 * textScale }]}>{rawTextPreview}</Text>
+          <View style={styles.rawTextHeader}>
+            <Text style={[styles.rawTextTitle, { fontSize: 18 * textScale }]}>📖 Detected Text</Text>
+            <Text style={styles.rawTextBadge}>Clear</Text>
+          </View>
+          <ScrollView style={styles.rawTextScrollContainer} nestedScrollEnabled={true}>
+            <Text style={[styles.rawTextBody, { fontSize: 15 * textScale, lineHeight: 24 * textScale }]}>{rawTextPreview}</Text>
+          </ScrollView>
         </View>
       )}
     </ScrollView>
@@ -576,21 +583,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecf1f5',
   },
   rawTextCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#f0f8ff',
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    padding: 12,
+    borderColor: '#81c3d7',
+    padding: 16,
+    marginBottom: 14,
+    minHeight: 200,
+  },
+  rawTextHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#81c3d7',
   },
   rawTextTitle: {
-    color: '#2b3c49',
+    color: '#0d5a7f',
+    fontWeight: '800',
+    fontSize: 18,
+  },
+  rawTextBadge: {
+    fontSize: 11,
+    color: '#4a8fa5',
     fontWeight: '700',
-    marginBottom: 6,
+    backgroundColor: '#e0f2f7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rawTextScrollContainer: {
+    maxHeight: 260,
   },
   rawTextBody: {
-    color: '#4f6172',
-    fontSize: 12,
-    lineHeight: 18,
+    color: '#1a3a4a',
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: '500',
+    letterSpacing: 0.2,
   },
   detectedListCard: {
     backgroundColor: '#eaf4ff',
@@ -611,13 +643,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 10,
   },
+  detectedButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
   fillAllButton: {
-    alignSelf: 'flex-start',
+    flex: 1,
     backgroundColor: '#2f5d50',
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 8,
+    alignItems: 'center',
   },
   fillAllButtonText: {
     color: '#ffffff',
@@ -625,14 +662,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   clearCapturedButton: {
-    alignSelf: 'flex-start',
+    flex: 1,
     borderWidth: 2,
     borderColor: '#eadcca',
     backgroundColor: '#fffdf8',
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 10,
+    alignItems: 'center',
   },
   clearCapturedButtonText: {
     color: '#4f6071',
