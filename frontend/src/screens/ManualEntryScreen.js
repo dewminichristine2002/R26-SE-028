@@ -259,9 +259,10 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
       </View>
 
       <View style={styles.helperCard}>
+        <Text style={[styles.helperIcon, { fontSize: 28 * textScale }]}>1</Text>
         <View style={styles.helperTextWrap}>
           <Text style={[styles.helperTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Medicine name</Text>
-          <Text style={[styles.helperText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}>Type and select your medicine.</Text>
+          <Text style={[styles.helperText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}>Type and tap the correct name.</Text>
         </View>
       </View>
 
@@ -353,6 +354,10 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
       {!!colorError && <Text style={[styles.errorText, { fontSize: 13 * textScale }]}>{colorError}</Text>}
 
       <View style={styles.dualInputRow}>
+        <View style={styles.stepHeaderRow}>
+          <Text style={[styles.stepBadge, { fontSize: 18 * textScale }]}>2</Text>
+          <Text style={[styles.stepHeaderText, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Medicine amount</Text>
+        </View>
         <View style={styles.miniField}>
           <Text style={[styles.miniFieldLabel, { fontSize: 13 * textScale }]}>Total tablets</Text>
           <View style={styles.miniFieldValueRow}>
@@ -383,6 +388,10 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
       </View>
 
       <View style={styles.scheduleCard}>
+        <View style={styles.stepHeaderRow}>
+          <Text style={[styles.stepBadge, { fontSize: 18 * textScale }]}>3</Text>
+          <Text style={[styles.stepHeaderText, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Daily plan</Text>
+        </View>
         <Text style={[styles.scheduleTitle, { fontSize: 22 * textScale }]}>How to take</Text>
 
         <Text style={[styles.sectionCaption, { fontSize: 12 * textScale }]}>Tablets each time</Text>
@@ -424,6 +433,10 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
       </View>
 
       <View style={styles.howSection}>
+        <View style={styles.stepHeaderRow}>
+          <Text style={[styles.stepBadge, { fontSize: 18 * textScale }]}>4</Text>
+          <Text style={[styles.stepHeaderText, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Meal rule</Text>
+        </View>
         <Text style={[styles.howSectionTitle, { fontSize: 18 * textScale }]}>Meal time</Text>
         <View style={styles.howButtonsRow}>
           {['Before', 'After'].map((item) => (
@@ -432,7 +445,9 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
               style={[styles.howButton, intakeTiming === item && styles.howButtonActive]}
               onPress={() => setIntakeTiming(item)}
             >
-              <Text style={[styles.howButtonText, intakeTiming === item && styles.howButtonTextActive, { fontSize: 17 * textScale }]}>{item}</Text>
+              <Text style={[styles.howButtonText, intakeTiming === item && styles.howButtonTextActive, { fontSize: 17 * textScale }]}>
+                {item === 'Before' ? 'Before meal' : 'After meal'}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -516,7 +531,7 @@ const styles = StyleSheet.create({
     height: 46,
   },
   helperCard: {
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 2,
     borderColor: '#eadcca',
     backgroundColor: '#fffdf8',
@@ -528,7 +543,7 @@ const styles = StyleSheet.create({
   helperIcon: {
     width: 60,
     height: 60,
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: '#f8d978',
     color: '#2d241d',
     fontSize: 28,
@@ -682,18 +697,46 @@ const styles = StyleSheet.create({
     color: '#20679f',
   },
   dualInputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginTop: 16,
-  },
-  miniField: {
-    width: '48%',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 2,
     borderColor: '#eadcca',
     backgroundColor: '#fffdf8',
+    padding: 14,
+  },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stepBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#f8d978',
+    color: '#2d241d',
+    fontSize: 18,
+    lineHeight: 40,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginRight: 10,
+  },
+  stepHeaderText: {
+    flex: 1,
+    fontSize: 20,
+    lineHeight: 25,
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  miniField: {
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#f7efe4',
     paddingHorizontal: 12,
     paddingVertical: 12,
+    marginBottom: 10,
   },
   miniFieldLabel: {
     fontSize: 11,
@@ -707,7 +750,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   miniFieldInput: {
-    minWidth: 52,
+    flex: 1,
+    minWidth: 80,
     fontSize: 21,
     color: '#273646',
     fontWeight: '700',
@@ -731,7 +775,7 @@ const styles = StyleSheet.create({
   scheduleTitle: {
     fontSize: 17,
     color: '#27384a',
-    fontWeight: '700',
+    fontWeight: '900',
     marginBottom: 12,
   },
   sectionCaption: {
@@ -742,17 +786,20 @@ const styles = StyleSheet.create({
   },
   amountRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     marginBottom: 12,
   },
   amountValuePill: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
     backgroundColor: '#e9f7f1',
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 10,
-    marginRight: 8,
+    marginRight: 0,
+    marginBottom: 10,
   },
   amountValueInput: {
     minWidth: 28,
@@ -769,6 +816,7 @@ const styles = StyleSheet.create({
     color: '#4f6171',
   },
   chipButton: {
+    flex: 1,
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#eadcca',
@@ -776,6 +824,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginRight: 8,
+    alignItems: 'center',
   },
   chipButtonActive: {
     backgroundColor: '#2f5d50',
@@ -830,7 +879,7 @@ const styles = StyleSheet.create({
   howSectionTitle: {
     fontSize: 22,
     color: '#253446',
-    fontWeight: '700',
+    fontWeight: '900',
     marginBottom: 8,
   },
   howButtonsRow: {
@@ -870,7 +919,7 @@ const styles = StyleSheet.create({
   },
   safetyTitle: {
     color: '#325a7e',
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 14,
     marginBottom: 4,
   },
@@ -884,7 +933,7 @@ const styles = StyleSheet.create({
     minHeight: 58,
     borderRadius: 18,
     backgroundColor: '#f0f2f5',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e6eaef',
     alignItems: 'center',
     justifyContent: 'center',

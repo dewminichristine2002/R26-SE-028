@@ -304,14 +304,16 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
                 dailyAmount: item.dailyAmount || '1',
               })))}
             >
-              <Text style={[styles.fillAllButtonText, { fontSize: 14 * textScale }]}>Use All</Text>
+              <Text style={styles.detectedButtonIcon}>✓</Text>
+              <Text style={[styles.fillAllButtonText, { fontSize: 14 * textScale }]}>Use all medicines</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.clearCapturedButton}
               onPress={handleClearCapturedData}
             >
-              <Text style={[styles.clearCapturedButtonText, { fontSize: 14 * textScale }]}>Clear</Text>
+              <Text style={styles.detectedButtonIconDark}>×</Text>
+              <Text style={[styles.clearCapturedButtonText, { fontSize: 14 * textScale }]}>Clear list</Text>
             </TouchableOpacity>
           </View>
 
@@ -404,9 +406,12 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
       {!!rawTextPreview && (
         <View style={styles.rawTextCard}>
           <View style={styles.rawTextHeader}>
-            <Text style={[styles.rawTextTitle, { fontSize: 18 * textScale }]}>📖 Detected Text</Text>
-            <Text style={styles.rawTextBadge}>Clear</Text>
+            <Text style={[styles.rawTextTitle, { fontSize: 18 * textScale }]}>📖 Text from receipt</Text>
+            <Text style={styles.rawTextBadge}>Read only</Text>
           </View>
+          <Text style={[styles.rawTextHint, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+            Use this to check the scanned words.
+          </Text>
           <ScrollView style={styles.rawTextScrollContainer} nestedScrollEnabled={true}>
             <Text style={[styles.rawTextBody, { fontSize: 15 * textScale, lineHeight: 24 * textScale }]}>{rawTextPreview}</Text>
           </ScrollView>
@@ -583,11 +588,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecf1f5',
   },
   rawTextCard: {
-    backgroundColor: '#f0f8ff',
-    borderRadius: 20,
+    backgroundColor: '#eaf4ff',
+    borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#81c3d7',
-    padding: 16,
+    borderColor: '#b9d4f2',
+    padding: 14,
     marginBottom: 14,
     minHeight: 200,
   },
@@ -598,31 +603,44 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#81c3d7',
+    borderBottomColor: '#b9d4f2',
   },
   rawTextTitle: {
-    color: '#0d5a7f',
-    fontWeight: '800',
+    color: '#24352f',
+    fontWeight: '900',
     fontSize: 18,
   },
   rawTextBadge: {
     fontSize: 11,
-    color: '#4a8fa5',
-    fontWeight: '700',
-    backgroundColor: '#e0f2f7',
+    color: '#2f5d50',
+    fontWeight: '900',
+    backgroundColor: '#e9f7f1',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 999,
+  },
+  rawTextHint: {
+    marginBottom: 10,
+    color: '#607384',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
   },
   rawTextScrollContainer: {
     maxHeight: 260,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#d6e7f7',
+    backgroundColor: '#fffdf8',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   rawTextBody: {
-    color: '#1a3a4a',
+    color: '#24352f',
     fontSize: 15,
     lineHeight: 24,
-    fontWeight: '500',
-    letterSpacing: 0.2,
+    fontWeight: '700',
+    letterSpacing: 0,
   },
   detectedListCard: {
     backgroundColor: '#eaf4ff',
@@ -645,36 +663,54 @@ const styles = StyleSheet.create({
   },
   detectedButtonsRow: {
     flexDirection: 'row',
-    gap: 10,
+    columnGap: 10,
     marginBottom: 12,
   },
   fillAllButton: {
     flex: 1,
+    minHeight: 58,
     backgroundColor: '#2f5d50',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   fillAllButtonText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '900',
+    textAlign: 'center',
   },
   clearCapturedButton: {
     flex: 1,
+    minHeight: 58,
     borderWidth: 2,
     borderColor: '#eadcca',
     backgroundColor: '#fffdf8',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   clearCapturedButtonText: {
     color: '#4f6071',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  detectedButtonIcon: {
+    color: '#ffffff',
+    fontSize: 20,
+    lineHeight: 23,
+    fontWeight: '900',
+  },
+  detectedButtonIconDark: {
+    color: '#5d5045',
+    fontSize: 20,
+    lineHeight: 23,
+    fontWeight: '900',
   },
   detectedItemCard: {
     borderWidth: 2,

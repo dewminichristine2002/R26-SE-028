@@ -51,18 +51,6 @@ const SLOT_SHORT_LABELS = {
   sleep: 'PM',
 };
 
-const shapeIconMap = {
-  round: '●',
-  circle: '●',
-  oval: '⬭',
-  capsule: '⬯',
-  tablet: '◼',
-  oblong: '▭',
-  square: '◼',
-  triangle: '▲',
-  diamond: '◆',
-};
-
 const colorMap = {
   red: '#e74c3c',
   blue: '#3498db',
@@ -84,11 +72,6 @@ const parseTakeWith = (takeWithValue = '') =>
     .split(',')
     .map((part) => normalizeSlotToken(part))
     .filter(Boolean);
-
-const getShapeIcon = (shape) => {
-  const normalized = (shape || '').toString().trim().toLowerCase();
-  return shapeIconMap[normalized] || '○';
-};
 
 const getColorValue = (color) => {
   const normalized = (color || '').toString().trim().toLowerCase();
@@ -422,6 +405,32 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   const activeVoiceEntryRef = useRef(null);
   const textScale = reminderTextScale || 1;
 
+  const renderAppearanceIcon = (shape, color, isLarge = false) => {
+    const normalizedShape = String(shape || '').trim().toLowerCase();
+    const resolvedColor = getColorValue(color);
+    const isTriangle = normalizedShape === 'triangle';
+    const shapeStyle = [
+      styles.pillShape,
+      isLarge && styles.pillShapeLarge,
+      ['round', 'circle'].includes(normalizedShape) && styles.pillShapeRound,
+      normalizedShape === 'oval' && styles.pillShapeOval,
+      ['capsule', 'oblong'].includes(normalizedShape) && styles.pillShapeCapsule,
+      ['tablet', 'square'].includes(normalizedShape) && styles.pillShapeSquare,
+      normalizedShape === 'diamond' && styles.pillShapeDiamond,
+      { backgroundColor: resolvedColor },
+    ];
+
+    return (
+      <View style={[styles.appearanceIconFrame, isLarge && styles.appearanceIconFrameLarge]}>
+        {isTriangle ? (
+          <Text style={[styles.pillShapeTriangle, isLarge && styles.pillShapeTriangleLarge, { color: resolvedColor }]}>▲</Text>
+        ) : (
+          <View style={shapeStyle} />
+        )}
+      </View>
+    );
+  };
+
   useEffect(() => {
     const loadScheduleData = async () => {
       try {
@@ -639,6 +648,18 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   );
 
   const visibleNextDoseGroup = nextDoseGroup;
+
+  const nextDoseIntakeSummary = useMemo(() => {
+    const medicineCount = visibleNextDoseGroup.length;
+    const tabletCount = visibleNextDoseGroup.reduce((total, entry) => total + (Number(entry?.dailyAmount) || 1), 0);
+
+    return {
+      medicineCount,
+      tabletCount,
+      medicineLabel: medicineCount === 1 ? 'medicine' : 'medicines',
+      tabletLabel: tabletCount === 1 ? 'tablet' : 'tablets',
+    };
+  }, [visibleNextDoseGroup]);
 
   const currentDateLabel = useMemo(
     () =>
@@ -1250,6 +1271,24 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           </View>
 
           {!!visibleNextDoseGroup.length && (
+            <View style={styles.nextIntakeSummaryCard}>
+              <Text style={[styles.nextIntakeSummaryTitle, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>This intake</Text>
+              <View style={styles.nextIntakeSummaryRow}>
+                <View style={styles.nextIntakeSummaryPill}>
+                  <Text style={[styles.nextIntakeSummaryValue, { fontSize: 16 * textScale }]}>
+                    {nextDoseIntakeSummary.medicineCount} {nextDoseIntakeSummary.medicineLabel}
+                  </Text>
+                </View>
+                <View style={[styles.nextIntakeSummaryPill, styles.nextIntakeSummaryPillStrong]}>
+                  <Text style={[styles.nextIntakeSummaryValueStrong, { fontSize: 16 * textScale }]}>
+                    Need {formatTabletCount(nextDoseIntakeSummary.tabletCount)} {nextDoseIntakeSummary.tabletLabel}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {!!visibleNextDoseGroup.length && (
             <View style={styles.nextDoseGlobalActionRow}>
               <TouchableOpacity
                 style={styles.nextDoseGlobalActionButton}
@@ -1277,8 +1316,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               return (
               <View key={`next-${entry.stableId}`} style={[styles.highlightMedicineRow, isLocked && styles.highlightMedicineRowLocked]}>
                 <View style={styles.highlightMedicineHeaderRow}>
-                  <View style={[styles.highlightAppearance, { backgroundColor: getColorValue(entry.color) }]}>
-                    <Text style={styles.highlightAppearanceIcon}>{getShapeIcon(entry.shape)}</Text>
+                  <View style={styles.highlightAppearance}>
+                    {renderAppearanceIcon(entry.shape, entry.color, true)}
                   </View>
                   <View style={styles.highlightTextWrap}>
                     <Text style={[styles.highlightMedicineName, isLocked && styles.highlightTextLocked, { fontSize: 25 * textScale, lineHeight: 30 * textScale }]}>{entry.medicineName}</Text>
@@ -1298,21 +1337,21 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                     onPress={() => handleSaveDoseStatus(entry, 'taken')}
                     disabled={isSavingStatus || isLocked}
                   >
-                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>✓ I took it</Text>
+                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>✓ Taken</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.entryStatusButton, styles.entryStatusButtonReminder, isLocked && styles.entryStatusButtonDisabled]}
                     onPress={() => openRemindMinutePicker(entry)}
                     disabled={isSavingStatus || isLocked}
                   >
-                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>🔔 Remind me</Text>
+                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>🔔 Remind</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.entryStatusButton, styles.entryStatusButtonDanger, isLocked && styles.entryStatusButtonDisabled]}
                     onPress={() => openOverdoseTabletPicker(entry)}
                     disabled={isSavingStatus || isLocked}
                   >
-                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>⚠ Overdose</Text>
+                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>⚠ Overdose</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1407,8 +1446,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                   </Text>
                 </View>
 
-                <View style={[styles.scheduleAppearanceDot, { backgroundColor: getColorValue(entry.color) }]}>
-                  <Text style={styles.scheduleAppearanceShape}>{getShapeIcon(entry.shape)}</Text>
+                <View style={styles.scheduleAppearanceDot}>
+                  {renderAppearanceIcon(entry.shape, entry.color)}
                 </View>
 
                 <Text style={styles.scheduleArrow}>›</Text>
@@ -1727,6 +1766,48 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#342719',
   },
+  nextIntakeSummaryCard: {
+    borderRadius: 18,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    padding: 12,
+    marginBottom: 12,
+  },
+  nextIntakeSummaryTitle: {
+    color: '#5d5045',
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  nextIntakeSummaryRow: {
+    flexDirection: 'row',
+    columnGap: 8,
+  },
+  nextIntakeSummaryPill: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: '#eaf4ff',
+    borderWidth: 1,
+    borderColor: '#b9d4f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  nextIntakeSummaryPillStrong: {
+    backgroundColor: '#f8d978',
+    borderColor: '#f4cf75',
+  },
+  nextIntakeSummaryValue: {
+    color: '#2f5d50',
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  nextIntakeSummaryValueStrong: {
+    color: '#342719',
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   highlightMedicineRow: {
     flexDirection: 'column',
     alignItems: 'flex-start',
@@ -1755,11 +1836,72 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 2,
-    borderColor: '#ffffff',
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
   },
-  highlightAppearanceIcon: {
-    fontSize: 20,
-    color: '#526271',
+  appearanceIconFrame: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: '#f7efe4',
+    borderWidth: 1,
+    borderColor: '#d8c9b7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appearanceIconFrameLarge: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+  },
+  pillShape: {
+    width: 28,
+    height: 20,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: 'rgba(36,53,47,0.22)',
+  },
+  pillShapeLarge: {
+    width: 36,
+    height: 26,
+  },
+  pillShapeRound: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  pillShapeOval: {
+    width: 34,
+    height: 24,
+    borderRadius: 16,
+  },
+  pillShapeCapsule: {
+    width: 36,
+    height: 20,
+    borderRadius: 14,
+  },
+  pillShapeSquare: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
+  pillShapeDiamond: {
+    width: 27,
+    height: 27,
+    borderRadius: 6,
+    transform: [{ rotate: '45deg' }],
+  },
+  pillShapeTriangle: {
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: '900',
+    textShadowColor: 'rgba(36,53,47,0.22)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  pillShapeTriangleLarge: {
+    fontSize: 36,
+    lineHeight: 40,
   },
   highlightTextWrap: {
     flex: 1,
@@ -1803,14 +1945,19 @@ const styles = StyleSheet.create({
   entryStatusRow: {
     width: '100%',
     marginTop: 12,
+    borderRadius: 20,
+    backgroundColor: '#f8fbff',
+    borderWidth: 2,
+    borderColor: '#cfe2f5',
+    padding: 8,
   },
   entryStatusButton: {
     width: '100%',
     minHeight: 50,
-    borderRadius: 14,
+    borderRadius: 15,
     backgroundColor: '#1e6f5c',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -1826,8 +1973,8 @@ const styles = StyleSheet.create({
   },
   entryStatusButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
     textAlign: 'center',
   },
@@ -1841,12 +1988,12 @@ const styles = StyleSheet.create({
   },
   entryActionButton: {
     width: '100%',
-    minHeight: 48,
-    borderRadius: 14,
+    minHeight: 56,
+    borderRadius: 18,
     backgroundColor: '#ffffff',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#a8dbc8',
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1856,7 +2003,7 @@ const styles = StyleSheet.create({
   },
   entryActionButtonText: {
     color: '#2f5d50',
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '900',
   },
   entryActionButtonTextDisabled: {
@@ -2061,16 +2208,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   scheduleAppearanceDot: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 50,
+    height: 50,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 6,
-  },
-  scheduleAppearanceShape: {
-    fontSize: 13,
-    color: '#65717e',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
   },
   scheduleArrow: {
     marginLeft: 9,
