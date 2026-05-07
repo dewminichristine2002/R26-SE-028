@@ -11,7 +11,7 @@ import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
@@ -51,14 +51,36 @@ const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, lau
     { id: 4, label: 'Dashboard', icon: '\u{1F4CA}' },
   ];
 
+  const reminderMenuItems = [
+    { title: 'Routine Setup', subtitle: 'Set daily medication schedules', icon: '\u{1F4C5}' },
+    { title: 'Add Medicine', subtitle: 'Add a new medicine to track', icon: '\u2795' },
+    { title: 'Scan Pharmacy Receipt', subtitle: 'Extract medicine details from a receipt', icon: '\u{1F4F7}' },
+    { title: 'Medicine List', subtitle: 'View all saved medicines', icon: '\u{1F4DA}' },
+    { title: 'Medicine Stock', subtitle: 'Check remaining medicine stock', icon: '\u{1F4E6}' },
+    { title: 'Schedule Board', subtitle: 'See the current reminder board', icon: '\u{1F4CB}' },
+    { title: 'Safety Center', subtitle: 'Review warnings and safety tips', icon: '\u26A0\uFE0F' },
+  ];
+
   const handleButtonPress = (item) => {
     if (item.label === 'Allergy') {
       onOpenAllergies();
       return;
     }
 
-    if (item.label === 'home.emotions') {
+    if (item.label === 'Reminder') {
+      setShowReminderMenu(true);
+      setActiveReminderView('menu');
+      return;
+    }
+
+    if (item.label === 'Emotions') {
       onOpenEmotionalSupport?.();
+      return;
+    }
+
+    if (item.label === 'Dashboard') {
+      setShowReminderMenu(false);
+      setActiveReminderView('menu');
       return;
     }
 

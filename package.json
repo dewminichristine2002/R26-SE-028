@@ -8,6 +8,7 @@
     "start:backend": "npm --prefix backend run start"
   },
   "dependencies": {
+    "expo-dev-client": "~3.3.12",
     "expo-image-picker": "~14.7.1"
   }
 }

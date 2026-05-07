@@ -30,30 +30,6 @@ try {
 }
 
 export default function App() {
-    // Android hardware back button navigation
-    useEffect(() => {
-      if (Platform.OS !== 'android') return;
-      const onBackPress = () => {
-        // If on login/register, exit app
-        if (!isAuthenticated) {
-          return false;
-        }
-        // If on profile, go back to home
-        if (activeScreen === 'profile') {
-          setActiveScreen('home');
-          return true;
-        }
-        // If not on home, go back to home
-        if (activeScreen !== 'home') {
-          setActiveScreen('home');
-          return true;
-        }
-        // Otherwise, let default (exit app)
-        return false;
-      };
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    }, [isAuthenticated, activeScreen]);
   const [isBooting, setIsBooting] = useState(true);
   const [authMode, setAuthMode] = useState('login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -61,6 +37,31 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLocalMode, setIsLocalMode] = useState(false);
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
+
+  // Android hardware back button navigation
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      // If on login/register, exit app
+      if (!isAuthenticated) {
+        return false;
+      }
+      // If on profile, go back to home
+      if (activeScreen === 'profile') {
+        setActiveScreen('home');
+        return true;
+      }
+      // If not on home, go back to home
+      if (activeScreen !== 'home') {
+        setActiveScreen('home');
+        return true;
+      }
+      // Otherwise, let default (exit app)
+      return false;
+    };
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [isAuthenticated, activeScreen]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -172,7 +173,7 @@ export default function App() {
     };
   }, []);
 
-  const handleLoginSuccess = (user) => {
+  const handleLoginSuccess = async (user) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveScreen('home');
@@ -240,6 +241,8 @@ export default function App() {
           }
         />
       );
+    }
+
     if (activeScreen === 'emotional-support') {
       return <EmotionalSupportNavigator />;
     }
@@ -248,12 +251,11 @@ export default function App() {
       <HomeScreen
         user={currentUser}
         isLocalMode={isLocalMode}
-        onOpenProfile={() => setActiveScreen('medicine-profile')}
+        onOpenProfile={() => setActiveScreen('profile')}
         onOpenAllergies={() => setActiveScreen('allergies')}
         onOpenMedicine={() => setActiveScreen('allergies')}
         onOpenHistory={() => setActiveScreen('history')}
         launchIntent={homeLaunchIntent}
-        onOpenProfile={() => setActiveScreen('profile')}
         onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
         onLogout={handleLogout}
       />
