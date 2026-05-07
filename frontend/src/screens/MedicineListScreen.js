@@ -67,7 +67,7 @@ const getColorValue = (color) => {
   return colorMap[normalized] || '#d9e8f7';
 };
 
-const MedicineListScreen = ({ onBack }) => {
+const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
   const scrollRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [medications, setMedications] = useState([]);
@@ -86,6 +86,7 @@ const MedicineListScreen = ({ onBack }) => {
     takeWithOptions: ['Breakfast'],
     intakeTiming: 'After',
   });
+  const textScale = reminderTextScale || 1;
 
   const loadMedications = async () => {
     try {
@@ -270,12 +271,12 @@ const MedicineListScreen = ({ onBack }) => {
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Medicine List</Text>
+        <Text style={[styles.headerTitle, { fontSize: 22 * textScale }]}>Medicine List</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <TextInput
-        style={styles.searchInput}
+        style={[styles.searchInput, { fontSize: 16 * textScale }]}
         placeholder="Search medicine name..."
         value={searchText}
         onChangeText={setSearchText}
@@ -284,7 +285,7 @@ const MedicineListScreen = ({ onBack }) => {
       {isLoading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#2f8fd0" />
-          <Text style={styles.loaderText}>Loading medicines...</Text>
+          <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading medicines...</Text>
         </View>
       ) : (
         <View style={styles.listWrap}>
@@ -296,64 +297,64 @@ const MedicineListScreen = ({ onBack }) => {
                 </View>
 
                 <View style={styles.cardTextWrap}>
-                  <Text style={styles.medicineName}>{item.medicine_name}</Text>
-                  <Text style={styles.metaText}>
+                  <Text style={[styles.medicineName, { fontSize: 18 * textScale }]}>{item.medicine_name}</Text>
+                  <Text style={[styles.metaText, { fontSize: 13 * textScale }]}>
                     {item.take_with} - {item.dosage_mg}mg ({item.daily_amount} tab)
                   </Text>
-                  <Text style={styles.metaTextLight}>{item.total_quantity} tabs left</Text>
-                  <Text style={styles.metaTextLight}>
+                  <Text style={[styles.metaTextLight, { fontSize: 12 * textScale }]}>{item.total_quantity} tabs left</Text>
+                  <Text style={[styles.metaTextLight, { fontSize: 12 * textScale }]}>
                     {item.medicine_color || 'No color'} | {item.medicine_shape || 'No shape'}
                   </Text>
                   <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
-                    <Text style={styles.viewButtonText}>View</Text>
+                    <Text style={[styles.viewButtonText, { fontSize: 14 * textScale }]}>View</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
           ))}
 
-          {!filteredMedications.length && <Text style={styles.emptyText}>No medicines found.</Text>}
+          {!filteredMedications.length && <Text style={[styles.emptyText, { fontSize: 15 * textScale }]}>No medicines found.</Text>}
         </View>
       )}
 
       {selectedMedication && (
         <View style={styles.detailPanel}>
-          <Text style={styles.detailTitle}>Medicine Details</Text>
+          <Text style={[styles.detailTitle, { fontSize: 22 * textScale }]}>Medicine Details</Text>
 
           <View style={styles.detailAppearanceRow}>
             <View style={[styles.detailAppearanceBadge, { backgroundColor: getColorValue(selectedMedication.medicine_color) }]}>
               <Text style={styles.detailAppearanceIcon}>{getShapeIcon(selectedMedication.medicine_shape)}</Text>
             </View>
             <View style={styles.detailAppearanceTextWrap}>
-              <Text style={styles.detailAppearanceLabel}>Appearance</Text>
-              <Text style={styles.detailAppearanceText}>
+              <Text style={[styles.detailAppearanceLabel, { fontSize: 13 * textScale }]}>Appearance</Text>
+              <Text style={[styles.detailAppearanceText, { fontSize: 14 * textScale }]}>
                 Color: {selectedMedication.medicine_color || 'N/A'}
               </Text>
-              <Text style={styles.detailAppearanceText}>
+              <Text style={[styles.detailAppearanceText, { fontSize: 14 * textScale }]}>
                 Shape: {selectedMedication.medicine_shape || 'N/A'}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.fieldLabel}>Medicine Name</Text>
+          <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Medicine Name</Text>
           <TextInput
-            style={styles.fieldInput}
+            style={[styles.fieldInput, { fontSize: 15 * textScale }]}
             value={form.medicineName}
             onChangeText={(v) => setForm((p) => ({ ...p, medicineName: v }))}
             editable={isEditMode}
           />
 
-          <Text style={styles.fieldLabel}>Selected Color</Text>
+          <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Selected Color</Text>
           <TextInput
-            style={styles.fieldInput}
+            style={[styles.fieldInput, { fontSize: 15 * textScale }]}
             value={form.selectedColor}
             onChangeText={(v) => setForm((p) => ({ ...p, selectedColor: v }))}
             editable={isEditMode}
           />
 
-          <Text style={styles.fieldLabel}>Selected Shape</Text>
+          <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Selected Shape</Text>
           <TextInput
-            style={styles.fieldInput}
+            style={[styles.fieldInput, { fontSize: 15 * textScale }]}
             value={form.selectedShape}
             onChangeText={(v) => setForm((p) => ({ ...p, selectedShape: v }))}
             editable={isEditMode}
@@ -361,9 +362,9 @@ const MedicineListScreen = ({ onBack }) => {
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Total Qty</Text>
+              <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Total Qty</Text>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { fontSize: 15 * textScale }]}
                 value={form.totalQuantity}
                 onChangeText={(v) => setForm((p) => ({ ...p, totalQuantity: v }))}
                 editable={isEditMode}
@@ -371,9 +372,9 @@ const MedicineListScreen = ({ onBack }) => {
               />
             </View>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Dosage mg</Text>
+              <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Dosage mg</Text>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { fontSize: 15 * textScale }]}
                 value={form.dosageMg}
                 onChangeText={(v) => setForm((p) => ({ ...p, dosageMg: v }))}
                 editable={isEditMode}
@@ -384,9 +385,9 @@ const MedicineListScreen = ({ onBack }) => {
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Daily Amount</Text>
+              <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Daily Amount</Text>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { fontSize: 15 * textScale }]}
                 value={form.dailyAmount}
                 onChangeText={(v) => setForm((p) => ({ ...p, dailyAmount: v }))}
                 editable={isEditMode}
@@ -397,9 +398,9 @@ const MedicineListScreen = ({ onBack }) => {
           </View>
 
           <View style={styles.scheduleCard}>
-            <Text style={styles.scheduleTitle}>Dosage & Schedule</Text>
+            <Text style={[styles.scheduleTitle, { fontSize: 20 * textScale }]}>Dosage & Schedule</Text>
 
-            <Text style={styles.sectionCaption}>DOSE FORM</Text>
+            <Text style={[styles.sectionCaption, { fontSize: 12 * textScale }]}>DOSE FORM</Text>
             <View style={styles.chipRow}>
               {DOSE_FORM_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -412,12 +413,12 @@ const MedicineListScreen = ({ onBack }) => {
                   onPress={() => isEditMode && setForm((p) => ({ ...p, doseForm: option }))}
                   disabled={!isEditMode}
                 >
-                  <Text style={[styles.chipButtonText, form.doseForm === option && styles.chipButtonTextActive]}>{option}</Text>
+                  <Text style={[styles.chipButtonText, form.doseForm === option && styles.chipButtonTextActive, { fontSize: 14 * textScale }]}>{option}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.sectionCaption, styles.takeWithLabel]}>TAKE WITH</Text>
+            <Text style={[styles.sectionCaption, styles.takeWithLabel, { fontSize: 12 * textScale }]}>TAKE WITH</Text>
             <View style={styles.mealGrid}>
               {TAKE_WITH_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -434,6 +435,7 @@ const MedicineListScreen = ({ onBack }) => {
                     style={[
                       styles.mealButtonText,
                       form.takeWithOptions.includes(option) && styles.mealButtonTextActive,
+                      { fontSize: 12 * textScale },
                     ]}
                   >
                     {option.toUpperCase()}
@@ -444,7 +446,7 @@ const MedicineListScreen = ({ onBack }) => {
           </View>
 
           <View style={styles.howSection}>
-            <Text style={styles.howSectionTitle}>How does it get?</Text>
+            <Text style={[styles.howSectionTitle, { fontSize: 18 * textScale }]}>How does it get?</Text>
             <View style={styles.howButtonsRow}>
               {TIMING_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -457,15 +459,15 @@ const MedicineListScreen = ({ onBack }) => {
                   onPress={() => isEditMode && setForm((p) => ({ ...p, intakeTiming: option }))}
                   disabled={!isEditMode}
                 >
-                  <Text style={[styles.howButtonText, form.intakeTiming === option && styles.howButtonTextActive]}>{option}</Text>
+                  <Text style={[styles.howButtonText, form.intakeTiming === option && styles.howButtonTextActive, { fontSize: 15 * textScale }]}>{option}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
           <View style={styles.safetyCard}>
-            <Text style={styles.safetyTitle}>Safety Verification</Text>
-            <Text style={styles.safetyBody}>
+            <Text style={[styles.safetyTitle, { fontSize: 16 * textScale }]}>Safety Verification</Text>
+            <Text style={[styles.safetyBody, { fontSize: 13 * textScale }]}>
               This medicine is currently planned with {form.takeWithOptions.length} meal
               {form.takeWithOptions.length > 1 ? 's' : ''} and reminder timing set to {form.intakeTiming.toLowerCase()}.
             </Text>
@@ -473,15 +475,15 @@ const MedicineListScreen = ({ onBack }) => {
 
           {!isEditMode ? (
             <TouchableOpacity style={styles.editButton} onPress={() => setIsEditMode(true)}>
-              <Text style={styles.editButtonText}>Edit</Text>
+              <Text style={[styles.editButtonText, { fontSize: 15 * textScale }]}>Edit</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.editActionRow}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setIsEditMode(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { fontSize: 15 * textScale }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveButton} onPress={handleSaveEdit} disabled={isSaving}>
-                <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save'}</Text>
+                <Text style={[styles.saveButtonText, { fontSize: 15 * textScale }]}>{isSaving ? 'Saving...' : 'Save'}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -491,7 +493,7 @@ const MedicineListScreen = ({ onBack }) => {
             onPress={handleDeleteMedication}
             disabled={isSaving}
           >
-            <Text style={styles.deleteButtonText}>{isSaving ? 'Please wait...' : 'Delete Medicine'}</Text>
+            <Text style={[styles.deleteButtonText, { fontSize: 15 * textScale }]}>{isSaving ? 'Please wait...' : 'Delete Medicine'}</Text>
           </TouchableOpacity>
         </View>
       )}

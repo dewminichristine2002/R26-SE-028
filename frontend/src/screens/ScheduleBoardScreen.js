@@ -151,6 +151,14 @@ const getReminderOffsetMinutes = (timingValue = '') => {
   return 30;
 };
 
+const getTakeTimeRuleLabel = (timingValue = '') => {
+  const normalized = String(timingValue || '').toLowerCase();
+  if (normalized.includes('before')) {
+    return 'Before meal -30 mins';
+  }
+  return 'After meal +30 mins';
+};
+
 const applyMinutesOffset = (sourceDate, minutesOffset) => {
   if (!sourceDate) {
     return null;
@@ -173,6 +181,17 @@ const formatDateTo12Hour = (dateValue) => {
   });
 };
 
+const formatDatePeriod = (dateValue) => {
+  if (!dateValue) {
+    return '';
+  }
+
+  return dateValue.toLocaleTimeString([], {
+    hour: '2-digit',
+    hour12: true,
+  }).replace(/\d|\s|:/g, '');
+};
+
 const format12HourTime = (timeStr, referenceDate = new Date()) => {
   const parsed = parseRoutineTimeToDate(timeStr, referenceDate);
   if (!parsed) {
@@ -191,11 +210,17 @@ const formatEtaMinutes = (targetDate, nowDate) => {
   if (minutes === 0) {
     return 'now';
   }
-  if (minutes === 1) {
-    return 'in 1 minute';
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0) {
+    const hourText = hours === 1 ? '1 hr' : `${hours} hrs`;
+    const minuteText = remainingMinutes === 1 ? '1 min' : `${remainingMinutes} min`;
+    return remainingMinutes > 0 ? `in ${hourText} ${minuteText}` : `in ${hourText}`;
   }
 
-  return `in ${minutes} minutes`;
+  return minutes === 1 ? 'in 1 min' : `in ${minutes} min`;
 };
 
 const STATUS_LABELS = {
@@ -355,6 +380,13 @@ const formatTabletCount = (count) => {
   return normalized.toFixed(1).replace(/\.0$/, '');
 };
 
+const getIntakeAmountText = (entry) => {
+  const tabletCount = Number(entry?.dailyAmount) || 1;
+  const formattedCount = formatTabletCount(tabletCount);
+  const unit = tabletCount === 1 ? 'tablet' : 'tablets';
+  return `💊 Take ${formattedCount} ${unit} for this intake`;
+};
+
 const isExpectedVoiceAbort = (event) => {
   const message = String(event?.message || event?.error || '').toLowerCase();
   const code = String(event?.code || '').toLowerCase();
@@ -367,7 +399,7 @@ const isExpectedVoiceAbort = (event) => {
   );
 };
 
-const ScheduleBoardScreen = ({ onBack, user }) => {
+const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [routine, setRoutine] = useState(null);
   const [medications, setMedications] = useState([]);
@@ -386,7 +418,9 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
   const [showOverdoseModal, setShowOverdoseModal] = useState(false);
   const [overdoseTabletsCount, setOverdoseTabletsCount] = useState(0.5);
   const [overdoseEntry, setOverdoseEntry] = useState(null);
+  const [showFullDay, setShowFullDay] = useState(true);
   const activeVoiceEntryRef = useRef(null);
+  const textScale = reminderTextScale || 1;
 
   useEffect(() => {
     const loadScheduleData = async () => {
@@ -491,24 +525,24 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
         .flatMap((row) =>
           row.items.map((item, index) => {
             const baseDate = parseRoutineTimeToDate(row.time, currentTime);
-            const normalizedTiming = String(item.timing || '').toLowerCase();
             const offsetMinutes = getReminderOffsetMinutes(item.timing);
-            const reminderDate = applyMinutesOffset(baseDate, offsetMinutes);
-            const reminderRuleLabel =
-              normalizedTiming.includes('before')
-                ? 'Before -30m'
-                : 'After +30m';
+            const takeDate = applyMinutesOffset(baseDate, offsetMinutes) || baseDate;
+            const takeRuleLabel = getTakeTimeRuleLabel(item.timing);
 
             return {
               ...item,
               rowKey: row.slotKey,
               rowLabel: row.slotLabel,
-              rowShort: SLOT_SHORT_LABELS[row.slotKey] || 'AM',
+              rowShort: formatDatePeriod(takeDate) || SLOT_SHORT_LABELS[row.slotKey] || 'AM',
               routineTime: row.time,
-              reminderTime: reminderDate,
-              reminderTimeLabel: formatDateTo12Hour(reminderDate),
-              reminderRuleLabel,
-              sortDate: reminderDate,
+              mealTimeLabel: format12HourTime(row.time, currentTime),
+              reminderTime: takeDate,
+              reminderTimeLabel: formatDateTo12Hour(takeDate),
+              tabletTime: takeDate,
+              tabletTimeLabel: formatDateTo12Hour(takeDate),
+              tabletPeriodLabel: formatDatePeriod(takeDate) || SLOT_SHORT_LABELS[row.slotKey] || 'AM',
+              reminderRuleLabel: takeRuleLabel,
+              sortDate: takeDate,
               stableId: `${item.id}-${index}`,
             };
           })
@@ -584,6 +618,10 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
       return '--:--';
     }
 
+    if (firstNextDose.tabletTimeLabel && firstNextDose.tabletTimeLabel !== '--:--') {
+      return firstNextDose.tabletTimeLabel;
+    }
+
     if (firstNextDose.reminderTimeLabel && firstNextDose.reminderTimeLabel !== '--:--') {
       return firstNextDose.reminderTimeLabel;
     }
@@ -601,15 +639,6 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
   );
 
   const visibleNextDoseGroup = nextDoseGroup;
-
-  const greetingName = useMemo(() => {
-    const fullName = (user?.fullName || '').trim();
-    if (!fullName) {
-      return 'there';
-    }
-
-    return fullName.split(' ')[0];
-  }, [user?.fullName]);
 
   const currentDateLabel = useMemo(
     () =>
@@ -644,7 +673,6 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
     const shapeText = entry?.shape ? `Shape ${entry.shape}.` : 'Shape not specified.';
     const timingText = entry?.reminderRuleLabel ? `Reminder ${entry.reminderRuleLabel}.` : '';
     const slotText = entry?.rowLabel ? `Time slot ${entry.rowLabel}.` : '';
-    const doseSequenceText = `Dose ${entry?.doseNumber || 1} of ${entry?.timesPerDay || 1} today.`;
     const message = [
       `${entry?.medicineName || 'Medicine'}.`,
       `${doseText} per intake.`,
@@ -653,7 +681,6 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
       shapeText,
       slotText,
       timingText,
-      doseSequenceText,
     ]
       .filter(Boolean)
       .join(' ');
@@ -678,23 +705,6 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
 
     const message = `Next dose time ${nextDoseDisplayTime}. ${summary}`;
     SpeechModule.speak(message, {
-      language: 'en',
-      pitch: 1.0,
-      rate: 0.95,
-    });
-  };
-
-  const handleHeaderSpeak = () => {
-    if (nextDoseGroup.length) {
-      speakNextDoseGroup();
-      return;
-    }
-
-    if (!SpeechModule) {
-      return;
-    }
-
-    SpeechModule.speak('No upcoming dose found right now.', {
       language: 'en',
       pitch: 1.0,
       rate: 0.95,
@@ -1175,49 +1185,66 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
 
   return (
     <View style={styles.page}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.staticHeaderWrap}>
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backIcon}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Schedule Board</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerActionButton} onPress={handleHeaderSpeak}>
-              <Text style={styles.headerActionIcon}>🔊</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerActionButton}>
-              <Text style={styles.headerActionIcon}>⚙</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>💊 My Medicines</Text>
+          <View style={styles.headerRightSpacer} />
         </View>
+      </View>
 
-        <View style={styles.greetingRow}>
-          <View>
-            <Text style={styles.greetingTitle}>Hello, {greetingName}</Text>
-            <Text style={styles.greetingSubtitle}>Ready for your schedule today?</Text>
-          </View>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>👤</Text>
-            <View style={styles.onlineDot} />
-          </View>
-        </View>
-
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.dateTimeCard}>
-          <Text style={styles.dateTimeLabel}>Date</Text>
-          <Text style={styles.dateTimeValue}>{currentDateLabel}</Text>
-          <Text style={[styles.dateTimeLabel, styles.timeLabelSpacing]}>Time</Text>
-          <Text style={styles.dateTimeValue}>{currentTimeLabel}</Text>
+          <View style={styles.dateTimeBlock}>
+            <Text style={styles.dateTimeLabel}>📅 Today</Text>
+            <Text style={[styles.dateTimeValue, { fontSize: 18 * textScale, lineHeight: 24 * textScale }]}>{currentDateLabel}</Text>
+          </View>
+          <View style={styles.dateTimeBlock}>
+            <Text style={styles.dateTimeLabel}>🕒 Now</Text>
+            <Text style={[styles.dateTimeValue, styles.dateTimeValueStrong, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>
+              {currentTimeLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.scheduleControlPanel}>
+          <View style={styles.scheduleControlGroup}>
+            <View style={styles.scheduleControlTitleRow}>
+              <Text style={styles.scheduleControlIcon}>👁</Text>
+              <Text style={[styles.scheduleControlLabel, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>List</Text>
+            </View>
+            <View style={styles.scheduleToggleRow}>
+              <TouchableOpacity
+                style={[styles.scheduleToggleButton, showFullDay && styles.scheduleToggleButtonActive]}
+                onPress={() => setShowFullDay(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Show full day medicine list"
+              >
+                <Text style={[styles.scheduleToggleButtonText, showFullDay && styles.scheduleToggleButtonTextActive, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>Show</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.scheduleToggleButton, !showFullDay && styles.scheduleToggleButtonActive]}
+                onPress={() => setShowFullDay(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Hide full day medicine list"
+              >
+                <Text style={[styles.scheduleToggleButtonText, !showFullDay && styles.scheduleToggleButtonTextActive, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>Hide</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         <View style={styles.nextDoseCard}>
           <View style={styles.nextDoseMetaRow}>
-            <View>
-              <Text style={styles.nextDoseLabel}>Next Dose At</Text>
-              <Text style={styles.nextDoseTime}>{nextDoseDisplayTime}</Text>
+            <View style={styles.nextDoseTitleWrap}>
+              <Text style={[styles.nextDoseLabel, { fontSize: 14 * textScale }]}>🔔 Take Next</Text>
+              <Text style={[styles.nextDoseTime, { fontSize: 30 * textScale, lineHeight: 36 * textScale }]}>{nextDoseDisplayTime}</Text>
             </View>
             {!!nextDoseEtaLabel && (
               <View style={styles.etaBadge}>
-                <Text style={styles.etaBadgeText}>{nextDoseEtaLabel}</Text>
+                <Text style={[styles.etaBadgeText, { fontSize: 13 * textScale }]}>{nextDoseEtaLabel}</Text>
               </View>
             )}
           </View>
@@ -1230,6 +1257,7 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
                 accessibilityLabel="Play next dose list"
               >
                 <Text style={styles.nextDoseGlobalActionIcon}>▶</Text>
+                <Text style={[styles.nextDoseGlobalActionLabel, { fontSize: 13 * textScale, lineHeight: 17 * textScale }]}>Read</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.nextDoseGlobalActionButton}
@@ -1237,6 +1265,7 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
                 accessibilityLabel="Stop voice"
               >
                 <Text style={styles.nextDoseGlobalActionIcon}>■</Text>
+                <Text style={[styles.nextDoseGlobalActionLabel, { fontSize: 13 * textScale, lineHeight: 17 * textScale }]}>Stop</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1247,132 +1276,147 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
 
               return (
               <View key={`next-${entry.stableId}`} style={[styles.highlightMedicineRow, isLocked && styles.highlightMedicineRowLocked]}>
-                <View style={[styles.highlightAppearance, { backgroundColor: getColorValue(entry.color) }]}>
-                  <Text style={styles.highlightAppearanceIcon}>{getShapeIcon(entry.shape)}</Text>
-                </View>
-                <View style={styles.highlightTextWrap}>
-                  <Text style={[styles.highlightMedicineName, isLocked && styles.highlightTextLocked]}>{entry.medicineName}</Text>
-                  <Text style={[styles.highlightMedicineMeta, isLocked && styles.highlightTextLocked]}>{entry.dosageMg}mg</Text>
-                  <Text style={[styles.highlightMedicineSubMeta, isLocked && styles.highlightTextLocked]}>
-                    {entry.timesPerDay} {entry.timesPerDay === 1 ? 'time' : 'times'} / day
-                  </Text>
-                  <Text style={[styles.highlightMedicineDoseText, isLocked && styles.highlightTextLocked]}>
-                    Dose {entry.doseNumber || 1} of {entry.timesPerDay || 1}
-                  </Text>
-
-                  <View style={styles.entryStatusRow}>
-                    <TouchableOpacity
-                      style={[styles.entryStatusButton, isLocked && styles.entryStatusButtonDisabled]}
-                      onPress={() => handleSaveDoseStatus(entry, 'taken')}
-                      disabled={isSavingStatus || isLocked}
-                    >
-                      <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled]}>Taken</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.entryStatusButton, isLocked && styles.entryStatusButtonDisabled]}
-                      onPress={() => openRemindMinutePicker(entry)}
-                      disabled={isSavingStatus || isLocked}
-                    >
-                      <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled]}>Remind</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.entryStatusButton, styles.entryStatusButtonDanger, isLocked && styles.entryStatusButtonDisabled]}
-                      onPress={() => openOverdoseTabletPicker(entry)}
-                      disabled={isSavingStatus || isLocked}
-                    >
-                      <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled]}>Overdose</Text>
-                    </TouchableOpacity>
+                <View style={styles.highlightMedicineHeaderRow}>
+                  <View style={[styles.highlightAppearance, { backgroundColor: getColorValue(entry.color) }]}>
+                    <Text style={styles.highlightAppearanceIcon}>{getShapeIcon(entry.shape)}</Text>
                   </View>
-
-                  <View style={styles.entryActionRow}>
-                    <TouchableOpacity
-                      style={[styles.entryActionButton, isLocked && styles.entryActionButtonDisabled]}
-                      onPress={() => handleEntrySpeak(entry)}
-                      disabled={isLocked}
-                    >
-                      <Text style={[styles.entryActionButtonText, isLocked && styles.entryActionButtonTextDisabled]}>
-                        {isVoiceListening && voiceTargetEntryKey === getEntryStatusKey(entry) ? 'Listening...' : 'Speak'}
-                      </Text>
-                    </TouchableOpacity>
+                  <View style={styles.highlightTextWrap}>
+                    <Text style={[styles.highlightMedicineName, isLocked && styles.highlightTextLocked, { fontSize: 25 * textScale, lineHeight: 30 * textScale }]}>{entry.medicineName}</Text>
+                    <Text style={[styles.highlightMedicineMeta, isLocked && styles.highlightTextLocked, { fontSize: 18 * textScale, lineHeight: 23 * textScale }]}>{entry.dosageMg}mg</Text>
+                    <Text style={[styles.highlightMedicineSubMeta, isLocked && styles.highlightTextLocked, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
+                      {entry.timesPerDay} {entry.timesPerDay === 1 ? 'time' : 'times'} / day
+                    </Text>
+                  <Text style={[styles.highlightMedicineDoseText, isLocked && styles.highlightTextLocked, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
+                      {getIntakeAmountText(entry)}
+                  </Text>
                   </View>
-
-                  {!!(isVoiceListening && voiceTargetEntryKey === getEntryStatusKey(entry) && voiceTranscript) && (
-                    <Text style={styles.entryVoiceText}>Heard: {voiceTranscript}</Text>
-                  )}
-
-                  {!!getSavedStatusTextForEntry(entry) && (
-                    <Text style={styles.entrySavedStatusText}>{getSavedStatusTextForEntry(entry)}</Text>
-                  )}
                 </View>
+
+                <View style={styles.entryStatusRow}>
+                  <TouchableOpacity
+                    style={[styles.entryStatusButton, isLocked && styles.entryStatusButtonDisabled]}
+                    onPress={() => handleSaveDoseStatus(entry, 'taken')}
+                    disabled={isSavingStatus || isLocked}
+                  >
+                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>✓ I took it</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.entryStatusButton, styles.entryStatusButtonReminder, isLocked && styles.entryStatusButtonDisabled]}
+                    onPress={() => openRemindMinutePicker(entry)}
+                    disabled={isSavingStatus || isLocked}
+                  >
+                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>🔔 Remind me</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.entryStatusButton, styles.entryStatusButtonDanger, isLocked && styles.entryStatusButtonDisabled]}
+                    onPress={() => openOverdoseTabletPicker(entry)}
+                    disabled={isSavingStatus || isLocked}
+                  >
+                    <Text style={[styles.entryStatusButtonText, isLocked && styles.entryStatusButtonTextDisabled, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>⚠ Overdose</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.entryActionRow}>
+                  <TouchableOpacity
+                    style={[styles.entryActionButton, isLocked && styles.entryActionButtonDisabled]}
+                    onPress={() => handleEntrySpeak(entry)}
+                    disabled={isLocked}
+                  >
+                    <Text style={[styles.entryActionButtonText, isLocked && styles.entryActionButtonTextDisabled, { fontSize: 15 * textScale }]}>
+                      {isVoiceListening && voiceTargetEntryKey === getEntryStatusKey(entry) ? 'Listening...' : '🔊 Speak'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {!!(isVoiceListening && voiceTargetEntryKey === getEntryStatusKey(entry) && voiceTranscript) && (
+                  <Text style={[styles.entryVoiceText, { fontSize: 11 * textScale }]}>Heard: {voiceTranscript}</Text>
+                )}
+
+                {!!getSavedStatusTextForEntry(entry) && (
+                  <Text style={[styles.entrySavedStatusText, { fontSize: 14 * textScale, lineHeight: 19 * textScale }]}>{getSavedStatusTextForEntry(entry)}</Text>
+                )}
               </View>
             );})
           ) : (
             <View style={styles.noNextDoseWrap}>
-              <Text style={styles.noNextDoseText}>No upcoming dose found.</Text>
+              <Text style={styles.noNextDoseText}>No medicine to take now.</Text>
             </View>
           )}
         </View>
 
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Upcoming Schedules Today</Text>
-          <View style={styles.totalBadge}>
-            <Text style={styles.totalBadgeText}>{upcomingTodaySchedule.length} total</Text>
-          </View>
-        </View>
-
-        {isLoading ? (
-          <View style={styles.loaderWrap}>
-            <ActivityIndicator size="large" color="#2f8fd0" />
-            <Text style={styles.loaderText}>Loading daily schedule...</Text>
-          </View>
-        ) : null}
-
-        {!isLoading && !!errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
-
-        {!isLoading && !errorMessage && upcomingTodaySchedule.length === 0 && (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyTitle}>No upcoming schedules for today</Text>
-            <Text style={styles.emptyText}>All scheduled reminders for today are already completed or passed.</Text>
-          </View>
+        {!showFullDay && (
+          <TouchableOpacity
+            style={styles.fullDayPrompt}
+            onPress={() => setShowFullDay(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Show all medicines today"
+          >
+            <Text style={styles.fullDayPromptIcon}>📋</Text>
+            <View style={styles.fullDayPromptTextWrap}>
+              <Text style={[styles.fullDayPromptTitle, { fontSize: 18 * textScale, lineHeight: 23 * textScale }]}>See all medicines</Text>
+              <Text style={[styles.fullDayPromptText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>Tap for full day list</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
-        {!isLoading && !errorMessage && upcomingTodaySchedule.map((entry) => (
-          <TouchableOpacity
-            key={entry.stableId}
-            style={styles.scheduleItemCard}
-            activeOpacity={0.9}
-            onPress={() => speakScheduleDetails(entry)}
-          >
-            <View style={styles.scheduleTimeCol}>
-              <Text style={styles.schedulePeriod}>{entry.rowShort}</Text>
-              <Text style={styles.scheduleTime}>{entry.reminderTimeLabel || format12HourTime(entry.routineTime, currentTime)}</Text>
+        {showFullDay && (
+          <View style={styles.allTodayPanel}>
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionTitle, { fontSize: 24 * textScale, lineHeight: 29 * textScale }]}>📋 All Today</Text>
+              <View style={styles.totalBadge}>
+                <Text style={styles.totalBadgeText}>{upcomingTodaySchedule.length}</Text>
+              </View>
             </View>
 
-            <View style={styles.scheduleMainCol}>
-              <Text style={styles.scheduleMedicineName}>{entry.medicineName}</Text>
-              <Text style={styles.scheduleMetaText}>
-                {entry.dosageMg}mg • {entry.rowLabel} • {entry.reminderRuleLabel}
-              </Text>
-              <Text style={styles.scheduleSubMetaText}>
-                {entry.timesPerDay} {entry.timesPerDay === 1 ? 'time' : 'times'} / day
-              </Text>
-              <Text style={styles.scheduleDoseText}>
-                Dose {entry.doseNumber || 1} of {entry.timesPerDay || 1}
-              </Text>
-            </View>
+            {isLoading ? (
+              <View style={styles.loaderWrap}>
+                <ActivityIndicator size="large" color="#2f5d50" />
+                <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading schedule...</Text>
+              </View>
+            ) : null}
 
-            <View style={[styles.scheduleAppearanceDot, { backgroundColor: getColorValue(entry.color) }]}>
-              <Text style={styles.scheduleAppearanceShape}>{getShapeIcon(entry.shape)}</Text>
-            </View>
+            {!isLoading && !!errorMessage && <Text style={[styles.errorText, { fontSize: 13 * textScale }]}>{errorMessage}</Text>}
 
-            <Text style={styles.scheduleArrow}>›</Text>
-          </TouchableOpacity>
-        ))}
+            {!isLoading && !errorMessage && upcomingTodaySchedule.length === 0 && (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyTitle, { fontSize: 17 * textScale }]}>No medicines now</Text>
+                <Text style={[styles.emptyText, { fontSize: 13 * textScale }]}>You are done for today.</Text>
+              </View>
+            )}
+
+            {!isLoading && !errorMessage && upcomingTodaySchedule.map((entry) => (
+              <TouchableOpacity
+                key={entry.stableId}
+                style={styles.scheduleItemCard}
+                activeOpacity={0.9}
+                onPress={() => speakScheduleDetails(entry)}
+              >
+                <View style={styles.scheduleMainCol}>
+                  <Text style={[styles.scheduleMedicineName, { fontSize: 21 * textScale, lineHeight: 26 * textScale }]}>{entry.medicineName}</Text>
+                  <Text style={[styles.scheduleMetaText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
+                    {entry.dosageMg}mg
+                  </Text>
+                  <Text style={[styles.scheduleSubMetaText, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+                    ⏰ {entry.rowLabel}: {entry.tabletTimeLabel}
+                  </Text>
+                  <Text style={[styles.scheduleRuleText, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+                    {entry.reminderRuleLabel}
+                  </Text>
+                  <Text style={[styles.scheduleDoseText, { fontSize: 13 * textScale, lineHeight: 17 * textScale }]}>
+                    {getIntakeAmountText(entry)}
+                  </Text>
+                </View>
+
+                <View style={[styles.scheduleAppearanceDot, { backgroundColor: getColorValue(entry.color) }]}>
+                  <Text style={styles.scheduleAppearanceShape}>{getShapeIcon(entry.shape)}</Text>
+                </View>
+
+                <Text style={styles.scheduleArrow}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
-
-      <TouchableOpacity style={styles.fabButton} activeOpacity={0.85}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
 
       {showCustomRemindModal && (
         <View style={styles.customRemindOverlay}>
@@ -1468,167 +1512,235 @@ const ScheduleBoardScreen = ({ onBack, user }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7f7f5',
+    backgroundColor: '#f7efe4',
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f7f7f5',
+    backgroundColor: '#f7efe4',
     paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 90,
+    paddingTop: 0,
+    paddingBottom: 28,
+  },
+  staticHeaderWrap: {
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 26,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    minHeight: 58,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    paddingHorizontal: 10,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e9eef3',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   backIcon: {
-    fontSize: 24,
-    color: '#445a6d',
-    marginTop: -2,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   headerTitle: {
-    fontSize: 20,
-    color: '#1f2934',
-    fontWeight: '700',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 8,
-  },
-  headerActionButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: '#dde5ed',
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerActionIcon: {
-    fontSize: 14,
-  },
-  greetingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  greetingTitle: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#1f2934',
-    lineHeight: 36,
-  },
-  greetingSubtitle: {
-    marginTop: 2,
-    fontSize: 15,
-    color: '#687785',
-  },
-  avatarWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#dde5ea',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  avatarText: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 22,
+    lineHeight: 28,
+    color: '#ffffff',
+    fontWeight: '900',
+    paddingHorizontal: 8,
   },
-  onlineDot: {
-    position: 'absolute',
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: '#28c269',
-    right: 0,
-    bottom: 2,
-    borderWidth: 2,
-    borderColor: '#f7f7f5',
+  headerRightSpacer: {
+    width: 46,
+    height: 46,
   },
   dateTimeCard: {
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#d7e2ec',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    columnGap: 10,
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
+  dateTimeBlock: {
+    flex: 1,
   },
   dateTimeLabel: {
-    fontSize: 11,
+    fontSize: 13,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: '#6f7f8f',
-    fontWeight: '700',
+    letterSpacing: 0,
+    color: '#74665b',
+    fontWeight: '900',
   },
   dateTimeValue: {
-    marginTop: 2,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#24313d',
+    marginTop: 4,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '900',
+    color: '#2d241d',
   },
-  timeLabelSpacing: {
-    marginTop: 8,
+  dateTimeValueStrong: {
+    color: '#2f5d50',
+  },
+  scheduleControlPanel: {
+    borderRadius: 20,
+    backgroundColor: '#fffdf8',
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    padding: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    columnGap: 10,
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  scheduleControlGroup: {
+    flex: 1,
+  },
+  scheduleControlTitleRow: {
+    minHeight: 28,
+    marginBottom: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scheduleControlIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f7efe4',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    fontSize: 15,
+    marginRight: 7,
+  },
+  scheduleControlLabel: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#5d5045',
+    fontWeight: '900',
+  },
+  scheduleToggleRow: {
+    flexDirection: 'row',
+    columnGap: 8,
+  },
+  scheduleToggleButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: '#f8f2e9',
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  scheduleToggleButtonActive: {
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
+  },
+  scheduleToggleButtonText: {
+    fontSize: 16,
+    lineHeight: 21,
+    color: '#5d5045',
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  scheduleToggleButtonTextActive: {
+    color: '#2f5d50',
   },
   nextDoseCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#c8dceb',
-    backgroundColor: '#dcebfa',
-    padding: 12,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    backgroundColor: '#2f5d50',
+    padding: 16,
     marginBottom: 16,
+    shadowColor: '#315a4f',
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 6,
   },
   nextDoseMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+  },
+  nextDoseTitleWrap: {
+    flex: 1,
+    paddingRight: 10,
   },
   nextDoseLabel: {
-    fontSize: 11,
+    fontSize: 14,
     textTransform: 'uppercase',
-    fontWeight: '700',
-    color: '#4c7898',
-    letterSpacing: 0.4,
+    fontWeight: '900',
+    color: '#f8d978',
+    letterSpacing: 0,
   },
   nextDoseTime: {
-    marginTop: 3,
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#156aa2',
+    marginTop: 5,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '900',
+    color: '#ffffff',
   },
   etaBadge: {
-    borderRadius: 10,
-    backgroundColor: '#aec8de',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderRadius: 16,
+    backgroundColor: '#f8d978',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   etaBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#2f5f7f',
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#342719',
   },
   highlightMedicineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 11,
-    padding: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    backgroundColor: '#fffdf8',
+    borderRadius: 20,
+    padding: 14,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#fff4c6',
+    shadowColor: '#17382f',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   highlightMedicineRowLocked: {
     backgroundColor: '#eef2f5',
@@ -1636,103 +1748,126 @@ const styles = StyleSheet.create({
     borderColor: '#d9e0e6',
   },
   highlightAppearance: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
   highlightAppearanceIcon: {
-    fontSize: 14,
+    fontSize: 20,
     color: '#526271',
   },
   highlightTextWrap: {
     flex: 1,
   },
+  highlightMedicineHeaderRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   highlightMedicineName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1f2a35',
+    fontSize: 25,
+    fontWeight: '900',
+    color: '#24352f',
     lineHeight: 30,
   },
   highlightMedicineMeta: {
-    marginTop: 2,
-    fontSize: 16,
-    color: '#5f6f7f',
+    marginTop: 3,
+    fontSize: 18,
+    lineHeight: 23,
+    color: '#5d5045',
+    fontWeight: '800',
   },
   highlightMedicineSubMeta: {
     marginTop: 2,
-    fontSize: 13,
-    color: '#5f6f7f',
-    fontWeight: '600',
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#6d6258',
+    fontWeight: '700',
   },
   highlightMedicineDoseText: {
-    marginTop: 1,
-    fontSize: 12,
-    color: '#4d7ea4',
-    fontWeight: '700',
+    marginTop: 3,
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#2f5d50',
+    fontWeight: '900',
   },
   highlightTextLocked: {
     color: '#7d8b96',
   },
   entryStatusRow: {
-    flexDirection: 'row',
-    columnGap: 6,
-    marginTop: 8,
+    width: '100%',
+    marginTop: 12,
   },
   entryStatusButton: {
-    flex: 1,
-    borderRadius: 8,
-    backgroundColor: '#5a8fb7',
-    paddingVertical: 8,
+    width: '100%',
+    minHeight: 50,
+    borderRadius: 14,
+    backgroundColor: '#1e6f5c',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   entryStatusButtonDanger: {
-    backgroundColor: '#cf4e3f',
+    backgroundColor: '#9b3d47',
+  },
+  entryStatusButtonReminder: {
+    backgroundColor: '#8a641c',
   },
   entryStatusButtonDisabled: {
     backgroundColor: '#b6c0c8',
   },
   entryStatusButtonText: {
     color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   entryStatusButtonTextDisabled: {
     color: '#eef2f5',
   },
   entryActionRow: {
+    width: '100%',
     flexDirection: 'row',
-    columnGap: 6,
-    marginTop: 6,
+    marginTop: 2,
   },
   entryActionButton: {
-    flex: 0.45,
-    borderRadius: 8,
+    width: '100%',
+    minHeight: 48,
+    borderRadius: 14,
     backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#d2dfeb',
-    paddingVertical: 8,
+    borderColor: '#a8dbc8',
+    paddingVertical: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   entryActionButtonDisabled: {
     backgroundColor: '#edf1f4',
     borderColor: '#d4dce3',
   },
   entryActionButtonText: {
-    color: '#2f3c49',
-    fontSize: 12,
-    fontWeight: '700',
+    color: '#2f5d50',
+    fontSize: 15,
+    fontWeight: '900',
   },
   entryActionButtonTextDisabled: {
     color: '#7e8b95',
   },
   entrySavedStatusText: {
-    marginTop: 6,
-    fontSize: 11,
-    color: '#2f5f7f',
-    fontWeight: '600',
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 19,
+    color: '#2f5d50',
+    fontWeight: '800',
   },
   entryVoiceText: {
     marginTop: 4,
@@ -1743,22 +1878,34 @@ const styles = StyleSheet.create({
   nextDoseGlobalActionRow: {
     flexDirection: 'row',
     columnGap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   nextDoseGlobalActionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#c6d9ea',
+    flex: 1,
+    minHeight: 64,
+    borderRadius: 16,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   nextDoseGlobalActionIcon: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2f3c49',
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '900',
+    color: '#2f5d50',
+    textAlign: 'center',
+  },
+  nextDoseGlobalActionLabel: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '900',
+    color: '#5d5045',
+    textAlign: 'center',
   },
   noNextDoseWrap: {
     borderRadius: 10,
@@ -1769,8 +1916,62 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   noNextDoseText: {
-    fontSize: 13,
-    color: '#57738c',
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#5d5045',
+    fontWeight: '700',
+  },
+  fullDayPrompt: {
+    minHeight: 78,
+    borderRadius: 18,
+    backgroundColor: '#fffdf8',
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fullDayPromptIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#f8d978',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    fontSize: 24,
+    marginRight: 12,
+  },
+  fullDayPromptTextWrap: {
+    flex: 1,
+  },
+  fullDayPromptTitle: {
+    fontSize: 18,
+    lineHeight: 23,
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  fullDayPromptText: {
+    marginTop: 3,
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#74665b',
+    fontWeight: '700',
+  },
+  allTodayPanel: {
+    borderRadius: 24,
+    backgroundColor: '#eaf4ff',
+    borderWidth: 2,
+    borderColor: '#b9d4f2',
+    padding: 12,
+    marginTop: 4,
+    marginBottom: 12,
+    shadowColor: '#2f65a3',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   sectionRow: {
     flexDirection: 'row',
@@ -1779,114 +1980,102 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1f2934',
-    lineHeight: 30,
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#2d241d',
+    lineHeight: 29,
   },
   totalBadge: {
-    borderRadius: 10,
-    backgroundColor: '#ecefef',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    minWidth: 40,
+    borderRadius: 14,
+    backgroundColor: '#2f5d50',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   totalBadgeText: {
-    fontSize: 11,
+    fontSize: 13,
     textTransform: 'uppercase',
-    color: '#6d7783',
-    fontWeight: '700',
+    color: '#ffffff',
+    fontWeight: '900',
+    textAlign: 'center',
   },
   scheduleItemCard: {
-    borderRadius: 14,
-    backgroundColor: '#ffffff',
+    minHeight: 104,
+    borderRadius: 18,
+    backgroundColor: '#fffdf8',
     borderWidth: 1,
-    borderColor: '#e2e7ed',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    borderColor: '#eadcca',
+    borderLeftWidth: 5,
+    borderLeftColor: '#2f5d50',
+    paddingVertical: 13,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 9,
-  },
-  scheduleTimeCol: {
-    width: 66,
-    marginRight: 8,
-  },
-  schedulePeriod: {
-    fontSize: 10,
-    textTransform: 'uppercase',
-    color: '#6f7a87',
-    fontWeight: '700',
-  },
-  scheduleTime: {
-    marginTop: 2,
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#212d37',
+    marginBottom: 12,
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   scheduleMainCol: {
     flex: 1,
   },
   scheduleMedicineName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1f2934',
-    lineHeight: 22,
+    fontSize: 21,
+    fontWeight: '900',
+    color: '#24352f',
+    lineHeight: 26,
   },
   scheduleMetaText: {
-    marginTop: 1,
-    fontSize: 14,
-    color: '#768596',
+    marginTop: 3,
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#5d5045',
+    fontWeight: '800',
   },
   scheduleSubMetaText: {
-    marginTop: 1,
-    fontSize: 12,
-    color: '#7e8b99',
-    fontWeight: '600',
-  },
-  scheduleDoseText: {
-    marginTop: 1,
-    fontSize: 12,
-    color: '#4d7ea4',
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#74665b',
     fontWeight: '700',
   },
+  scheduleRuleText: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#2f65a3',
+    fontWeight: '800',
+  },
+  scheduleDoseText: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: '#e9f7f1',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    fontSize: 13,
+    lineHeight: 17,
+    color: '#2f5d50',
+    fontWeight: '900',
+  },
   scheduleAppearanceDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 6,
   },
   scheduleAppearanceShape: {
-    fontSize: 10,
+    fontSize: 13,
     color: '#65717e',
   },
   scheduleArrow: {
     marginLeft: 9,
     fontSize: 22,
     color: '#b3bdc8',
-  },
-  fabButton: {
-    position: 'absolute',
-    right: 18,
-    bottom: 18,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#2f90eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0b4f8f',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
-  },
-  fabText: {
-    fontSize: 34,
-    lineHeight: 34,
-    color: '#ffffff',
-    marginTop: -2,
   },
   customRemindOverlay: {
     position: 'absolute',

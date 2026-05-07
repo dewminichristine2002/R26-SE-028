@@ -38,7 +38,7 @@ const getProgressColor = (item) => {
   return '#2f8fd0';
 };
 
-const MedicineStockScreen = ({ onBack }) => {
+const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [summary, setSummary] = useState({ totalMedications: 0, lowStockCount: 0, totalPills: 0, usedPills: 0 });
   const [inventory, setInventory] = useState([]);
@@ -49,6 +49,7 @@ const MedicineStockScreen = ({ onBack }) => {
   const [isRefilling, setIsRefilling] = useState(false);
   const [isRefillNotifying, setIsRefillNotifying] = useState(false);
   const [isRequestingRefill, setIsRequestingRefill] = useState({});
+  const textScale = reminderTextScale || 1;
 
   const loadStock = async () => {
     try {
@@ -166,7 +167,7 @@ const MedicineStockScreen = ({ onBack }) => {
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Medicine Stock</Text>
+        <Text style={[styles.headerTitle, { fontSize: 22 * textScale }]}>Medicine Stock</Text>
         <TouchableOpacity style={styles.refreshButton} onPress={loadStock}>
           <Text style={styles.refreshIcon}>↻</Text>
         </TouchableOpacity>
@@ -174,26 +175,26 @@ const MedicineStockScreen = ({ onBack }) => {
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryBlock}>
-          <Text style={styles.summaryLabel}>Total Medications</Text>
-          <Text style={styles.summaryValue}>{summary.totalMedications}</Text>
-          <Text style={styles.summarySubText}>Pills: {summary.totalPills}</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Total Medications</Text>
+          <Text style={[styles.summaryValue, { fontSize: 30 * textScale }]}>{summary.totalMedications}</Text>
+          <Text style={[styles.summarySubText, { fontSize: 13 * textScale }]}>Pills: {summary.totalPills}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryBlock}>
-          <Text style={styles.summaryLabel}>Low Stock</Text>
-          <Text style={styles.summaryDanger}>{summary.lowStockCount} Need refill soon</Text>
-          <Text style={styles.summarySubText}>Used: {summary.usedPills} pills</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Low Stock</Text>
+          <Text style={[styles.summaryDanger, { fontSize: 18 * textScale }]}>{summary.lowStockCount} Need refill soon</Text>
+          <Text style={[styles.summarySubText, { fontSize: 13 * textScale }]}>Used: {summary.usedPills} pills</Text>
         </View>
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Current Inventory</Text>
+        <Text style={[styles.sectionTitle, { fontSize: 21 * textScale }]}>Current Inventory</Text>
       </View>
 
       {isLoading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#2f8fd0" />
-          <Text style={styles.loaderText}>Loading inventory...</Text>
+          <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading inventory...</Text>
         </View>
       ) : (
         <View>
@@ -201,32 +202,32 @@ const MedicineStockScreen = ({ onBack }) => {
             <View key={item.id} style={styles.stockCard}>
               <View style={styles.stockTopRow}>
                 <View>
-                  <Text style={styles.medName}>{item.medicineName}</Text>
-                  <Text style={styles.medSub}>{item.dosageMg}mg • {item.dailyAmount}x daily</Text>
+                  <Text style={[styles.medName, { fontSize: 19 * textScale }]}>{item.medicineName}</Text>
+                  <Text style={[styles.medSub, { fontSize: 13 * textScale }]}>{item.dosageMg}mg • {item.dailyAmount}x daily</Text>
                 </View>
                 <View style={[styles.stockTag, getStockTagStyle(item)]}>
-                  <Text style={styles.stockTagText}>{item.stockLabel}</Text>
+                  <Text style={[styles.stockTagText, { fontSize: 12 * textScale }]}>{item.stockLabel}</Text>
                 </View>
               </View>
 
               <View style={styles.stockMetaRow}>
-                <Text style={styles.pillsLeftText}>{item.pillsLeft} pills left</Text>
-                <Text style={styles.percentText}>{item.coveragePercent}%</Text>
+                <Text style={[styles.pillsLeftText, { fontSize: 16 * textScale }]}>{item.pillsLeft} pills left</Text>
+                <Text style={[styles.percentText, { fontSize: 14 * textScale }]}>{item.coveragePercent}%</Text>
               </View>
 
-              <Text style={styles.pillUsageText}>Total: {item.totalPills} pills • Used: {item.usedPills} pills</Text>
+              <Text style={[styles.pillUsageText, { fontSize: 12 * textScale }]}>Total: {item.totalPills} pills • Used: {item.usedPills} pills</Text>
 
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${item.coveragePercent}%`, backgroundColor: getProgressColor(item) }]} />
               </View>
 
               <View style={styles.refillInfoRow}>
-                <Text style={styles.refillInfoText}>Next Refill: {formatShortDate(item.nextRefillDate)} ({item.daysLeft} days left)</Text>
+                <Text style={[styles.refillInfoText, { fontSize: 13 * textScale }]}>Next Refill: {formatShortDate(item.nextRefillDate)} ({item.daysLeft} days left)</Text>
               </View>
 
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.refillButton} onPress={() => openRefillModal(item)}>
-                  <Text style={styles.refillButtonText}>Refill Now</Text>
+                  <Text style={[styles.refillButtonText, { fontSize: 14 * textScale }]}>Refill Now</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -234,7 +235,7 @@ const MedicineStockScreen = ({ onBack }) => {
                   onPress={() => handleRequestRefillFromCard(item)}
                   disabled={!!isRequestingRefill[item.id]}
                 >
-                  <Text style={styles.refillRequestButtonText}>
+                  <Text style={[styles.refillRequestButtonText, { fontSize: 14 * textScale }]}>
                     {isRequestingRefill[item.id] ? 'Requesting...' : 'Request Refill'}
                   </Text>
                 </TouchableOpacity>
@@ -248,22 +249,22 @@ const MedicineStockScreen = ({ onBack }) => {
                     onPress={() => handleManualNotify(item)}
                     disabled={!!isNotifying[item.id]}
                   >
-                    <Text style={styles.notifyButtonText}>{isNotifying[item.id] ? 'Notifying...' : 'Notify Caregiver'}</Text>
+                    <Text style={[styles.notifyButtonText, { fontSize: 14 * textScale }]}>{isNotifying[item.id] ? 'Notifying...' : 'Notify Caregiver'}</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
           ))}
 
-          {!sortedInventory.length && <Text style={styles.emptyText}>No medicine stock records yet.</Text>}
+          {!sortedInventory.length && <Text style={[styles.emptyText, { fontSize: 15 * textScale }]}>No medicine stock records yet.</Text>}
         </View>
       )}
 
       {showRefillModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Refill Tablets</Text>
-            <Text style={styles.modalSubtitle}>{refillTarget?.medicineName || 'Medicine'}</Text>
+            <Text style={[styles.modalTitle, { fontSize: 22 * textScale }]}>Refill Tablets</Text>
+            <Text style={[styles.modalSubtitle, { fontSize: 14 * textScale }]}>{refillTarget?.medicineName || 'Medicine'}</Text>
 
             <View style={styles.stepperRow}>
               <TouchableOpacity
@@ -274,7 +275,7 @@ const MedicineStockScreen = ({ onBack }) => {
                 <Text style={styles.stepperButtonText}>-</Text>
               </TouchableOpacity>
 
-              <Text style={styles.stepperValue}>{refillTablets} tablets</Text>
+              <Text style={[styles.stepperValue, { fontSize: 22 * textScale }]}>{refillTablets} tablets</Text>
 
               <TouchableOpacity
                 style={styles.stepperButton}
@@ -290,7 +291,7 @@ const MedicineStockScreen = ({ onBack }) => {
               onPress={handleConfirmRefill}
               disabled={isRefilling || isRefillNotifying}
             >
-              <Text style={styles.modalPrimaryButtonText}>{isRefilling ? 'Updating...' : 'Confirm Refill'}</Text>
+              <Text style={[styles.modalPrimaryButtonText, { fontSize: 15 * textScale }]}>{isRefilling ? 'Updating...' : 'Confirm Refill'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -298,7 +299,7 @@ const MedicineStockScreen = ({ onBack }) => {
               onPress={handleRefillNotifyCaregiver}
               disabled={isRefilling || isRefillNotifying}
             >
-              <Text style={styles.modalSecondaryButtonText}>{isRefillNotifying ? 'Notifying...' : 'Notify Caregiver'}</Text>
+              <Text style={[styles.modalSecondaryButtonText, { fontSize: 15 * textScale }]}>{isRefillNotifying ? 'Notifying...' : 'Notify Caregiver'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -306,7 +307,7 @@ const MedicineStockScreen = ({ onBack }) => {
               onPress={() => setShowRefillModal(false)}
               disabled={isRefilling || isRefillNotifying}
             >
-              <Text style={styles.modalCancelButtonText}>Close</Text>
+              <Text style={[styles.modalCancelButtonText, { fontSize: 15 * textScale }]}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -4,12 +4,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { receiptOcrService } from '../services/receiptOcrService';
 import { medicationService } from '../services/medicationService';
 
-const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetectedMedicines, onCapturedListChange }) => {
+const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetectedMedicines, onCapturedListChange, reminderTextScale = 1 }) => {
   const [imageUri, setImageUri] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [rawTextPreview, setRawTextPreview] = useState('');
   const [detectedMedicines, setDetectedMedicines] = useState([]);
   const [savingByIndex, setSavingByIndex] = useState({});
+  const textScale = reminderTextScale || 1;
 
   useEffect(() => {
     if (!Array.isArray(initialDetectedMedicines) || !initialDetectedMedicines.length) {
@@ -273,18 +274,26 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backText}>{'<'}</Text>
+          <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Scan Pharmacy Receipt</Text>
+        <Text style={[styles.title, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>📷 Scan Receipt</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <Text style={styles.subtitle}>Take a clear photo of the receipt. OCR will auto-fill medicine details.</Text>
+      <View style={styles.scanHelpCard}>
+        <View style={styles.scanHelpIconWrap}>
+          <Text style={styles.scanHelpIcon}>🧾</Text>
+        </View>
+        <View style={styles.scanHelpTextWrap}>
+          <Text style={[styles.scanHelpTitle, { fontSize: 21 * textScale, lineHeight: 27 * textScale }]}>Add from receipt</Text>
+          <Text style={[styles.subtitle, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Take a clear photo.</Text>
+        </View>
+      </View>
 
       {!!detectedMedicines.length && (
         <View style={styles.detectedListCard}>
-          <Text style={styles.detectedListTitle}>Detected Medicines ({detectedMedicines.length})</Text>
-          <Text style={styles.detectedListSubtitle}>Edit each row and save separately.</Text>
+          <Text style={[styles.detectedListTitle, { fontSize: 20 * textScale, lineHeight: 26 * textScale }]}>Found Medicines ({detectedMedicines.length})</Text>
+          <Text style={[styles.detectedListSubtitle, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>Check details before saving.</Text>
           <TouchableOpacity
             style={styles.fillAllButton}
             onPress={() => onDetectedMany?.(detectedMedicines.map((item) => ({
@@ -294,45 +303,45 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
               dailyAmount: item.dailyAmount || '1',
             })))}
           >
-            <Text style={styles.fillAllButtonText}>Fill All One by One</Text>
+            <Text style={[styles.fillAllButtonText, { fontSize: 14 * textScale }]}>Use All</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.clearCapturedButton}
             onPress={handleClearCapturedData}
           >
-            <Text style={styles.clearCapturedButtonText}>Clear Captured Data</Text>
+            <Text style={[styles.clearCapturedButtonText, { fontSize: 14 * textScale }]}>Clear</Text>
           </TouchableOpacity>
 
           {detectedMedicines.map((item, index) => (
             <View key={`${item.medicineName || 'medicine'}-${index}`} style={styles.detectedItemCard}>
-              <Text style={styles.detectedLabel}>Name (letters only)</Text>
+              <Text style={[styles.detectedLabel, { fontSize: 12 * textScale }]}>Medicine name</Text>
               <TextInput
                 value={item.medicineName}
                 onChangeText={(value) => updateDetectedMedicineField(index, 'medicineName', value)}
-                style={styles.detectedInput}
+                style={[styles.detectedInput, { fontSize: 14 * textScale }]}
                 placeholder="Medicine name"
                 placeholderTextColor="#8292a2"
               />
 
               <View style={styles.detectedInputRow}>
                 <View style={styles.detectedInputCol}>
-                  <Text style={styles.detectedLabel}>Dose (mg)</Text>
+                  <Text style={[styles.detectedLabel, { fontSize: 12 * textScale }]}>Strength mg</Text>
                   <TextInput
                     value={item.dosageMg}
                     onChangeText={(value) => updateDetectedMedicineField(index, 'dosageMg', value)}
-                    style={styles.detectedInput}
+                    style={[styles.detectedInput, { fontSize: 14 * textScale }]}
                     placeholder="20"
                     keyboardType="decimal-pad"
                     placeholderTextColor="#8292a2"
                   />
                 </View>
                 <View style={styles.detectedInputCol}>
-                  <Text style={styles.detectedLabel}>Qty</Text>
+                  <Text style={[styles.detectedLabel, { fontSize: 12 * textScale }]}>Tablets</Text>
                   <TextInput
                     value={item.totalQuantity}
                     onChangeText={(value) => updateDetectedMedicineField(index, 'totalQuantity', value)}
-                    style={styles.detectedInput}
+                    style={[styles.detectedInput, { fontSize: 14 * textScale }]}
                     placeholder="30"
                     keyboardType="number-pad"
                     placeholderTextColor="#8292a2"
@@ -350,14 +359,14 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
                     dailyAmount: item.dailyAmount || '1',
                   })}
                 >
-                  <Text style={styles.useEntryButtonText}>Open in Entry Form</Text>
+                  <Text style={[styles.useEntryButtonText, { fontSize: 14 * textScale }]}>Use This</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.deleteEntryButton}
                   onPress={() => handleDeleteCapturedMedicine(index)}
                 >
-                  <Text style={styles.deleteEntryButtonText}>Delete</Text>
+                  <Text style={[styles.deleteEntryButtonText, { fontSize: 14 * textScale }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -367,31 +376,33 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
 
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.primaryButton} onPress={handleTakePhoto} disabled={isProcessing}>
-          <Text style={styles.primaryButtonText}>Capture Receipt</Text>
+          <Text style={styles.actionButtonIcon}>📷</Text>
+          <Text style={[styles.primaryButtonText, { fontSize: 16 * textScale }]}>Take Photo</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={handlePickFromGallery} disabled={isProcessing}>
-          <Text style={styles.secondaryButtonText}>Pick from Gallery</Text>
+          <Text style={styles.actionButtonIcon}>🖼️</Text>
+          <Text style={[styles.secondaryButtonText, { fontSize: 16 * textScale }]}>Gallery</Text>
         </TouchableOpacity>
       </View>
 
       {isProcessing && (
         <View style={styles.loadingCard}>
           <ActivityIndicator size="small" color="#2e8ec8" />
-          <Text style={styles.loadingText}>Reading receipt text and extracting fields...</Text>
+          <Text style={[styles.loadingText, { fontSize: 14 * textScale }]}>Reading receipt...</Text>
         </View>
       )}
 
       {!!imageUri && (
         <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>Receipt Preview</Text>
+          <Text style={[styles.previewTitle, { fontSize: 18 * textScale }]}>Receipt Preview</Text>
           <Image source={{ uri: imageUri }} style={styles.previewImage} />
         </View>
       )}
 
       {!!rawTextPreview && (
         <View style={styles.rawTextCard}>
-          <Text style={styles.rawTextTitle}>Detected Text</Text>
-          <Text style={styles.rawTextBody}>{rawTextPreview}</Text>
+          <Text style={[styles.rawTextTitle, { fontSize: 18 * textScale }]}>Detected Text</Text>
+          <Text style={[styles.rawTextBody, { fontSize: 13 * textScale }]}>{rawTextPreview}</Text>
         </View>
       )}
     </ScrollView>
@@ -400,84 +411,142 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
 
 const styles = StyleSheet.create({
   container: {
-    padding: 14,
-    paddingBottom: 26,
-    backgroundColor: '#f4f6f8',
     flexGrow: 1,
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 26,
+    paddingBottom: 28,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    minHeight: 58,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    paddingHorizontal: 10,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#ffffff',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   backText: {
-    fontSize: 18,
-    color: '#34414d',
-    fontWeight: '700',
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   title: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 22,
-    fontWeight: '700',
-    color: '#23303c',
+    lineHeight: 28,
+    fontWeight: '900',
+    color: '#ffffff',
+    paddingHorizontal: 8,
   },
   headerSpacer: {
-    width: 34,
-    height: 34,
+    width: 46,
+    height: 46,
+  },
+  scanHelpCard: {
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scanHelpIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    backgroundColor: '#f8d978',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  scanHelpIcon: {
+    fontSize: 28,
+  },
+  scanHelpTextWrap: {
+    flex: 1,
+  },
+  scanHelpTitle: {
+    fontSize: 21,
+    lineHeight: 27,
+    color: '#2d241d',
+    fontWeight: '900',
   },
   subtitle: {
-    color: '#5e6f7f',
-    fontSize: 13,
-    marginBottom: 12,
+    marginTop: 3,
+    color: '#74665b',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
   },
   actionRow: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 14,
+    columnGap: 10,
   },
   primaryButton: {
     flex: 1,
-    marginRight: 6,
-    backgroundColor: '#2e8ec8',
-    borderRadius: 10,
-    minHeight: 40,
+    backgroundColor: '#2f5d50',
+    borderRadius: 18,
+    minHeight: 66,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
   },
   primaryButtonText: {
     color: '#ffffff',
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 12,
   },
   secondaryButton: {
     flex: 1,
-    marginLeft: 6,
-    borderColor: '#2e8ec8',
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 40,
+    borderColor: '#2f5d50',
+    borderWidth: 2,
+    borderRadius: 18,
+    minHeight: 66,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f3f9fd',
+    backgroundColor: '#fffdf8',
   },
   secondaryButtonText: {
-    color: '#2e6f9a',
-    fontWeight: '700',
+    color: '#2f5d50',
+    fontWeight: '900',
     fontSize: 12,
   },
+  actionButtonIcon: {
+    fontSize: 22,
+    marginBottom: 3,
+  },
   loadingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#dce7ef',
-    padding: 10,
+    backgroundColor: '#fffdf8',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
@@ -488,11 +557,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   previewCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e8ef',
-    padding: 10,
+    backgroundColor: '#fffdf8',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 12,
     marginBottom: 12,
   },
   previewTitle: {
@@ -503,15 +572,15 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: 280,
-    borderRadius: 8,
+    borderRadius: 16,
     backgroundColor: '#ecf1f5',
   },
   rawTextCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e8ef',
-    padding: 10,
+    backgroundColor: '#fffdf8',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 12,
   },
   rawTextTitle: {
     color: '#2b3c49',
@@ -524,12 +593,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   detectedListCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d9e6f0',
-    padding: 10,
-    marginBottom: 12,
+    backgroundColor: '#eaf4ff',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#b9d4f2',
+    padding: 12,
+    marginBottom: 14,
   },
   detectedListTitle: {
     color: '#1f3241',
@@ -540,15 +609,15 @@ const styles = StyleSheet.create({
     color: '#607384',
     fontSize: 12,
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   fillAllButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1f6f9d',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 10,
+    backgroundColor: '#2f5d50',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 8,
   },
   fillAllButtonText: {
     color: '#ffffff',
@@ -557,12 +626,12 @@ const styles = StyleSheet.create({
   },
   clearCapturedButton: {
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#6f7f8e',
-    backgroundColor: '#f4f7fa',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     marginBottom: 10,
   },
   clearCapturedButtonText: {
@@ -571,12 +640,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   detectedItemCard: {
-    borderWidth: 1,
-    borderColor: '#e1e9f0',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-    backgroundColor: '#f9fcff',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    borderRadius: 20,
+    padding: 12,
+    marginBottom: 10,
+    backgroundColor: '#fffdf8',
   },
   detectedName: {
     color: '#263845',
@@ -591,12 +660,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   detectedInput: {
-    borderWidth: 1,
-    borderColor: '#d8e4ee',
-    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    borderRadius: 16,
     backgroundColor: '#ffffff',
-    minHeight: 36,
-    paddingHorizontal: 10,
+    minHeight: 48,
+    paddingHorizontal: 12,
     color: '#243847',
     fontSize: 13,
     marginBottom: 8,
@@ -620,10 +689,10 @@ const styles = StyleSheet.create({
   useEntryButton: {
     marginTop: 8,
     flex: 1,
-    backgroundColor: '#2e8ec8',
-    borderRadius: 8,
+    backgroundColor: '#2f5d50',
+    borderRadius: 14,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 11,
     marginRight: 6,
     alignItems: 'center',
   },
@@ -634,12 +703,12 @@ const styles = StyleSheet.create({
   },
   deleteEntryButton: {
     marginTop: 8,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: 2,
     borderColor: '#cc415b',
     backgroundColor: '#fff0f3',
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 11,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 6,

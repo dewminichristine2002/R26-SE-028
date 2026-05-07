@@ -56,10 +56,11 @@ const getIssueDisplay = (item) => {
   };
 };
 
-const SafetyCenterScreen = ({ onBack }) => {
+const SafetyCenterScreen = ({ onBack, reminderTextScale = 1 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [issues, setIssues] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const textScale = reminderTextScale || 1;
 
   const loadTodayIssues = async () => {
     try {
@@ -153,33 +154,33 @@ const SafetyCenterScreen = ({ onBack }) => {
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backText}>{'<'}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Safety Center</Text>
+        <Text style={[styles.title, { fontSize: 24 * textScale }]}>Safety Center</Text>
         <TouchableOpacity style={styles.refreshButton} onPress={loadTodayIssues}>
           <Text style={styles.refreshText}>i</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.summaryRow}>
-        <Text style={styles.summaryText}>Taken: {takenCount}   Non-Taken: {missedCount}   Overdose: {overdoseCount}</Text>
+        <Text style={[styles.summaryText, { fontSize: 14 * textScale }]}>Taken: {takenCount}   Non-Taken: {missedCount}   Overdose: {overdoseCount}</Text>
       </View>
 
       {isLoading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#d34b5f" />
-          <Text style={styles.loaderText}>Loading today's safety events...</Text>
+          <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading today's safety events...</Text>
         </View>
       ) : (
         <>
           <View style={styles.recentHeaderRow}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <Text style={[styles.sectionTitle, { fontSize: 19 * textScale }]}>Recent Activity</Text>
             <TouchableOpacity onPress={() => setIssues([])}>
-              <Text style={styles.clearText}>Clear All</Text>
+              <Text style={[styles.clearText, { fontSize: 13 * textScale }]}>Clear All</Text>
             </TouchableOpacity>
           </View>
 
           {!issues.length ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No taken, non-taken, or overdose entries for today's schedule.</Text>
+              <Text style={[styles.emptyText, { fontSize: 14 * textScale }]}>No taken, non-taken, or overdose entries for today's schedule.</Text>
             </View>
           ) : (
             issues.map((item) => {
@@ -191,12 +192,12 @@ const SafetyCenterScreen = ({ onBack }) => {
                   </View>
                   <View style={styles.issueBody}>
                     <View style={styles.issueTopRow}>
-                      <Text style={styles.issueHeadline}>{display.headline}</Text>
-                      <Text style={[styles.issueLevel, display.levelStyle]}>{display.level}</Text>
+                      <Text style={[styles.issueHeadline, { fontSize: 16 * textScale }]}>{display.headline}</Text>
+                      <Text style={[styles.issueLevel, display.levelStyle, { fontSize: 11 * textScale }]}>{display.level}</Text>
                     </View>
-                    <Text style={styles.issueMedicine}>{item.medicineName}</Text>
-                    <Text style={styles.issueTime}>{formatEventTime(item.eventDate)} Today</Text>
-                    <Text style={styles.issueDetail}>{display.detail}</Text>
+                    <Text style={[styles.issueMedicine, { fontSize: 15 * textScale }]}>{item.medicineName}</Text>
+                    <Text style={[styles.issueTime, { fontSize: 12 * textScale }]}>{formatEventTime(item.eventDate)} Today</Text>
+                    <Text style={[styles.issueDetail, { fontSize: 13 * textScale }]}>{display.detail}</Text>
                   </View>
                 </View>
               );
@@ -204,9 +205,9 @@ const SafetyCenterScreen = ({ onBack }) => {
           )}
 
           <View style={[styles.monitorCard, monitoringState.style]}>
-            <Text style={styles.monitorTitle}>{monitoringState.title}</Text>
-            <Text style={styles.monitorText}>{monitoringState.detail}</Text>
-            {!!lastUpdatedText && <Text style={styles.monitorMeta}>{lastUpdatedText}</Text>}
+            <Text style={[styles.monitorTitle, { fontSize: 17 * textScale }]}>{monitoringState.title}</Text>
+            <Text style={[styles.monitorText, { fontSize: 14 * textScale }]}>{monitoringState.detail}</Text>
+            {!!lastUpdatedText && <Text style={[styles.monitorMeta, { fontSize: 12 * textScale }]}>{lastUpdatedText}</Text>}
           </View>
         </>
       )}

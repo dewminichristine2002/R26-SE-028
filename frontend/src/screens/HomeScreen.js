@@ -52,12 +52,60 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   ];
 
   const reminderMenuItems = [
-    { title: 'Routine Setup', subtitle: 'Create daily reminder times', icon: '⏰' },
-    { title: 'Schedule Board', subtitle: 'View today and weekly plans', icon: '🗓️' },
-    { title: 'Add Medicine', subtitle: 'Register a new medication', icon: '💊' },
-    { title: 'Medicine List', subtitle: 'See all active medicines', icon: '📋' },
-    { title: 'Medicine Stock', subtitle: 'Track remaining quantities', icon: '📦' },
-    { title: 'Safety Center', subtitle: 'Warnings and safe-use tips', icon: '🛡️' },
+    {
+      title: 'Schedule Board',
+      subtitle: 'See today medicines',
+      helper: 'Today',
+      icon: '🗓️',
+      accentColor: '#1e6f5c',
+      backgroundColor: '#e9f7f1',
+      borderColor: '#a8dbc8',
+    },
+    {
+      title: 'Routine Setup',
+      subtitle: 'Set meal times',
+      helper: 'Times',
+      icon: '⏰',
+      accentColor: '#2f65a3',
+      backgroundColor: '#edf5ff',
+      borderColor: '#b9d4f2',
+    },
+    {
+      title: 'Add Medicine',
+      subtitle: 'Add new medicine',
+      helper: 'Add',
+      icon: '💊',
+      accentColor: '#8a4a17',
+      backgroundColor: '#fff4e8',
+      borderColor: '#f0cda8',
+    },
+    {
+      title: 'Medicine List',
+      subtitle: 'View medicines',
+      helper: 'List',
+      icon: '📋',
+      accentColor: '#5b4aa0',
+      backgroundColor: '#f3efff',
+      borderColor: '#cbc0f0',
+    },
+    {
+      title: 'Medicine Stock',
+      subtitle: 'Check medicine amount',
+      helper: 'Stock',
+      icon: '📦',
+      accentColor: '#126b7a',
+      backgroundColor: '#e9f8fb',
+      borderColor: '#a7dce4',
+    },
+    {
+      title: 'Safety Center',
+      subtitle: 'See safety alerts',
+      helper: 'Safe',
+      icon: '🛡️',
+      accentColor: '#9b3d47',
+      backgroundColor: '#fff0f2',
+      borderColor: '#edbdc4',
+    },
   ];
 
   const handleButtonPress = (item) => {
@@ -112,6 +160,7 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   };
 
   const textScale = largeTextMode ? 1.15 : 1;
+  const reminderTextScale = textScale;
   const isCaregiver = user?.role === 'caregiver';
   const criticalAlerts = caregiverAlerts.filter((item) => !item.is_read);
   const recentAlerts = caregiverAlerts.slice(0, 5);
@@ -499,7 +548,7 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
   if (showReminderMenu) {
     if (activeReminderView === 'routine-setup') {
-      return <RoutineSetupScreen onBackToMenu={() => setActiveReminderView('menu')} />;
+      return <RoutineSetupScreen onBackToMenu={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
     }
 
     if (activeReminderView === 'add-medicine') {
@@ -514,12 +563,18 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
             >
               <Text style={styles.addMedicineBackIcon}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.addMedicineTitle}>Add Medicine</Text>
+            <Text style={[styles.addMedicineTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>💊 Add Medicine</Text>
             <View style={styles.addMedicineHeaderSpacer} />
           </View>
 
           <View style={styles.addMedicineHintCard}>
-            <Text style={styles.addMedicineHintTitle}>How would you like to add your medicine today?</Text>
+            <View style={styles.addMedicineHintIconWrap}>
+              <Text style={styles.addMedicineHintIcon}>➕</Text>
+            </View>
+            <View style={styles.addMedicineHintTextWrap}>
+              <Text style={[styles.addMedicineHintTitle, { fontSize: 24 * textScale, lineHeight: 30 * textScale }]}>Choose how to add</Text>
+              <Text style={[styles.addMedicineHintText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Pick the easiest way.</Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -533,9 +588,10 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
               <Text style={styles.addMedicineOptionIcon}>📷</Text>
             </View>
             <View style={styles.addMedicineOptionTextWrap}>
-              <Text style={styles.addMedicineOptionTitle}>Scan Pharmacy Receipt</Text>
-              <Text style={styles.addMedicineOptionSubtitle}>Capture your pharmacy receipt details</Text>
+              <Text style={[styles.addMedicineOptionTitle, { fontSize: 21 * textScale, lineHeight: 27 * textScale }]}>Scan Receipt</Text>
+              <Text style={[styles.addMedicineOptionSubtitle, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Use camera. Fast way.</Text>
             </View>
+            <Text style={styles.addMedicineOptionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -551,13 +607,14 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
             accessibilityLabel="Manual Entry"
             accessibilityHint="Type medicine details manually"
           >
-            <View style={styles.addMedicineOptionIconWrap}>
+            <View style={[styles.addMedicineOptionIconWrap, styles.addMedicineOptionIconWrapManual]}>
               <Text style={styles.addMedicineOptionIcon}>⌨️</Text>
             </View>
             <View style={styles.addMedicineOptionTextWrap}>
-              <Text style={styles.addMedicineOptionTitle}>Manual Entry</Text>
-              <Text style={styles.addMedicineOptionSubtitle}>Type in the details yourself</Text>
+              <Text style={[styles.addMedicineOptionTitle, { fontSize: 21 * textScale, lineHeight: 27 * textScale }]}>Type Details</Text>
+              <Text style={[styles.addMedicineOptionSubtitle, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Enter by yourself.</Text>
             </View>
+            <Text style={styles.addMedicineOptionArrow}>›</Text>
           </TouchableOpacity>
         </ScrollView>
       );
@@ -570,6 +627,7 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
       return (
         <ManualEntryScreen
+          reminderTextScale={reminderTextScale}
           initialData={currentDraft}
           onBack={() => {
             if (capturedMedicines.length) {
@@ -616,6 +674,7 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
     if (activeReminderView === 'scan-receipt') {
       return (
         <ReceiptScanScreen
+          reminderTextScale={reminderTextScale}
           onBack={() => setActiveReminderView('add-medicine')}
           initialDetectedMedicines={capturedMedicines}
           onCapturedListChange={(list) => {
@@ -646,37 +705,72 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
     }
 
     if (activeReminderView === 'medicine-list') {
-      return <MedicineListScreen onBack={() => setActiveReminderView('menu')} />;
+      return <MedicineListScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
     }
 
     if (activeReminderView === 'medicine-stock') {
-      return <MedicineStockScreen onBack={() => setActiveReminderView('menu')} />;
+      return <MedicineStockScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
     }
 
     if (activeReminderView === 'schedule-board') {
-      return <ScheduleBoardScreen user={user} onBack={() => setActiveReminderView('menu')} />;
+      return <ScheduleBoardScreen user={user} onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
     }
 
     if (activeReminderView === 'safety-center') {
-      return <SafetyCenterScreen onBack={() => setActiveReminderView('menu')} />;
+      return <SafetyCenterScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
     }
 
     return (
       <ScrollView contentContainerStyle={styles.reminderContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.backgroundBlobTop} />
-        <View style={styles.backgroundBlobBottom} />
+        <View style={styles.reminderTopBar}>
+          <View style={styles.reminderTopLeft}>
+            <View style={styles.reminderTopTitleWrap}>
+              <Text style={styles.reminderEyebrow}>ElderMeds</Text>
+              <Text style={styles.reminderTopLabel}>Reminder Menu</Text>
+            </View>
+          </View>
+          <View style={styles.reminderTopActions}>
+            <TouchableOpacity
+              style={styles.reminderProfileButton}
+              onPress={onOpenProfile}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
+              accessibilityHint="Opens your user profile"
+            >
+              <Text style={styles.reminderProfileButtonIcon}>👤</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reminderHomeButton}
+              onPress={() => {
+                setShowReminderMenu(false);
+                setActiveReminderView('menu');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Back to home"
+              accessibilityHint="Returns to the main home menu"
+            >
+              <Text style={styles.reminderHomeButtonIcon}>🏠</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.reminderHeaderCard}>
-          <Text style={styles.reminderEyebrow}>ElderMeds Planner</Text>
-          <Text style={[styles.reminderTitle, { fontSize: 36 * textScale, lineHeight: 42 * textScale }]}>
-            Intelligent{`\n`}Medication Reminder
-          </Text>
-          <Text style={styles.reminderSubtitle}>
-            Keep routines simple. Pick an action below to manage reminders.
-          </Text>
+          <View style={styles.reminderHeaderIconWrap}>
+            <Text style={styles.reminderHeaderIcon}>🔔</Text>
+          </View>
+          <View style={styles.reminderHeaderTextWrap}>
+            <Text style={[styles.reminderTitle, { fontSize: 34 * textScale, lineHeight: 40 * textScale }]}>
+              Medicine{`\n`}Reminder
+            </Text>
+          </View>
+        </View>
 
+        <View style={styles.reminderSectionHeader}>
+          <View style={styles.reminderSectionCopy}>
+            <Text style={styles.reminderInfoText}>Choose Action</Text>
+          </View>
           <View style={styles.textModeRow}>
-            <Text style={styles.textModeLabel}>Text Size</Text>
+            <Text style={styles.textModeLabel}>Text</Text>
             <TouchableOpacity
               style={[styles.textModeButton, !largeTextMode && styles.textModeButtonActive]}
               onPress={() => setLargeTextMode(false)}
@@ -698,46 +792,40 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
           </View>
         </View>
 
-        <View style={styles.reminderInfoStrip}>
-          <Text style={styles.reminderInfoText}>Quick Actions</Text>
-          <Text style={styles.reminderInfoBadge}>{reminderMenuItems.length} options</Text>
-        </View>
-
         <View style={styles.reminderButtonList}>
           {reminderMenuItems.map((item) => (
             <TouchableOpacity
               key={item.title}
-              style={styles.reminderButton}
+              style={[
+                styles.reminderButton,
+                {
+                  backgroundColor: item.backgroundColor,
+                  borderColor: item.borderColor,
+                },
+              ]}
               activeOpacity={0.86}
               onPress={() => handleReminderMenuPress(item.title)}
               accessibilityRole="button"
               accessibilityLabel={item.title}
               accessibilityHint={item.subtitle}
             >
-              <View style={styles.reminderButtonIconWrap}>
+              <View style={[styles.reminderButtonIconWrap, { backgroundColor: item.accentColor }]}>
                 <Text style={styles.reminderButtonIcon}>{item.icon}</Text>
               </View>
               <View style={styles.reminderButtonTextWrap}>
-                <Text style={[styles.reminderButtonText, { fontSize: 20 * textScale }]}>{item.title}</Text>
-                <Text style={[styles.reminderButtonSubText, { fontSize: 13 * textScale }]}>{item.subtitle}</Text>
+                <View style={styles.reminderButtonTitleRow}>
+                  <Text style={[styles.reminderButtonText, { fontSize: 21 * textScale }]}>{item.title}</Text>
+                </View>
+                <Text style={[styles.reminderButtonSubText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
+                  {item.subtitle}
+                </Text>
               </View>
-              <Text style={styles.reminderButtonArrow}>›</Text>
+              <View style={[styles.reminderButtonArrowWrap, { borderColor: item.borderColor }]}>
+                <Text style={[styles.reminderButtonArrow, { color: item.accentColor }]}>›</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
-
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            setShowReminderMenu(false);
-            setActiveReminderView('menu');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Back to home"
-          accessibilityHint="Returns to the main home menu"
-        >
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
       </ScrollView>
     );
   }
@@ -856,10 +944,10 @@ const styles = StyleSheet.create({
   },
   reminderContainer: {
     flexGrow: 1,
-    backgroundColor: '#edf4fb',
-    paddingTop: 28,
-    paddingBottom: 32,
-    paddingHorizontal: 18,
+    backgroundColor: '#f7efe4',
+    paddingTop: 22,
+    paddingBottom: 34,
+    paddingHorizontal: 16,
     position: 'relative',
   },
   caregiverContainer: {
@@ -1127,285 +1215,392 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  backgroundBlobTop: {
-    position: 'absolute',
-    top: -110,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: '#bfe9ff',
+  reminderTopBar: {
+    minHeight: 54,
+    marginBottom: 14,
+    paddingHorizontal: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  backgroundBlobBottom: {
-    position: 'absolute',
-    bottom: -120,
-    left: -95,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: '#cde4ff',
+  reminderTopLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 10,
+  },
+  reminderTopTitleWrap: {
+    flex: 1,
+  },
+  reminderTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reminderProfileButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#fffdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    borderWidth: 2,
+    borderColor: '#a8dbc8',
+    shadowColor: '#17382f',
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  reminderProfileButtonIcon: {
+    fontSize: 27,
+    lineHeight: 31,
+    fontWeight: '900',
+  },
+  reminderTopLabel: {
+    marginTop: 2,
+    fontSize: 24,
+    lineHeight: 30,
+    color: '#2d241d',
+    fontWeight: '800',
+  },
+  reminderHomeButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#fffdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#17382f',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  reminderHomeButtonIcon: {
+    fontSize: 27,
+    lineHeight: 31,
+    fontWeight: '900',
   },
   reminderHeaderCard: {
     width: '100%',
+    minHeight: 126,
     borderRadius: 24,
-    backgroundColor: '#ffffff',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    marginBottom: 18,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
+    backgroundColor: '#2f5d50',
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 5,
   },
+  reminderHeaderIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: '#f8d978',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: '#fff4c6',
+  },
+  reminderHeaderIcon: {
+    fontSize: 36,
+  },
+  reminderHeaderTextWrap: {
+    flex: 1,
+  },
   reminderEyebrow: {
-    fontSize: 13,
-    letterSpacing: 1,
+    fontSize: 12,
+    letterSpacing: 0,
     textTransform: 'uppercase',
-    color: '#2c79a9',
-    fontWeight: '700',
-    marginBottom: 8,
+    color: '#74614e',
+    fontWeight: '800',
   },
   reminderTitle: {
-    fontSize: 36,
-    fontWeight: '700',
-    lineHeight: 42,
-    color: '#0a4b70',
+    fontSize: 34,
+    fontWeight: '900',
+    lineHeight: 40,
+    color: '#ffffff',
   },
-  reminderSubtitle: {
-    marginTop: 10,
-    fontSize: 15,
-    lineHeight: 21,
-    color: '#4c6d82',
+  reminderSectionHeader: {
+    marginBottom: 12,
+    paddingHorizontal: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reminderSectionCopy: {
+    flex: 1,
+    paddingRight: 10,
   },
   textModeRow: {
-    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
   },
   textModeLabel: {
-    marginRight: 10,
-    color: '#355f7a',
-    fontSize: 13,
-    fontWeight: '600',
+    marginRight: 8,
+    color: '#5e5045',
+    fontSize: 14,
+    fontWeight: '800',
   },
   textModeButton: {
-    minWidth: 42,
-    height: 34,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: '#eef6fc',
+    minWidth: 44,
+    height: 38,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginLeft: 6,
     borderWidth: 1,
-    borderColor: '#d5e9f9',
+    borderColor: '#d8c9b7',
   },
   textModeButtonActive: {
-    backgroundColor: '#1f6894',
-    borderColor: '#1f6894',
+    backgroundColor: '#2f5d50',
+    borderColor: '#2f5d50',
   },
   textModeButtonText: {
-    color: '#3e637b',
-    fontWeight: '700',
-    fontSize: 13,
+    color: '#5e5045',
+    fontWeight: '900',
+    fontSize: 14,
   },
   textModeButtonTextActive: {
     color: '#ffffff',
   },
-  reminderInfoStrip: {
-    marginBottom: 12,
-    borderRadius: 14,
-    backgroundColor: '#d8edff',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   reminderInfoText: {
-    fontSize: 13,
-    color: '#2f5f80',
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  reminderInfoBadge: {
-    fontSize: 12,
-    color: '#16486a',
-    fontWeight: '700',
-    backgroundColor: '#eef7ff',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+    fontSize: 21,
+    lineHeight: 26,
+    color: '#2d241d',
+    fontWeight: '900',
+    letterSpacing: 0,
   },
   reminderButtonList: {
     width: '100%',
   },
   reminderButton: {
-    backgroundColor: '#8ad0f7',
-    borderRadius: 20,
-    minHeight: 88,
+    borderRadius: 18,
+    minHeight: 104,
     marginBottom: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#a8dcfb',
-    shadowColor: '#175b8d',
-    shadowOpacity: 0.16,
+    shadowColor: '#5c4a39',
+    shadowOpacity: 0.1,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   reminderButtonIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#edf8ff',
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   reminderButtonIcon: {
-    fontSize: 20,
+    fontSize: 27,
   },
   reminderButtonTextWrap: {
     flex: 1,
     paddingRight: 6,
   },
+  reminderButtonTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
   reminderButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#083350',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '900',
+    color: '#24352f',
+    marginRight: 8,
   },
   reminderButtonSubText: {
-    marginTop: 2,
-    fontSize: 13,
-    color: '#255574',
+    marginTop: 7,
+    fontSize: 15,
+    lineHeight: 21,
+    color: '#4d473f',
+    fontWeight: '700',
+  },
+  reminderButtonArrowWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.78)',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reminderButtonArrow: {
-    fontSize: 28,
-    color: '#1b5f88',
-    marginLeft: 10,
-    marginBottom: 2,
-  },
-  backButton: {
-    marginTop: 10,
-    alignSelf: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
-    shadowColor: '#175b8d',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#1e4f72',
-    fontWeight: '600',
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: '900',
   },
   addMedicineContainer: {
     flexGrow: 1,
-    backgroundColor: '#f4f6f8',
-    paddingTop: 14,
+    backgroundColor: '#f7efe4',
+    paddingTop: 26,
     paddingHorizontal: 14,
-    paddingBottom: 24,
+    paddingBottom: 30,
   },
   addMedicineHeader: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: '#ffffff',
+    minHeight: 58,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
     paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#e7ebef',
-    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    marginBottom: 14,
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   addMedicineBackButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#f0f5fa',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   addMedicineBackIcon: {
-    fontSize: 24,
-    color: '#4c6175',
-    marginTop: -2,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   addMedicineTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#1e2a35',
+    lineHeight: 28,
+    fontWeight: '900',
+    color: '#ffffff',
   },
   addMedicineHeaderSpacer: {
-    width: 34,
-    height: 34,
+    width: 46,
+    height: 46,
   },
   addMedicineHintCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e6eaef',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  addMedicineHintTitle: {
-    fontSize: 20,
-    lineHeight: 24,
-    color: '#2a3c4c',
-    fontWeight: '600',
-  },
-  addMedicineOptionCard: {
-    minHeight: 90,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e0e5ea',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
+    backgroundColor: '#fffdf8',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 14,
+    marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  addMedicineOptionCardPrimary: {
-    borderColor: '#3c98d6',
-    backgroundColor: '#f4fbff',
-  },
-  addMedicineOptionIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 10,
-    backgroundColor: '#f2f4f7',
+  addMedicineHintIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    backgroundColor: '#f8d978',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
+  addMedicineHintIcon: {
+    fontSize: 27,
+  },
+  addMedicineHintTextWrap: {
+    flex: 1,
+  },
+  addMedicineHintTitle: {
+    fontSize: 24,
+    lineHeight: 30,
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  addMedicineHintText: {
+    marginTop: 4,
+    fontSize: 15,
+    lineHeight: 21,
+    color: '#74665b',
+    fontWeight: '700',
+  },
+  addMedicineOptionCard: {
+    minHeight: 108,
+    backgroundColor: '#f3efff',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#cbc0f0',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  addMedicineOptionCardPrimary: {
+    borderColor: '#a8dbc8',
+    backgroundColor: '#e9f7f1',
+  },
+  addMedicineOptionIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: '#5b4aa0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
   addMedicineOptionIconWrapPrimary: {
-    backgroundColor: '#2f8fd0',
+    backgroundColor: '#1e6f5c',
+  },
+  addMedicineOptionIconWrapManual: {
+    backgroundColor: '#5b4aa0',
   },
   addMedicineOptionIcon: {
-    fontSize: 22,
+    fontSize: 29,
   },
   addMedicineOptionTextWrap: {
     flex: 1,
   },
   addMedicineOptionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1c2b36',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '900',
+    color: '#24352f',
   },
   addMedicineOptionSubtitle: {
-    marginTop: 2,
-    fontSize: 16,
-    color: '#556472',
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 21,
+    color: '#4d473f',
+    fontWeight: '700',
+  },
+  addMedicineOptionArrow: {
+    width: 40,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    fontWeight: '900',
+    textAlign: 'right',
   },
 });
 
