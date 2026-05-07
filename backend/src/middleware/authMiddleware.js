@@ -11,7 +11,10 @@ const requireAuth = (req, res, next) => {
   try {
     const secret = process.env.JWT_SECRET || 'eldermeds-dev-secret';
     const decoded = jwt.verify(token, secret);
-    req.user = { id: decoded.userId };
+    req.user = {
+      id: decoded.userId,
+      role: decoded.role || 'user',
+    };
     return next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });

@@ -50,6 +50,10 @@ const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
           placeholderTextColor="#8a97a4"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          importantForAutofill="yes"
           value={email}
           onChangeText={setEmail}
         />

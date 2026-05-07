@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const emotionalSupportRoutes = require('./modules/emotionalSupport/routes/emotionalSupportRoutes');
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api/medications', require('./routes/medications'));
 app.use('/api/routines', require('./routes/routines'));
 app.use('/api/allergies', require('./routes/allergies'));
 app.use('/api/prescriptions', require('./routes/prescriptions'));
+app.use('/api/emotional-support', emotionalSupportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
