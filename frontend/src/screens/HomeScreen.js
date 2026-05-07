@@ -11,7 +11,7 @@ import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, onOpenProfile, onOpenEmotionalSupport, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
@@ -109,9 +109,13 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
   ];
 
   const handleButtonPress = (item) => {
-    if (item.label === 'home.reminder') {
-      setActiveReminderView('menu');
-      setShowReminderMenu(true);
+    if (item.label === 'Allergy') {
+      onOpenAllergies();
+      return;
+    }
+
+    if (item.label === 'home.emotions') {
+      onOpenEmotionalSupport?.();
       return;
     }
 
@@ -832,9 +836,18 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>{t('home.title')}</Text>
-      <Text style={styles.welcome}>{t('home.welcome')}</Text>
+      <Text style={styles.title}>Home</Text>
+      <Text style={styles.welcome}>Welcome back!</Text>
       <Text style={styles.userName}>Signed in as {user?.fullName || 'User'}</Text>
+
+      {isLocalMode ? (
+        <View style={styles.localModeBanner}>
+          <Text style={styles.localModeTitle}>Saved On This Device</Text>
+          <Text style={styles.localModeText}>
+            The shared database is unavailable right now, so this account and its new changes are being stored on this phone.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.quickActionRow}>
         <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
@@ -847,13 +860,9 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
       <View style={styles.grid}>
         {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.button}
-            onPress={() => handleButtonPress(item)}
-          >
+          <TouchableOpacity key={item.id} style={styles.button} onPress={() => handleButtonPress(item)}>
             <Text style={styles.icon}>{item.icon}</Text>
-            <Text style={styles.buttonLabel}>{t(item.label)}</Text>
+            <Text style={styles.buttonLabel}>{item.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -883,6 +892,25 @@ const styles = StyleSheet.create({
     color: '#1f6894',
     fontWeight: '600',
     marginBottom: 12,
+  },
+  localModeBanner: {
+    backgroundColor: '#fff6da',
+    borderColor: '#efd28a',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  localModeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#7b5700',
+  },
+  localModeText: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6d5a24',
   },
   quickActionRow: {
     flexDirection: 'row',

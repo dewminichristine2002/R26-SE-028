@@ -2,8 +2,11 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/db');
+const { requireDatabase } = require('../middleware/databaseMiddleware');
 
 const router = express.Router();
+
+router.use(requireDatabase);
 
 router.post('/register', async (req, res, next) => {
   try {
