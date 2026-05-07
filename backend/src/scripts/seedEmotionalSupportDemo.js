@@ -2,11 +2,11 @@ require('dotenv').config();
 
 const { getPool, withTransaction } = require('../db/postgres');
 
-const DEMO_CAREGIVER_ID = '22222222-2222-2222-2222-222222222222';
+const DEMO_CAREGIVER_ID = 2;
 
 const elders = [
   {
-    id: '11111111-1111-1111-1111-111111111111',
+    id: 1,
     name: 'Nimal Perera',
     age: 72,
     gender: 'male',
@@ -16,7 +16,7 @@ const elders = [
     chronicConditions: ['hypertension'],
   },
   {
-    id: '33333333-3333-3333-3333-333333333333',
+    id: 3,
     name: 'Kamala Silva',
     age: 76,
     gender: 'female',
@@ -26,7 +26,7 @@ const elders = [
     chronicConditions: ['diabetes'],
   },
   {
-    id: '44444444-4444-4444-4444-444444444444',
+    id: 4,
     name: 'Sunil Fernando',
     age: 81,
     gender: 'male',
@@ -362,13 +362,13 @@ async function seed() {
     await client.query(
       `
         DELETE FROM emotional_support_caregiver_alerts
-        WHERE elder_user_id = ANY($1::UUID[])
+        WHERE elder_user_id = ANY($1::INTEGER[])
            OR caregiver_user_id = $2
       `,
       [elderIds, DEMO_CAREGIVER_ID]
     );
-    await client.query('DELETE FROM emotional_support_emotion_sessions WHERE elder_user_id = ANY($1::UUID[])', [elderIds]);
-    await client.query('DELETE FROM emotional_support_elder_profiles WHERE elder_user_id = ANY($1::UUID[])', [elderIds]);
+    await client.query('DELETE FROM emotional_support_emotion_sessions WHERE elder_user_id = ANY($1::INTEGER[])', [elderIds]);
+    await client.query('DELETE FROM emotional_support_elder_profiles WHERE elder_user_id = ANY($1::INTEGER[])', [elderIds]);
 
     for (const elder of elders) {
       await client.query(
@@ -394,7 +394,7 @@ async function seed() {
             FALSE,
             $8::TEXT[],
             'Demo profile for caregiver dashboard and emotional-support reporting.',
-            ARRAY[$9]::UUID[],
+            ARRAY[$9]::INTEGER[],
             NOW()
           )
         `,

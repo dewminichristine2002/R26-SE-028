@@ -3,7 +3,6 @@ const { requireDatabase } = require('../middleware/databaseMiddleware');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { searchMedications, enrichMedication } = require('../services/medicationKnowledgeService');
 const { pool } = require('../config/db');
-const { requireAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 

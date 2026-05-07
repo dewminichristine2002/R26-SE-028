@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const emotionalSupportRoutes = require('./modules/emotionalSupport/routes/emotionalSupportRoutes');
+const emotionalSupportRoutes = require('./routes/emotionalSupportRoutes');
 
 dotenv.config();
 

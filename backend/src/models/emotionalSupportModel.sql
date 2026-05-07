@@ -30,7 +30,7 @@ FROM emotional_support_response_bank;
 
 CREATE TABLE IF NOT EXISTS emotional_support_elder_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    elder_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
     display_name TEXT,
     age INTEGER,
     gender TEXT,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS emotional_support_elder_profiles (
     voice_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     chronic_conditions TEXT[] DEFAULT ARRAY[]::TEXT[],
     clinical_notes TEXT,
-    caregiver_user_ids UUID[] DEFAULT ARRAY[]::UUID[],
+    caregiver_user_ids INTEGER[] DEFAULT ARRAY[]::INTEGER[],
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS emotional_support_cognitive_activities (
 
 CREATE TABLE IF NOT EXISTS emotional_support_emotion_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    elder_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
     input_mode TEXT NOT NULL CHECK (input_mode IN ('emoji', 'text', 'voice', 'multimodal')),
     check_in_type TEXT NOT NULL CHECK (check_in_type IN ('manual', 'scheduled', 'triggered')),
     emoji TEXT,
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_es_sessions_elder_created
 CREATE TABLE IF NOT EXISTS emotional_support_interventions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES emotional_support_emotion_sessions(id) ON DELETE CASCADE,
-    elder_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
     response_bank_id UUID REFERENCES emotional_support_response_bank(id) ON DELETE SET NULL,
     response_type TEXT NOT NULL CHECK (response_type IN ('empathetic_reply', 'calming_support', 'motivation', 'escalation_hold', 'de_escalation')),
     response_text TEXT NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS emotional_support_interventions (
 CREATE TABLE IF NOT EXISTS chat_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES emotional_support_emotion_sessions(id) ON DELETE CASCADE,
-    elder_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
     actor_type TEXT NOT NULL CHECK (actor_type IN ('elder', 'system')),
     message_type TEXT NOT NULL CHECK (message_type IN ('text', 'voice_transcript', 'emoji', 'multimodal', 'response')),
     message_text TEXT NOT NULL,
@@ -128,7 +128,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_logs_elder_created
 
 CREATE TABLE IF NOT EXISTS emotional_support_activity_attempts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    elder_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
     session_id UUID NOT NULL REFERENCES emotional_support_emotion_sessions(id) ON DELETE CASCADE,
     activity_id UUID NOT NULL REFERENCES emotional_support_cognitive_activities(id) ON DELETE CASCADE,
     answer_text TEXT,
@@ -144,8 +144,8 @@ CREATE INDEX IF NOT EXISTS idx_es_attempts_elder_started
 
 CREATE TABLE IF NOT EXISTS emotional_support_caregiver_alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    elder_user_id UUID NOT NULL,
-    caregiver_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
+    caregiver_user_id INTEGER NOT NULL,
     session_id UUID REFERENCES emotional_support_emotion_sessions(id) ON DELETE SET NULL,
     alert_type TEXT NOT NULL CHECK (alert_type IN ('negative_mood_trend', 'high_stress', 'loneliness_pattern', 'missed_checkins')),
     severity TEXT NOT NULL CHECK (severity IN ('medium', 'high', 'critical')),
@@ -163,7 +163,7 @@ CREATE INDEX IF NOT EXISTS idx_es_alerts_caregiver_status_created
 
 CREATE TABLE IF NOT EXISTS emotional_support_trend_snapshots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    elder_user_id UUID NOT NULL,
+    elder_user_id INTEGER NOT NULL,
     period_type TEXT NOT NULL CHECK (period_type IN ('daily', 'weekly')),
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
