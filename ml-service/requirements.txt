@@ -12,3 +12,9 @@ numpy==2.3.2
 librosa==0.11.0
 soundfile==0.13.1
 joblib==1.5.1
+
+# Unified Conversational Dashboard (RAG)
+httpx==0.27.2
+spacy==3.8.7
+# After installing, run:
+#   python -m spacy download en_core_web_sm

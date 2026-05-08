@@ -34,6 +34,7 @@ app.use('/api/routines', require('./routes/routines'));
 app.use('/api/allergies', require('./routes/allergies'));
 app.use('/api/prescriptions', require('./routes/prescriptions'));
 app.use('/api/emotional-support', emotionalSupportRoutes);
+app.use('/api/assistant', require('./routes/assistant'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

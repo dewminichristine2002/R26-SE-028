@@ -11,7 +11,7 @@ import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenAssistant, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
@@ -81,11 +81,11 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
     if (item.label === 'Dashboard') {
       setShowReminderMenu(false);
       setActiveReminderView('menu');
+      onOpenDashboard?.();
       return;
     }
 
     console.log(`Navigating to ${item.label}`);
-    // TODO: Navigate to the respective screen
   };
 
   const handleReminderMenuPress = (menuItem) => {

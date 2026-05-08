@@ -10,6 +10,9 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import MedicineSafetyScreen from './src/screens/MedicineSafetyScreenFixed';
+import UnifiedDashboardScreen from './src/screens/UnifiedDashboardScreen';
+import AssistantChatScreen from './src/screens/AssistantChatScreen';
+import AssistantFAB from './src/components/AssistantFAB';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
 import { reminderNotificationService } from './src/services/reminderNotificationService';
@@ -37,31 +40,49 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLocalMode, setIsLocalMode] = useState(false);
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
+  const [assistantInitialPrompt, setAssistantInitialPrompt] = useState('');
+  const [assistantReturnScreen, setAssistantReturnScreen] = useState('home');
 
   // Android hardware back button navigation
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const onBackPress = () => {
-      // If on login/register, exit app
       if (!isAuthenticated) {
         return false;
       }
-      // If on profile, go back to home
+      if (activeScreen === 'assistant-chat') {
+        setActiveScreen(assistantReturnScreen || 'home');
+        return true;
+      }
+      if (activeScreen === 'unified-dashboard') {
+        setActiveScreen('home');
+        return true;
+      }
       if (activeScreen === 'profile') {
         setActiveScreen('home');
         return true;
       }
-      // If not on home, go back to home
       if (activeScreen !== 'home') {
         setActiveScreen('home');
         return true;
       }
-      // Otherwise, let default (exit app)
       return false;
     };
     BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-  }, [isAuthenticated, activeScreen]);
+  }, [isAuthenticated, activeScreen, assistantReturnScreen]);
+
+  const openAssistant = (options = {}) => {
+    const fromScreen = activeScreen === 'assistant-chat' ? assistantReturnScreen : activeScreen;
+    setAssistantReturnScreen(fromScreen || 'home');
+    setAssistantInitialPrompt(options.initialPrompt || '');
+    setActiveScreen('assistant-chat');
+  };
+
+  const closeAssistant = () => {
+    setActiveScreen(assistantReturnScreen || 'home');
+    setAssistantInitialPrompt('');
+  };
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -247,6 +268,25 @@ export default function App() {
       return <EmotionalSupportNavigator />;
     }
 
+    if (activeScreen === 'unified-dashboard') {
+      return (
+        <UnifiedDashboardScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+          onOpenAssistant={openAssistant}
+        />
+      );
+    }
+
+    if (activeScreen === 'assistant-chat') {
+      return (
+        <AssistantChatScreen
+          initialPrompt={assistantInitialPrompt}
+          onBack={closeAssistant}
+        />
+      );
+    }
+
     return (
       <HomeScreen
         user={currentUser}
@@ -257,14 +297,22 @@ export default function App() {
         onOpenHistory={() => setActiveScreen('history')}
         launchIntent={homeLaunchIntent}
         onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
+        onOpenDashboard={() => setActiveScreen('unified-dashboard')}
+        onOpenAssistant={openAssistant}
         onLogout={handleLogout}
       />
     );
   };
 
+  const showFab =
+    isAuthenticated &&
+    !isBooting &&
+    (activeScreen === 'home' || activeScreen === 'unified-dashboard');
+
   return (
     <I18nextProvider i18n={i18n}>
       {renderContent()}
+      <AssistantFAB visible={showFab} onPress={() => openAssistant()} />
     </I18nextProvider>
   );
 }
