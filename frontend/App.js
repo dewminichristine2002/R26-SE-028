@@ -8,6 +8,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
 import { reminderNotificationService } from './src/services/reminderNotificationService';
@@ -28,30 +29,6 @@ try {
 }
 
 export default function App() {
-    // Android hardware back button navigation
-    useEffect(() => {
-      if (Platform.OS !== 'android') return;
-      const onBackPress = () => {
-        // If on login/register, exit app
-        if (!isAuthenticated) {
-          return false;
-        }
-        // If on profile, go back to home
-        if (activeScreen === 'profile') {
-          setActiveScreen('home');
-          return true;
-        }
-        // If not on home, go back to home
-        if (activeScreen !== 'home') {
-          setActiveScreen('home');
-          return true;
-        }
-        // Otherwise, let default (exit app)
-        return false;
-      };
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    }, [isAuthenticated, activeScreen]);
   const [isBooting, setIsBooting] = useState(true);
   const [authMode, setAuthMode] = useState('login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,9 +36,34 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
 
+  // Android hardware back button navigation
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      // If on login/register, exit app
+      if (!isAuthenticated) {
+        return false;
+      }
+      // If on profile/settings, go back to home
+      if (activeScreen === 'profile' || activeScreen === 'settings') {
+        setActiveScreen('home');
+        return true;
+      }
+      // If not on home, go back to home
+      if (activeScreen !== 'home') {
+        setActiveScreen('home');
+        return true;
+      }
+      // Otherwise, let default (exit app)
+      return false;
+    };
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [isAuthenticated, activeScreen]);
+
   useEffect(() => {
     const bootstrap = async () => {
-      languageService.loadSavedLanguage();
+      await languageService.loadSavedLanguage();
 
       const token = await authService.getToken();
 
@@ -195,7 +197,17 @@ export default function App() {
         <ProfileScreen
           user={currentUser}
           onBack={() => setActiveScreen('home')}
+          onOpenSettings={() => setActiveScreen('settings')}
           onProfileUpdated={handleProfileUpdated}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
+    if (activeScreen === 'settings') {
+      return (
+        <SettingsScreen
+          onBack={() => setActiveScreen('profile')}
           onLogout={handleLogout}
         />
       );
