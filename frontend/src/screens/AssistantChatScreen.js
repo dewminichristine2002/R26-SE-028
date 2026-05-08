@@ -60,6 +60,14 @@ const formatRelativeTime = (isoString) => {
   return new Date(ts).toLocaleDateString();
 };
 
+const getCompactPromptLabel = (prompt, maxLength = 44) => {
+  const text = String(prompt || '').trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+};
+
 const mapServerMessageToBubble = (row) => ({
   id: `srv-${row.id}`,
   role: row.role || 'assistant',
@@ -519,11 +527,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
       </ScrollView>
 
       {lastFollowUps.length > 0 && !sending ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.followUpRow}
-        >
+        <View style={styles.followUpRow}>
           {lastFollowUps.map((q) => (
             <Pressable
               key={q}
@@ -531,10 +535,12 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
               onPress={() => sendMessage(q)}
               style={({ pressed }) => [styles.followUpChip, pressed && styles.followUpChipPressed]}
             >
-              <Text style={styles.followUpText}>{q}</Text>
+              <Text style={styles.followUpText} numberOfLines={2} ellipsizeMode="tail">
+                {getCompactPromptLabel(q)}
+              </Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
       ) : null}
 
       {!!error ? (
@@ -904,6 +910,9 @@ const styles = StyleSheet.create({
   thinkingText: { marginLeft: 10, color: '#4B5563', fontSize: 15 },
 
   followUpRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: '#F3F4F6',
@@ -911,13 +920,14 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
   },
   followUpChip: {
+    flexShrink: 1,
+    maxWidth: '48%',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#3B82F6',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 999,
-    marginRight: 10,
+    borderRadius: 22,
   },
   followUpChipPressed: { backgroundColor: '#EFF6FF' },
   followUpText: { color: '#1D4ED8', fontWeight: '700', fontSize: 15 },

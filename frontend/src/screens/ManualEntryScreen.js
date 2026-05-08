@@ -12,7 +12,7 @@ import {
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
-const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
+const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1 }) => {
   const [medicineQuery, setMedicineQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -31,6 +31,7 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
   const [dosageMg, setDosageMg] = useState('20');
   const [dailyAmount, setDailyAmount] = useState('1');
   const [isSaving, setIsSaving] = useState(false);
+  const textScale = reminderTextScale || 1;
 
   useEffect(() => {
     if (!initialData) {
@@ -253,11 +254,19 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manual Entry</Text>
+        <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>💊 Add Medicine</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <Text style={styles.fieldLabel}>Which medicine?</Text>
+      <View style={styles.helperCard}>
+        <Text style={[styles.helperIcon, { fontSize: 28 * textScale }]}>1</Text>
+        <View style={styles.helperTextWrap}>
+          <Text style={[styles.helperTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Medicine name</Text>
+          <Text style={[styles.helperText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}>Type and tap the correct name.</Text>
+        </View>
+      </View>
+
+      <Text style={[styles.fieldLabel, { fontSize: 18 * textScale }]}>Medicine name</Text>
       <TextInput
         value={medicineQuery}
         onChangeText={(value) => {
@@ -271,8 +280,8 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
             setColorError('');
           }
         }}
-        style={styles.input}
-        placeholder="Start typing medicine name (e.g. Aspirin)"
+        style={[styles.input, { fontSize: 17 * textScale }]}
+        placeholder="Type medicine name"
         placeholderTextColor="#8d98a3"
         returnKeyType="done"
         onSubmitEditing={handleSubmitMedicineName}
@@ -280,21 +289,21 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
 
       {!!selectedMedicineName && (
         <View style={styles.selectedMedicineCard}>
-          <Text style={styles.selectedMedicineLabel}>Selected Medicine</Text>
-          <Text style={styles.selectedMedicineValue}>{selectedMedicineName}</Text>
+          <Text style={[styles.selectedMedicineLabel, { fontSize: 12 * textScale }]}>Selected Medicine</Text>
+          <Text style={[styles.selectedMedicineValue, { fontSize: 18 * textScale }]}>{selectedMedicineName}</Text>
         </View>
       )}
 
       {isLoadingColors ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="small" color="#2e8ec8" />
-          <Text style={styles.loadingText}>Loading available color and shape...</Text>
+          <Text style={[styles.loadingText, { fontSize: 14 * textScale }]}>Loading available color and shape...</Text>
         </View>
       ) : null}
 
       {!isLoadingColors && availableAppearances.length > 0 && (
         <View style={styles.colorPickerCard}>
-          <Text style={styles.colorPickerTitle}>
+          <Text style={[styles.colorPickerTitle, { fontSize: 17 * textScale }]}>
             {availableAppearances.length > 1 ? 'Confirm color and shape' : 'Detected appearance'}
           </Text>
           <View style={styles.colorOptionsRow}>
@@ -312,7 +321,7 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
                 }}
               >
                 <View style={[styles.colorDot, { backgroundColor: item.color }]} />
-                <Text style={[styles.colorChipText, isActive && styles.colorChipTextActive]}>{item.color} / {item.shape}</Text>
+                <Text style={[styles.colorChipText, isActive && styles.colorChipTextActive, { fontSize: 13 * textScale }]}>{item.color} / {item.shape}</Text>
               </TouchableOpacity>
               );
             })}
@@ -323,7 +332,7 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
       {isLoadingSuggestions ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="small" color="#2e8ec8" />
-          <Text style={styles.loadingText}>Loading suggestions...</Text>
+          <Text style={[styles.loadingText, { fontSize: 14 * textScale }]}>Loading suggestions...</Text>
         </View>
       ) : null}
 
@@ -335,59 +344,67 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
               style={styles.suggestionItem}
               onPress={() => handlePickSuggestion(item)}
             >
-              <Text style={styles.suggestionText}>{item.name}</Text>
+              <Text style={[styles.suggestionText, { fontSize: 16 * textScale }]}>{item.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
       )}
 
-      {!!suggestionError && <Text style={styles.errorText}>{suggestionError}</Text>}
-      {!!colorError && <Text style={styles.errorText}>{colorError}</Text>}
+      {!!suggestionError && <Text style={[styles.errorText, { fontSize: 13 * textScale }]}>{suggestionError}</Text>}
+      {!!colorError && <Text style={[styles.errorText, { fontSize: 13 * textScale }]}>{colorError}</Text>}
 
       <View style={styles.dualInputRow}>
+        <View style={styles.stepHeaderRow}>
+          <Text style={[styles.stepBadge, { fontSize: 18 * textScale }]}>2</Text>
+          <Text style={[styles.stepHeaderText, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Medicine amount</Text>
+        </View>
         <View style={styles.miniField}>
-          <Text style={styles.miniFieldLabel}>Total Quantity</Text>
+          <Text style={[styles.miniFieldLabel, { fontSize: 13 * textScale }]}>Total tablets</Text>
           <View style={styles.miniFieldValueRow}>
             <TextInput
               value={totalQuantity}
               onChangeText={setTotalQuantity}
               keyboardType="number-pad"
-              style={styles.miniFieldInput}
+              style={[styles.miniFieldInput, { fontSize: 25 * textScale }]}
               maxLength={4}
             />
-            <Text style={styles.miniFieldUnit}>TABS</Text>
+            <Text style={[styles.miniFieldUnit, { fontSize: 12 * textScale }]}>TABS</Text>
           </View>
         </View>
 
         <View style={styles.miniField}>
-          <Text style={styles.miniFieldLabel}>Dosage</Text>
+          <Text style={[styles.miniFieldLabel, { fontSize: 13 * textScale }]}>Strength</Text>
           <View style={styles.miniFieldValueRow}>
             <TextInput
               value={dosageMg}
               onChangeText={setDosageMg}
               keyboardType="number-pad"
-              style={styles.miniFieldInput}
+              style={[styles.miniFieldInput, { fontSize: 25 * textScale }]}
               maxLength={4}
             />
-            <Text style={styles.miniFieldUnit}>MG</Text>
+            <Text style={[styles.miniFieldUnit, { fontSize: 12 * textScale }]}>MG</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.scheduleCard}>
-        <Text style={styles.scheduleTitle}>Dosage & Schedule</Text>
+        <View style={styles.stepHeaderRow}>
+          <Text style={[styles.stepBadge, { fontSize: 18 * textScale }]}>3</Text>
+          <Text style={[styles.stepHeaderText, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Daily plan</Text>
+        </View>
+        <Text style={[styles.scheduleTitle, { fontSize: 22 * textScale }]}>How to take</Text>
 
-        <Text style={styles.sectionCaption}>DAILY AMOUNT</Text>
+        <Text style={[styles.sectionCaption, { fontSize: 12 * textScale }]}>Tablets each time</Text>
         <View style={styles.amountRow}>
           <View style={styles.amountValuePill}>
             <TextInput
               value={dailyAmount}
               onChangeText={setDailyAmount}
               keyboardType="number-pad"
-              style={styles.amountValueInput}
+              style={[styles.amountValueInput, { fontSize: 25 * textScale }]}
               maxLength={2}
             />
-            <Text style={styles.amountValueText}>Pills</Text>
+            <Text style={[styles.amountValueText, { fontSize: 15 * textScale }]}>Pills</Text>
           </View>
 
           {['Tablet', 'Drops'].map((item) => (
@@ -396,12 +413,12 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
               style={[styles.chipButton, doseForm === item && styles.chipButtonActive]}
               onPress={() => setDoseForm(item)}
             >
-              <Text style={[styles.chipButtonText, doseForm === item && styles.chipButtonTextActive]}>{item}</Text>
+              <Text style={[styles.chipButtonText, doseForm === item && styles.chipButtonTextActive, { fontSize: 16 * textScale }]}>{item}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={[styles.sectionCaption, styles.takeWithLabel]}>TAKE WITH:</Text>
+        <Text style={[styles.sectionCaption, styles.takeWithLabel, { fontSize: 12 * textScale }]}>Take with</Text>
         <View style={styles.mealGrid}>
           {['Breakfast', 'Lunch', 'Dinner', 'Before Sleep'].map((item) => (
             <TouchableOpacity
@@ -409,14 +426,18 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
               style={[styles.mealButton, takeWithOptions.includes(item) && styles.mealButtonActive]}
               onPress={() => toggleTakeWithOption(item)}
             >
-              <Text style={[styles.mealButtonText, takeWithOptions.includes(item) && styles.mealButtonTextActive]}>{item.toUpperCase()}</Text>
+              <Text style={[styles.mealButtonText, takeWithOptions.includes(item) && styles.mealButtonTextActive, { fontSize: 13 * textScale }]}>{item}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
       <View style={styles.howSection}>
-        <Text style={styles.howSectionTitle}>How does it get?</Text>
+        <View style={styles.stepHeaderRow}>
+          <Text style={[styles.stepBadge, { fontSize: 18 * textScale }]}>4</Text>
+          <Text style={[styles.stepHeaderText, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>Meal rule</Text>
+        </View>
+        <Text style={[styles.howSectionTitle, { fontSize: 18 * textScale }]}>Meal time</Text>
         <View style={styles.howButtonsRow}>
           {['Before', 'After'].map((item) => (
             <TouchableOpacity
@@ -424,16 +445,18 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
               style={[styles.howButton, intakeTiming === item && styles.howButtonActive]}
               onPress={() => setIntakeTiming(item)}
             >
-              <Text style={[styles.howButtonText, intakeTiming === item && styles.howButtonTextActive]}>{item}</Text>
+              <Text style={[styles.howButtonText, intakeTiming === item && styles.howButtonTextActive, { fontSize: 17 * textScale }]}>
+                {item === 'Before' ? 'Before meal' : 'After meal'}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
       <View style={styles.safetyCard}>
-        <Text style={styles.safetyTitle}>Safety Verification</Text>
-        <Text style={styles.safetyBody}>
-          Based on your routine, taking this with {takeWithOptions.length} meal{takeWithOptions.length > 1 ? 's' : ''} is being scheduled. We will remind you 30 minutes before each.
+        <Text style={[styles.safetyTitle, { fontSize: 17 * textScale }]}>Safety Verification</Text>
+        <Text style={[styles.safetyBody, { fontSize: 14 * textScale }]}>
+          Reminder will follow your routine time.
         </Text>
       </View>
 
@@ -442,12 +465,12 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
         onPress={handleFinish}
         disabled={isSaving}
       >
-        <Text style={[styles.finishButtonText, isFormValid && styles.finishButtonTextEnabled]}>
-          {isSaving ? 'Saving...' : 'Finish & Add Medicine'}
+        <Text style={[styles.finishButtonText, isFormValid && styles.finishButtonTextEnabled, { fontSize: 17 * textScale }]}>
+          {isSaving ? 'Saving...' : '✓ Save Medicine'}
         </Text>
       </TouchableOpacity>
 
-      <Text style={styles.footerNote}>You can always edit these details later in the Meds tab.</Text>
+      <Text style={[styles.footerNote, { fontSize: 13 * textScale }]}>You can edit later in Medicine List.</Text>
     </ScrollView>
   );
 };
@@ -455,54 +478,112 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved }) => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#f6f8fb',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 18,
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 26,
+    paddingBottom: 28,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    minHeight: 58,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    paddingHorizontal: 10,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#ecf2f7',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   backIcon: {
-    fontSize: 24,
-    color: '#445a6d',
-    marginTop: -2,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   headerTitle: {
-    fontSize: 19,
-    color: '#202833',
-    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 22,
+    lineHeight: 28,
+    color: '#ffffff',
+    fontWeight: '900',
+    paddingHorizontal: 8,
   },
   headerSpacer: {
-    width: 34,
-    height: 34,
+    width: 46,
+    height: 46,
+  },
+  helperCard: {
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  helperIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: '#f8d978',
+    color: '#2d241d',
+    fontSize: 28,
+    fontWeight: '900',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    marginRight: 14,
+  },
+  helperTextWrap: {
+    flex: 1,
+  },
+  helperTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  helperText: {
+    marginTop: 4,
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#74665b',
+    fontWeight: '700',
   },
   fieldLabel: {
     fontSize: 17,
-    color: '#1f2f42',
-    fontWeight: '700',
+    color: '#2d241d',
+    fontWeight: '900',
     marginBottom: 8,
   },
   input: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: '#d8dee6',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
+    minHeight: 56,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    borderRadius: 18,
+    backgroundColor: '#fffdf8',
+    paddingHorizontal: 14,
     fontSize: 15,
-    color: '#1f2f3d',
+    color: '#24352f',
+    fontWeight: '800',
   },
   loadingBox: {
     marginTop: 8,
@@ -516,14 +597,14 @@ const styles = StyleSheet.create({
   },
   suggestionsCard: {
     marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dce5ed',
-    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#a8dbc8',
+    backgroundColor: '#fffdf8',
     overflow: 'hidden',
   },
   suggestionItem: {
-    minHeight: 44,
+    minHeight: 54,
     justifyContent: 'center',
     paddingHorizontal: 12,
     borderBottomWidth: 1,
@@ -542,10 +623,10 @@ const styles = StyleSheet.create({
   },
   selectedMedicineCard: {
     marginTop: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#cfe4f6',
-    backgroundColor: '#eef7ff',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#a8dbc8',
+    backgroundColor: '#e9f7f1',
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -564,10 +645,10 @@ const styles = StyleSheet.create({
   },
   colorPickerCard: {
     marginTop: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dbe5ef',
-    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
@@ -584,8 +665,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   colorChip: {
-    height: 34,
-    borderRadius: 17,
+    minHeight: 42,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#d7e0e9',
     backgroundColor: '#f9fbfe',
@@ -596,8 +677,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   colorChipActive: {
-    borderColor: '#2f8fd0',
-    backgroundColor: '#ebf5ff',
+    borderColor: '#2f5d50',
+    backgroundColor: '#e9f7f1',
   },
   colorDot: {
     width: 14,
@@ -616,18 +697,46 @@ const styles = StyleSheet.create({
     color: '#20679f',
   },
   dualInputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginTop: 16,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 14,
+  },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stepBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#f8d978',
+    color: '#2d241d',
+    fontSize: 18,
+    lineHeight: 40,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginRight: 10,
+  },
+  stepHeaderText: {
+    flex: 1,
+    fontSize: 20,
+    lineHeight: 25,
+    color: '#2d241d',
+    fontWeight: '900',
   },
   miniField: {
-    width: '48%',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#dce3eb',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 10,
   },
   miniFieldLabel: {
     fontSize: 11,
@@ -641,7 +750,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   miniFieldInput: {
-    minWidth: 52,
+    flex: 1,
+    minWidth: 80,
     fontSize: 21,
     color: '#273646',
     fontWeight: '700',
@@ -656,16 +766,16 @@ const styles = StyleSheet.create({
   },
   scheduleCard: {
     marginTop: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#d6dee7',
-    backgroundColor: '#ffffff',
-    padding: 12,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    backgroundColor: '#fffdf8',
+    padding: 14,
   },
   scheduleTitle: {
     fontSize: 17,
     color: '#27384a',
-    fontWeight: '700',
+    fontWeight: '900',
     marginBottom: 12,
   },
   sectionCaption: {
@@ -676,17 +786,20 @@ const styles = StyleSheet.create({
   },
   amountRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     marginBottom: 12,
   },
   amountValuePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f5f8',
-    borderRadius: 12,
+    width: '100%',
+    backgroundColor: '#e9f7f1',
+    borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 10,
-    marginRight: 8,
+    marginRight: 0,
+    marginBottom: 10,
   },
   amountValueInput: {
     minWidth: 28,
@@ -703,17 +816,19 @@ const styles = StyleSheet.create({
     color: '#4f6171',
   },
   chipButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e0e5eb',
-    backgroundColor: '#f6f7f9',
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginRight: 8,
+    alignItems: 'center',
   },
   chipButtonActive: {
-    backgroundColor: '#e8f3ff',
-    borderColor: '#8fc3ef',
+    backgroundColor: '#2f5d50',
+    borderColor: '#2f5d50',
   },
   chipButtonText: {
     color: '#728495',
@@ -721,7 +836,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chipButtonTextActive: {
-    color: '#2985ca',
+    color: '#ffffff',
   },
   takeWithLabel: {
     marginTop: 4,
@@ -733,17 +848,17 @@ const styles = StyleSheet.create({
   },
   mealButton: {
     width: '48.5%',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d8dfe7',
-    backgroundColor: '#ffffff',
-    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
   },
   mealButtonActive: {
-    backgroundColor: '#8fc8fa',
-    borderColor: '#8fc8fa',
+    backgroundColor: '#e9f7f1',
+    borderColor: '#2f5d50',
   },
   mealButtonText: {
     fontSize: 11,
@@ -751,15 +866,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mealButtonTextActive: {
-    color: '#21415d',
+    color: '#2f5d50',
   },
   howSection: {
     marginTop: 14,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 14,
   },
   howSectionTitle: {
     fontSize: 22,
     color: '#253446',
-    fontWeight: '700',
+    fontWeight: '900',
     marginBottom: 8,
   },
   howButtonsRow: {
@@ -768,17 +888,17 @@ const styles = StyleSheet.create({
   },
   howButton: {
     width: '48.5%',
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.2,
-    borderColor: '#d5dde6',
-    backgroundColor: '#f8fafc',
+    minHeight: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   howButtonActive: {
-    borderColor: '#273645',
-    backgroundColor: '#ffffff',
+    borderColor: '#2f5d50',
+    backgroundColor: '#2f5d50',
   },
   howButtonText: {
     color: '#697988',
@@ -786,20 +906,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   howButtonTextActive: {
-    color: '#253443',
+    color: '#ffffff',
   },
   safetyCard: {
     marginTop: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#bcdcf6',
-    backgroundColor: '#eaf5ff',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#b9d4f2',
+    backgroundColor: '#eaf4ff',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   safetyTitle: {
     color: '#325a7e',
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 14,
     marginBottom: 4,
   },
@@ -809,18 +929,18 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   finishButton: {
-    marginTop: 14,
-    height: 46,
-    borderRadius: 12,
+    marginTop: 16,
+    minHeight: 58,
+    borderRadius: 18,
     backgroundColor: '#f0f2f5',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#e6eaef',
     alignItems: 'center',
     justifyContent: 'center',
   },
   finishButtonEnabled: {
-    backgroundColor: '#2f8fd0',
-    borderColor: '#2f8fd0',
+    backgroundColor: '#2f5d50',
+    borderColor: '#2f5d50',
   },
   finishButtonText: {
     color: '#9ba7b4',

@@ -12,18 +12,6 @@ import {
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
-const shapeIconMap = {
-  round: '●',
-  circle: '●',
-  oval: '⬭',
-  capsule: '⬯',
-  tablet: '◼',
-  oblong: '▭',
-  square: '◼',
-  triangle: '▲',
-  diamond: '◆',
-};
-
 const colorMap = {
   red: '#e74c3c',
   blue: '#3498db',
@@ -49,10 +37,13 @@ const parseTakeWith = (value = '') =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const getShapeIcon = (shape) => {
-  const normalized = (shape || '').toString().trim().toLowerCase();
-  return shapeIconMap[normalized] || '⬤';
-};
+const getSlotIcon = (slot) =>
+  ({
+    Breakfast: '☀️',
+    Lunch: '🍽️',
+    Dinner: '🌙',
+    'Before Sleep': '🛏️',
+  }[slot] || '⏰');
 
 const getColorValue = (color) => {
   const normalized = (color || '').toString().trim().toLowerCase();
@@ -67,7 +58,7 @@ const getColorValue = (color) => {
   return colorMap[normalized] || '#d9e8f7';
 };
 
-const MedicineListScreen = ({ onBack }) => {
+const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
   const scrollRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [medications, setMedications] = useState([]);
@@ -86,6 +77,34 @@ const MedicineListScreen = ({ onBack }) => {
     takeWithOptions: ['Breakfast'],
     intakeTiming: 'After',
   });
+  const textScale = reminderTextScale || 1;
+
+  const renderAppearanceIcon = (shape, color, isLarge = false) => {
+    const normalizedShape = String(shape || '').trim().toLowerCase();
+    const resolvedColor = getColorValue(color);
+    const isTriangle = normalizedShape === 'triangle';
+    const isDiamond = normalizedShape === 'diamond';
+    const shapeStyle = [
+      styles.pillShape,
+      isLarge && styles.pillShapeLarge,
+      ['round', 'circle'].includes(normalizedShape) && styles.pillShapeRound,
+      normalizedShape === 'oval' && styles.pillShapeOval,
+      ['capsule', 'oblong'].includes(normalizedShape) && styles.pillShapeCapsule,
+      ['tablet', 'square'].includes(normalizedShape) && styles.pillShapeSquare,
+      isDiamond && styles.pillShapeDiamond,
+      { backgroundColor: resolvedColor },
+    ];
+
+    return (
+      <View style={[styles.appearanceIconFrame, isLarge && styles.appearanceIconFrameLarge]}>
+        {isTriangle ? (
+          <Text style={[styles.pillShapeTriangle, isLarge && styles.pillShapeTriangleLarge, { color: resolvedColor }]}>▲</Text>
+        ) : (
+          <View style={shapeStyle} />
+        )}
+      </View>
+    );
+  };
 
   const loadMedications = async () => {
     try {
@@ -123,6 +142,34 @@ const MedicineListScreen = ({ onBack }) => {
 
     return medications.filter((item) => item.medicine_name?.toLowerCase().includes(needle));
   }, [medications, searchText]);
+
+  const groupedMedications = useMemo(() => {
+    const groups = TAKE_WITH_OPTIONS.map((slot) => ({
+      slot,
+      before: [],
+      after: [],
+    }));
+
+    filteredMedications.forEach((item) => {
+      const selectedSlots = parseTakeWith(item.take_with);
+      const slotsToShow = selectedSlots.length ? selectedSlots : ['Breakfast'];
+      const timingKey = String(item.intake_timing || 'After').toLowerCase().includes('before') ? 'before' : 'after';
+
+      slotsToShow.forEach((slot) => {
+        const group = groups.find((entry) => entry.slot === slot);
+        if (group) {
+          group[timingKey].push(item);
+        }
+      });
+    });
+
+    return groups
+      .map((group) => ({
+        ...group,
+        count: group.before.length + group.after.length,
+      }))
+      .filter((group) => group.count > 0);
+  }, [filteredMedications]);
 
   const applyMedicationToForm = (medication) => {
     setSelectedMedication(medication);
@@ -265,95 +312,155 @@ const MedicineListScreen = ({ onBack }) => {
   };
 
   return (
-    <ScrollView ref={scrollRef} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backIcon}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Medicine List</Text>
-        <View style={styles.headerSpacer} />
+    <View style={styles.page}>
+      <View style={styles.staticHeaderWrap}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>‹</Text>
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>📋 Medicine List</Text>
+          <View style={styles.headerSpacer} />
+        </View>
       </View>
 
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search medicine name..."
-        value={searchText}
-        onChangeText={setSearchText}
-      />
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={[styles.searchInput, { fontSize: 16 * textScale }]}
+            placeholder="Search medicine"
+            placeholderTextColor="#8d98a3"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+        </View>
+
+        <View style={styles.totalMedicineCard}>
+          <View>
+            <Text style={[styles.totalMedicineLabel, { fontSize: 14 * textScale }]}>Total medicines</Text>
+            {!!searchText.trim() && (
+              <Text style={[styles.totalMedicineSubText, { fontSize: 12 * textScale }]}>
+                {filteredMedications.length} showing now
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.totalMedicineValue, { fontSize: 32 * textScale }]}>{medications.length}</Text>
+        </View>
 
       {isLoading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#2f8fd0" />
-          <Text style={styles.loaderText}>Loading medicines...</Text>
+          <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading medicines...</Text>
         </View>
       ) : (
         <View style={styles.listWrap}>
-          {filteredMedications.map((item) => (
-            <View key={item.id} style={styles.card}>
-              <View style={styles.cardRow}>
-                <View style={[styles.appearanceBadge, { backgroundColor: getColorValue(item.medicine_color) }]}>
-                  <Text style={styles.appearanceBadgeIcon}>{getShapeIcon(item.medicine_shape)}</Text>
-                </View>
-
-                <View style={styles.cardTextWrap}>
-                  <Text style={styles.medicineName}>{item.medicine_name}</Text>
-                  <Text style={styles.metaText}>
-                    {item.take_with} - {item.dosage_mg}mg ({item.daily_amount} tab)
-                  </Text>
-                  <Text style={styles.metaTextLight}>{item.total_quantity} tabs left</Text>
-                  <Text style={styles.metaTextLight}>
-                    {item.medicine_color || 'No color'} | {item.medicine_shape || 'No shape'}
-                  </Text>
-                  <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
-                    <Text style={styles.viewButtonText}>View</Text>
-                  </TouchableOpacity>
-                </View>
+          {groupedMedications.map((group) => (
+            <View key={group.slot} style={styles.slotGroupCard}>
+              <View style={styles.slotGroupHeader}>
+                <Text style={[styles.slotGroupTitle, { fontSize: 18 * textScale }]}>
+                  {getSlotIcon(group.slot)} {group.slot}
+                </Text>
+                <Text style={[styles.slotGroupCount, { fontSize: 14 * textScale }]}>{group.count}</Text>
               </View>
+
+              {[
+                { key: 'before', label: 'Before meal', items: group.before },
+                { key: 'after', label: 'After meal', items: group.after },
+              ].map((timingGroup) =>
+                timingGroup.items.length ? (
+                  <View key={`${group.slot}-${timingGroup.key}`} style={styles.timingGroupBlock}>
+                    <Text style={[styles.timingGroupTitle, { fontSize: 14 * textScale }]}>{timingGroup.label}</Text>
+
+                    {timingGroup.items.map((item) => (
+                      <View key={`${group.slot}-${timingGroup.key}-${item.id}`} style={styles.card}>
+                        <View style={styles.cardRow}>
+                          <View style={styles.appearanceBadge}>
+                            {renderAppearanceIcon(item.medicine_shape, item.medicine_color)}
+                          </View>
+
+                          <View style={styles.cardTextWrap}>
+                            <Text style={[styles.medicineName, { fontSize: 18 * textScale }]}>{item.medicine_name}</Text>
+                            <Text style={[styles.metaText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
+                              {item.dosage_mg}mg - {item.daily_amount} tablet each time
+                            </Text>
+                            <Text style={[styles.metaTextLight, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+                              Time: {timingGroup.label}
+                            </Text>
+                            <Text style={[styles.metaTextLight, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+                              Stock: {item.total_quantity} tablets left
+                            </Text>
+                            <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
+                              <Text style={[styles.viewButtonText, { fontSize: 14 * textScale }]}>View details</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : null
+              )}
             </View>
           ))}
 
-          {!filteredMedications.length && <Text style={styles.emptyText}>No medicines found.</Text>}
+          {!filteredMedications.length && <Text style={[styles.emptyText, { fontSize: 15 * textScale }]}>No medicines found.</Text>}
         </View>
       )}
+      </ScrollView>
 
       {selectedMedication && (
-        <View style={styles.detailPanel}>
-          <Text style={styles.detailTitle}>Medicine Details</Text>
+        <View style={styles.detailOverlay}>
+          <View style={styles.detailPanel}>
+            <View style={styles.detailHeaderRow}>
+              <Text style={[styles.detailTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Medicine Details</Text>
+              <TouchableOpacity
+                style={styles.detailCloseButton}
+                onPress={() => {
+                  setSelectedMedication(null);
+                  setIsEditMode(false);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Close medicine details"
+              >
+                <Text style={styles.detailCloseText}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.detailScrollContent} showsVerticalScrollIndicator={false}>
 
           <View style={styles.detailAppearanceRow}>
-            <View style={[styles.detailAppearanceBadge, { backgroundColor: getColorValue(selectedMedication.medicine_color) }]}>
-              <Text style={styles.detailAppearanceIcon}>{getShapeIcon(selectedMedication.medicine_shape)}</Text>
+            <View style={styles.detailAppearanceBadge}>
+              {renderAppearanceIcon(selectedMedication.medicine_shape, selectedMedication.medicine_color, true)}
             </View>
             <View style={styles.detailAppearanceTextWrap}>
-              <Text style={styles.detailAppearanceLabel}>Appearance</Text>
-              <Text style={styles.detailAppearanceText}>
+              <Text style={[styles.detailAppearanceLabel, { fontSize: 13 * textScale }]}>Appearance</Text>
+              <Text style={[styles.detailAppearanceText, { fontSize: 14 * textScale }]}>
                 Color: {selectedMedication.medicine_color || 'N/A'}
               </Text>
-              <Text style={styles.detailAppearanceText}>
+              <Text style={[styles.detailAppearanceText, { fontSize: 14 * textScale }]}>
                 Shape: {selectedMedication.medicine_shape || 'N/A'}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.fieldLabel}>Medicine Name</Text>
+          <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Medicine name</Text>
           <TextInput
-            style={styles.fieldInput}
+            style={[styles.fieldInput, { fontSize: 15 * textScale }]}
             value={form.medicineName}
             onChangeText={(v) => setForm((p) => ({ ...p, medicineName: v }))}
             editable={isEditMode}
           />
 
-          <Text style={styles.fieldLabel}>Selected Color</Text>
+          <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Color</Text>
           <TextInput
-            style={styles.fieldInput}
+            style={[styles.fieldInput, { fontSize: 15 * textScale }]}
             value={form.selectedColor}
             onChangeText={(v) => setForm((p) => ({ ...p, selectedColor: v }))}
             editable={isEditMode}
           />
 
-          <Text style={styles.fieldLabel}>Selected Shape</Text>
+          <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Shape</Text>
           <TextInput
-            style={styles.fieldInput}
+            style={[styles.fieldInput, { fontSize: 15 * textScale }]}
             value={form.selectedShape}
             onChangeText={(v) => setForm((p) => ({ ...p, selectedShape: v }))}
             editable={isEditMode}
@@ -361,9 +468,9 @@ const MedicineListScreen = ({ onBack }) => {
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Total Qty</Text>
+              <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Total tablets</Text>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { fontSize: 15 * textScale }]}
                 value={form.totalQuantity}
                 onChangeText={(v) => setForm((p) => ({ ...p, totalQuantity: v }))}
                 editable={isEditMode}
@@ -371,9 +478,9 @@ const MedicineListScreen = ({ onBack }) => {
               />
             </View>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Dosage mg</Text>
+              <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Strength mg</Text>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { fontSize: 15 * textScale }]}
                 value={form.dosageMg}
                 onChangeText={(v) => setForm((p) => ({ ...p, dosageMg: v }))}
                 editable={isEditMode}
@@ -384,9 +491,9 @@ const MedicineListScreen = ({ onBack }) => {
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>Daily Amount</Text>
+              <Text style={[styles.fieldLabel, { fontSize: 14 * textScale }]}>Tablets each time</Text>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { fontSize: 15 * textScale }]}
                 value={form.dailyAmount}
                 onChangeText={(v) => setForm((p) => ({ ...p, dailyAmount: v }))}
                 editable={isEditMode}
@@ -397,9 +504,9 @@ const MedicineListScreen = ({ onBack }) => {
           </View>
 
           <View style={styles.scheduleCard}>
-            <Text style={styles.scheduleTitle}>Dosage & Schedule</Text>
+            <Text style={[styles.scheduleTitle, { fontSize: 20 * textScale }]}>How to take</Text>
 
-            <Text style={styles.sectionCaption}>DOSE FORM</Text>
+            <Text style={[styles.sectionCaption, { fontSize: 12 * textScale }]}>Medicine type</Text>
             <View style={styles.chipRow}>
               {DOSE_FORM_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -412,12 +519,12 @@ const MedicineListScreen = ({ onBack }) => {
                   onPress={() => isEditMode && setForm((p) => ({ ...p, doseForm: option }))}
                   disabled={!isEditMode}
                 >
-                  <Text style={[styles.chipButtonText, form.doseForm === option && styles.chipButtonTextActive]}>{option}</Text>
+                  <Text style={[styles.chipButtonText, form.doseForm === option && styles.chipButtonTextActive, { fontSize: 14 * textScale }]}>{option}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.sectionCaption, styles.takeWithLabel]}>TAKE WITH</Text>
+            <Text style={[styles.sectionCaption, styles.takeWithLabel, { fontSize: 12 * textScale }]}>Take with</Text>
             <View style={styles.mealGrid}>
               {TAKE_WITH_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -434,9 +541,10 @@ const MedicineListScreen = ({ onBack }) => {
                     style={[
                       styles.mealButtonText,
                       form.takeWithOptions.includes(option) && styles.mealButtonTextActive,
+                      { fontSize: 12 * textScale },
                     ]}
                   >
-                    {option.toUpperCase()}
+                    {option}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -444,7 +552,7 @@ const MedicineListScreen = ({ onBack }) => {
           </View>
 
           <View style={styles.howSection}>
-            <Text style={styles.howSectionTitle}>How does it get?</Text>
+            <Text style={[styles.howSectionTitle, { fontSize: 18 * textScale }]}>Meal time</Text>
             <View style={styles.howButtonsRow}>
               {TIMING_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -457,31 +565,32 @@ const MedicineListScreen = ({ onBack }) => {
                   onPress={() => isEditMode && setForm((p) => ({ ...p, intakeTiming: option }))}
                   disabled={!isEditMode}
                 >
-                  <Text style={[styles.howButtonText, form.intakeTiming === option && styles.howButtonTextActive]}>{option}</Text>
+                  <Text style={[styles.howButtonText, form.intakeTiming === option && styles.howButtonTextActive, { fontSize: 15 * textScale }]}>
+                    {option === 'Before' ? 'Before meal' : 'After meal'}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
           <View style={styles.safetyCard}>
-            <Text style={styles.safetyTitle}>Safety Verification</Text>
-            <Text style={styles.safetyBody}>
-              This medicine is currently planned with {form.takeWithOptions.length} meal
-              {form.takeWithOptions.length > 1 ? 's' : ''} and reminder timing set to {form.intakeTiming.toLowerCase()}.
+            <Text style={[styles.safetyTitle, { fontSize: 16 * textScale }]}>Safety Verification</Text>
+            <Text style={[styles.safetyBody, { fontSize: 13 * textScale }]}>
+              Reminder follows your routine time.
             </Text>
           </View>
 
           {!isEditMode ? (
             <TouchableOpacity style={styles.editButton} onPress={() => setIsEditMode(true)}>
-              <Text style={styles.editButtonText}>Edit</Text>
+              <Text style={[styles.editButtonText, { fontSize: 15 * textScale }]}>✎ Edit details</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.editActionRow}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setIsEditMode(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { fontSize: 15 * textScale }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveButton} onPress={handleSaveEdit} disabled={isSaving}>
-                <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save'}</Text>
+                <Text style={[styles.saveButtonText, { fontSize: 15 * textScale }]}>{isSaving ? 'Saving...' : '✓ Save'}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -491,58 +600,101 @@ const MedicineListScreen = ({ onBack }) => {
             onPress={handleDeleteMedication}
             disabled={isSaving}
           >
-            <Text style={styles.deleteButtonText}>{isSaving ? 'Please wait...' : 'Delete Medicine'}</Text>
+            <Text style={[styles.deleteButtonText, { fontSize: 15 * textScale }]}>{isSaving ? 'Please wait...' : 'Delete Medicine'}</Text>
           </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: '#f7efe4',
+  },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f4f7fb',
+    backgroundColor: '#f7efe4',
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 28,
+  },
+  staticHeaderWrap: {
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 26,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    minHeight: 58,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    paddingHorizontal: 10,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#ecf2f7',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   backIcon: {
-    fontSize: 24,
-    color: '#445a6d',
-    marginTop: -2,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 22,
-    color: '#202f3b',
-    fontWeight: '700',
+    lineHeight: 28,
+    color: '#ffffff',
+    fontWeight: '900',
+    paddingHorizontal: 8,
   },
   headerSpacer: {
-    width: 34,
-    height: 34,
+    width: 46,
+    height: 46,
+  },
+  searchBox: {
+    minHeight: 56,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    fontSize: 20,
+    marginRight: 8,
   },
   searchInput: {
-    height: 46,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#dce4ec',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 12,
+    flex: 1,
+    minHeight: 52,
+    color: '#24352f',
+    fontWeight: '800',
+    paddingVertical: 0,
   },
   loaderWrap: {
     alignItems: 'center',
@@ -556,64 +708,211 @@ const styles = StyleSheet.create({
   listWrap: {
     marginBottom: 14,
   },
-  card: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e0e6ed',
-    borderRadius: 14,
+  totalMedicineCard: {
+    minHeight: 78,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
+  totalMedicineLabel: {
+    color: '#5d5045',
+    fontWeight: '900',
+  },
+  totalMedicineSubText: {
+    marginTop: 4,
+    color: '#74665b',
+    fontWeight: '700',
+  },
+  totalMedicineValue: {
+    minWidth: 60,
+    color: '#2f5d50',
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  slotGroupCard: {
+    backgroundColor: '#eaf4ff',
+    borderWidth: 2,
+    borderColor: '#b9d4f2',
+    borderRadius: 24,
     padding: 12,
-    marginBottom: 10,
+    marginBottom: 16,
+  },
+  slotGroupHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  slotGroupTitle: {
+    flex: 1,
+    color: '#24352f',
+    fontWeight: '900',
+    paddingRight: 10,
+  },
+  slotGroupCount: {
+    minWidth: 40,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#2f5d50',
+    color: '#ffffff',
+    fontWeight: '900',
+    textAlign: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  timingGroupBlock: {
+    marginTop: 8,
+  },
+  timingGroupTitle: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    borderRadius: 999,
+    color: '#2f5d50',
+    fontWeight: '900',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  card: {
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    borderRadius: 22,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   appearanceBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 62,
+    height: 62,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#d3dde8',
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
   },
-  appearanceBadgeIcon: {
-    fontSize: 18,
-    color: '#243648',
-    fontWeight: '700',
+  appearanceIconFrame: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: '#f7efe4',
+    borderWidth: 1,
+    borderColor: '#d8c9b7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appearanceIconFrameLarge: {
+    width: 50,
+    height: 50,
+    borderRadius: 17,
+  },
+  pillShape: {
+    width: 34,
+    height: 24,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(36,53,47,0.22)',
+  },
+  pillShapeLarge: {
+    width: 38,
+    height: 28,
+  },
+  pillShapeRound: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  pillShapeOval: {
+    width: 38,
+    height: 28,
+    borderRadius: 18,
+  },
+  pillShapeCapsule: {
+    width: 40,
+    height: 22,
+    borderRadius: 14,
+  },
+  pillShapeSquare: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  pillShapeDiamond: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    transform: [{ rotate: '45deg' }],
+  },
+  pillShapeTriangle: {
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '900',
+    textShadowColor: 'rgba(36,53,47,0.22)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  pillShapeTriangleLarge: {
+    fontSize: 38,
+    lineHeight: 42,
   },
   cardTextWrap: {
     flex: 1,
   },
   medicineName: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#25384a',
+    fontWeight: '900',
+    color: '#24352f',
   },
   metaText: {
     marginTop: 4,
-    color: '#4e6680',
+    color: '#5d5045',
     fontSize: 13,
+    fontWeight: '800',
   },
   metaTextLight: {
-    marginTop: 2,
-    color: '#7d8f9f',
+    marginTop: 3,
+    color: '#74665b',
     fontSize: 12,
+    fontWeight: '700',
   },
   viewButton: {
-    marginTop: 10,
+    marginTop: 12,
     alignSelf: 'flex-start',
-    backgroundColor: '#ebf6ff',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#b7ddf7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#2f5d50',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#2f5d50',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
   },
   viewButtonText: {
-    color: '#216ea6',
-    fontWeight: '700',
+    color: '#ffffff',
+    fontWeight: '900',
   },
   emptyText: {
     textAlign: 'center',
@@ -621,42 +920,78 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   detailPanel: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#d9e2ec',
-    padding: 12,
+    width: '100%',
+    maxHeight: '88%',
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    padding: 14,
+  },
+  detailOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(31, 44, 39, 0.58)',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 24,
+  },
+  detailHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  detailCloseButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fff0f2',
+    borderWidth: 2,
+    borderColor: '#edbdc4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  detailCloseText: {
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: '900',
+    color: '#9b3d47',
+    marginTop: -2,
+  },
+  detailScrollContent: {
+    paddingBottom: 4,
   },
   detailTitle: {
+    flex: 1,
     fontSize: 18,
-    color: '#203447',
-    fontWeight: '700',
-    marginBottom: 10,
+    color: '#2d241d',
+    fontWeight: '900',
   },
   detailAppearanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#dde6ef',
-    borderRadius: 12,
-    backgroundColor: '#f7fbff',
-    padding: 10,
+    borderWidth: 2,
+    borderColor: '#a8dbc8',
+    borderRadius: 20,
+    backgroundColor: '#e9f7f1',
+    padding: 12,
   },
   detailAppearanceBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 58,
+    height: 58,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#d3dde8',
-    marginRight: 10,
-  },
-  detailAppearanceIcon: {
-    fontSize: 20,
-    color: '#243648',
-    fontWeight: '700',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    backgroundColor: '#fffdf8',
+    marginRight: 12,
   },
   detailAppearanceTextWrap: {
     flex: 1,
@@ -674,18 +1009,20 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    color: '#617488',
-    fontWeight: '700',
-    marginBottom: 4,
+    color: '#5d5045',
+    fontWeight: '900',
+    marginBottom: 6,
   },
   fieldInput: {
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d6dee8',
-    backgroundColor: '#f9fbfd',
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    minHeight: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    color: '#24352f',
+    fontWeight: '800',
   },
   fieldRow: {
     flexDirection: 'row',
@@ -696,17 +1033,16 @@ const styles = StyleSheet.create({
   },
   scheduleCard: {
     marginTop: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dce5ed',
-    backgroundColor: '#f8fcff',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    marginBottom: 10,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 14,
+    marginBottom: 12,
   },
   scheduleTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '900',
     color: '#203447',
     marginBottom: 6,
   },
@@ -720,19 +1056,21 @@ const styles = StyleSheet.create({
   chipRow: {
     flexDirection: 'row',
     marginBottom: 8,
-    gap: 8,
+    columnGap: 8,
   },
   chipButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d7e1ea',
-    backgroundColor: '#ffffff',
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     paddingHorizontal: 12,
     paddingVertical: 8,
+    alignItems: 'center',
   },
   chipButtonActive: {
-    backgroundColor: '#2f8fd0',
-    borderColor: '#2f8fd0',
+    backgroundColor: '#2f5d50',
+    borderColor: '#2f5d50',
   },
   chipButtonDisabled: {
     opacity: 0.7,
@@ -751,19 +1089,22 @@ const styles = StyleSheet.create({
   mealGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
   },
   mealButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d7e1ea',
-    backgroundColor: '#ffffff',
+    width: '48.5%',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    marginBottom: 8,
+    alignItems: 'center',
   },
   mealButtonActive: {
-    borderColor: '#2f8fd0',
-    backgroundColor: '#eaf6ff',
+    borderColor: '#2f5d50',
+    backgroundColor: '#e9f7f1',
   },
   mealButtonText: {
     fontSize: 11,
@@ -771,39 +1112,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mealButtonTextActive: {
-    color: '#1f6fa8',
+    color: '#2f5d50',
   },
   howSection: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dce5ed',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    marginBottom: 10,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 14,
+    marginBottom: 12,
   },
   howSectionTitle: {
     fontSize: 14,
     color: '#22384b',
-    fontWeight: '700',
+    fontWeight: '900',
     marginBottom: 8,
   },
   howButtonsRow: {
     flexDirection: 'row',
-    gap: 8,
+    columnGap: 8,
   },
   howButton: {
     flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d7e1ea',
-    backgroundColor: '#ffffff',
-    paddingVertical: 9,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    paddingVertical: 12,
     alignItems: 'center',
   },
   howButtonActive: {
-    borderColor: '#2f8fd0',
-    backgroundColor: '#eaf6ff',
+    borderColor: '#2f5d50',
+    backgroundColor: '#2f5d50',
   },
   howButtonText: {
     color: '#5d7489',
@@ -811,15 +1151,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   howButtonTextActive: {
-    color: '#1f6fa8',
+    color: '#ffffff',
   },
   safetyCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dfe7ef',
-    backgroundColor: '#f9fbfd',
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#b9d4f2',
+    backgroundColor: '#eaf4ff',
+    padding: 12,
+    marginBottom: 12,
   },
   safetyTitle: {
     fontSize: 13,
@@ -834,9 +1174,9 @@ const styles = StyleSheet.create({
   },
   editButton: {
     marginTop: 4,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#2f8fd0',
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: '#2f5d50',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -852,9 +1192,11 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     width: '48.5%',
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#eef2f7',
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -864,9 +1206,9 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     width: '48.5%',
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#2f8fd0',
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: '#2f5d50',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -876,9 +1218,9 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     marginTop: 10,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
+    minHeight: 52,
+    borderRadius: 18,
+    borderWidth: 2,
     borderColor: '#f3c0c0',
     backgroundColor: '#fff5f5',
     alignItems: 'center',

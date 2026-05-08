@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, Platform } from 'react-native';
-import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { useTranslation } from '../i18n/useTranslation';
+
+const elderMedsLogo = require('../../assets/logo.png');
 import RoutineSetupScreen from './RoutineSetupScreen';
 import ManualEntryScreen from './ManualEntryScreen';
 import MedicineListScreen from './MedicineListScreen';
@@ -759,11 +761,54 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
     );
   }
 
+  const todayLabel = new Date().toLocaleDateString([], {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+  const firstName = String(user?.fullName || '').trim().split(/\s+/)[0] || 'there';
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Home</Text>
-      <Text style={styles.welcome}>Welcome back!</Text>
-      <Text style={styles.userName}>Signed in as {user?.fullName || 'User'}</Text>
+    <ScrollView style={styles.homeScroll} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.homeTopBar}>
+        <Image source={elderMedsLogo} style={styles.homeBrandLogo} resizeMode="contain" />
+        <View style={styles.homeTopActions}>
+          <TouchableOpacity
+            style={styles.homeTopProfileButton}
+            onPress={onOpenProfile}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            accessibilityHint="Opens your ElderMeds profile"
+          >
+            <Text style={styles.homeTopProfileIcon}>👤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.homeTopLogoutButton}
+            onPress={onLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Logout"
+            accessibilityHint="Signs out from ElderMeds"
+          >
+            <View style={styles.homeTopLogoutIconFrame}>
+              <View style={styles.homeTopLogoutDoor} />
+              <Text style={styles.homeTopLogoutArrow}>→</Text>
+            </View>
+            <Text style={styles.homeTopLogoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.homeHeroCard}>
+        <View style={styles.homeHeroTextWrap}>
+          <Text style={styles.homeDateText}>{todayLabel}</Text>
+          <Text style={styles.homeHeroTitle}>Good day, {firstName}</Text>
+          <Text style={styles.homeHeroSubtitle}>Your medicine care is ready when you are.</Text>
+        </View>
+        <View style={styles.homeHeroBadge}>
+          <Text style={styles.homeHeroBadgeIcon}>❤</Text>
+          <Text style={styles.homeHeroBadgeText}>Care</Text>
+        </View>
+      </View>
 
       {isLocalMode ? (
         <View style={styles.localModeBanner}>
@@ -774,20 +819,53 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
         </View>
       ) : null}
 
-      <View style={styles.quickActionRow}>
-        <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
-          <Text style={styles.profileButtonText}>My Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.homePrimaryAction}
+        activeOpacity={0.88}
+        onPress={() => handleButtonPress(menuItems[0])}
+        accessibilityRole="button"
+        accessibilityLabel="Open medicine reminder"
+        accessibilityHint="Shows schedule, routine, medicine list, stock and safety options"
+      >
+        <View style={styles.homePrimaryIconWrap}>
+          <Text style={styles.homePrimaryIcon}>🔔</Text>
+        </View>
+        <View style={styles.homePrimaryTextWrap}>
+          <Text style={styles.homePrimaryEyebrow}>Main action</Text>
+          <Text style={styles.homePrimaryTitle}>Medicine Reminder</Text>
+          <Text style={styles.homePrimarySubtitle}>Open today schedule and medicine tools.</Text>
+        </View>
+        <View style={styles.homePrimaryArrowWrap}>
+          <Text style={styles.homePrimaryArrow}>›</Text>
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.homeSectionHeader}>
+        <View>
+          <Text style={styles.homeSectionTitle}>Quick Care</Text>
+          <Text style={styles.homeSectionSubtitle}>Large buttons for easy tapping</Text>
+        </View>
       </View>
 
-      <View style={styles.grid}>
-        {menuItems.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.button} onPress={() => handleButtonPress(item)}>
-            <Text style={styles.icon}>{item.icon}</Text>
-            <Text style={styles.buttonLabel}>{item.label}</Text>
+      <View style={styles.homeActionList}>
+        {menuItems.slice(1).map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[styles.homeActionCard, { backgroundColor: '#f4f9ff', borderColor: '#b9d9f2' }]}
+            activeOpacity={0.88}
+            onPress={() => handleButtonPress(item)}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+            accessibilityHint="Medicine care option"
+          >
+            <View style={[styles.homeActionIconWrap, { backgroundColor: '#1f6894' }]}>
+              <Text style={styles.homeActionIcon}>{item.icon}</Text>
+            </View>
+            <View style={styles.homeActionTextWrap}>
+              <Text style={styles.homeActionTitle}>{item.label}</Text>
+              <Text style={styles.homeActionSubtitle}>Care option</Text>
+            </View>
+            <Text style={[styles.homeActionHelper, { color: '#1f6894' }]}>Soon</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -800,6 +878,318 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: '#f5f5f5',
+  },
+  homeScroll: {
+    flex: 1,
+    backgroundColor: '#eaf4ff',
+  },
+  homeContent: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 30,
+  },
+  homeTopBar: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  homeBrandLogo: {
+    width: 132,
+    height: 40,
+    flexShrink: 1,
+  },
+  homeTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  homeTopProfileButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 18,
+    backgroundColor: '#fbfdff',
+    borderWidth: 2,
+    borderColor: '#b9d9f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    shadowColor: '#0f4f7a',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  homeTopProfileIcon: {
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  homeTopLogoutButton: {
+    minWidth: 104,
+    minHeight: 50,
+    borderRadius: 18,
+    backgroundColor: '#fbfdff',
+    borderWidth: 2,
+    borderColor: '#b9d9f2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    shadowColor: '#0f4f7a',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  homeTopLogoutIconFrame: {
+    width: 24,
+    height: 24,
+    marginRight: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  homeTopLogoutDoor: {
+    position: 'absolute',
+    left: 2,
+    width: 11,
+    height: 18,
+    borderRadius: 3,
+    borderWidth: 2,
+    borderColor: '#1f6894',
+    borderRightWidth: 0,
+  },
+  homeTopLogoutArrow: {
+    position: 'absolute',
+    right: 0,
+    color: '#1f6894',
+    fontSize: 19,
+    lineHeight: 23,
+    fontWeight: '900',
+  },
+  homeTopLogoutText: {
+    color: '#1f6894',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  homeHeroCard: {
+    minHeight: 150,
+    borderRadius: 24,
+    backgroundColor: '#1f6894',
+    borderWidth: 2,
+    borderColor: '#b9d9f2',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0f4f7a',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
+  },
+  homeHeroTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  homeDateText: {
+    color: '#eaf5ff',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
+  homeHeroTitle: {
+    color: '#ffffff',
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  homeHeroSubtitle: {
+    color: '#f3f9ff',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+  },
+  homeHeroBadge: {
+    width: 78,
+    minHeight: 92,
+    borderRadius: 24,
+    backgroundColor: '#fbfdff',
+    borderWidth: 2,
+    borderColor: '#d5eafa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeHeroBadgeIcon: {
+    color: '#1f6894',
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: '900',
+  },
+  homeHeroBadgeText: {
+    color: '#1f6894',
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  homePrimaryAction: {
+    minHeight: 118,
+    borderRadius: 22,
+    backgroundColor: '#fbfdff',
+    borderWidth: 2,
+    borderColor: '#b9d9f2',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0f4f7a',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  homePrimaryIconWrap: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    backgroundColor: '#1f6894',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  homePrimaryIcon: {
+    fontSize: 32,
+    lineHeight: 36,
+  },
+  homePrimaryTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  homePrimaryEyebrow: {
+    color: '#4c6d82',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  homePrimaryTitle: {
+    color: '#12354d',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '900',
+  },
+  homePrimarySubtitle: {
+    color: '#4c6d82',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+    marginTop: 5,
+  },
+  homePrimaryArrowWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#eaf4ff',
+    borderWidth: 1,
+    borderColor: '#b9d9f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homePrimaryArrow: {
+    color: '#1f6894',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '900',
+  },
+  homeSectionHeader: {
+    marginBottom: 12,
+  },
+  homeSectionTitle: {
+    color: '#12354d',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '900',
+  },
+  homeSectionSubtitle: {
+    color: '#4c6d82',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  homeActionList: {
+    marginBottom: 4,
+  },
+  homeActionCard: {
+    minHeight: 102,
+    borderRadius: 20,
+    borderWidth: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  homeActionIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
+  homeActionIcon: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  homeActionTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  homeActionTitle: {
+    color: '#12354d',
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '900',
+  },
+  homeActionSubtitle: {
+    color: '#4c6d82',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  homeActionHelper: {
+    minWidth: 46,
+    textAlign: 'right',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  localModeBanner: {
+    backgroundColor: '#fff6da',
+    borderColor: '#efd28a',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  localModeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#7b5700',
+  },
+  localModeText: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6d5a24',
   },
   title: {
     fontSize: 28,
@@ -817,25 +1207,6 @@ const styles = StyleSheet.create({
     color: '#1f6894',
     fontWeight: '600',
     marginBottom: 12,
-  },
-  localModeBanner: {
-    backgroundColor: '#fff6da',
-    borderColor: '#efd28a',
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-  },
-  localModeTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#7b5700',
-  },
-  localModeText: {
-    marginTop: 6,
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#6d5a24',
   },
   quickActionRow: {
     flexDirection: 'row',

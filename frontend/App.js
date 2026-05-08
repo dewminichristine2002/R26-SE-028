@@ -9,6 +9,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import MedicineSafetyScreen from './src/screens/MedicineSafetyScreenFixed';
 import UnifiedDashboardScreen from './src/screens/UnifiedDashboardScreen';
 import AssistantChatScreen from './src/screens/AssistantChatScreen';
@@ -60,6 +61,10 @@ export default function App() {
       }
       if (activeScreen === 'profile') {
         setActiveScreen('home');
+        return true;
+      }
+      if (activeScreen === 'settings') {
+        setActiveScreen('profile');
         return true;
       }
       if (activeScreen !== 'home') {
@@ -237,12 +242,22 @@ export default function App() {
       );
     }
 
-    if (activeScreen === 'account') {
+    if (activeScreen === 'profile') {
       return (
         <ProfileScreen
           user={currentUser}
           onBack={() => setActiveScreen('home')}
+          onOpenSettings={() => setActiveScreen('settings')}
           onProfileUpdated={handleProfileUpdated}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
+    if (activeScreen === 'settings') {
+      return (
+        <SettingsScreen
+          onBack={() => setActiveScreen('profile')}
           onLogout={handleLogout}
         />
       );

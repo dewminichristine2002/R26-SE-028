@@ -30,13 +30,45 @@ try {
 }
 
 const routineRows = [
-  { key: 'breakfast', label: 'BREAKFAST', icon: '☀️' },
-  { key: 'lunch', label: 'LUNCH', icon: '🌤️' },
-  { key: 'dinner', label: 'DINNER', icon: '🌆' },
-  { key: 'sleep', label: 'SLEEP', icon: '🌙' },
+  {
+    key: 'breakfast',
+    label: 'Breakfast',
+    subtitle: 'Morning meal',
+    icon: '☀️',
+    backgroundColor: '#fff4e8',
+    borderColor: '#f0cda8',
+    accentColor: '#8a4a17',
+  },
+  {
+    key: 'lunch',
+    label: 'Lunch',
+    subtitle: 'Afternoon meal',
+    icon: '🌤️',
+    backgroundColor: '#edf5ff',
+    borderColor: '#b9d4f2',
+    accentColor: '#2f65a3',
+  },
+  {
+    key: 'dinner',
+    label: 'Dinner',
+    subtitle: 'Evening meal',
+    icon: '🌆',
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
+    accentColor: '#1e6f5c',
+  },
+  {
+    key: 'sleep',
+    label: 'Sleep',
+    subtitle: 'Bed time',
+    icon: '🌙',
+    backgroundColor: '#f3efff',
+    borderColor: '#cbc0f0',
+    accentColor: '#5b4aa0',
+  },
 ];
 
-const RoutineSetupScreen = ({ onBackToMenu }) => {
+const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
   const [mealTimes, setMealTimes] = useState({
     breakfast: '08:00 AM',
     lunch: '01:00 PM',
@@ -52,6 +84,7 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
   const [pickerPeriod, setPickerPeriod] = useState('AM');
   const [isListening, setIsListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
+  const textScale = reminderTextScale || 1;
 
   const parseVoiceCommand = (transcript) => {
     if (!transcript || typeof transcript !== 'string') {
@@ -234,6 +267,10 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
     () => routineRows.map((row) => ({ ...row, time: mealTimes[row.key] })),
     [mealTimes]
   );
+  const selectedMeal = useMemo(
+    () => routineRows.find((row) => row.key === selectedMealKey),
+    [selectedMealKey]
+  );
 
   const parseTime = (timeStr) => {
     const [time, period] = timeStr.split(' ');
@@ -308,8 +345,8 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#2c8de0" />
-        <Text style={styles.loaderText}>Loading your routine...</Text>
+        <ActivityIndicator size="large" color="#2f5d50" />
+        <Text style={[styles.loaderText, { fontSize: 15 * textScale }]}>Loading your routine...</Text>
       </View>
     );
   }
@@ -320,18 +357,19 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
         <TouchableOpacity onPress={onBackToMenu} style={styles.backIconButton}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.topTitle}>Routine Setup</Text>
-        <TouchableOpacity style={styles.voiceIconButton} onPress={handleVoiceSetup}>
-          <Text style={styles.voiceIcon}>🔊</Text>
-        </TouchableOpacity>
+        <Text style={[styles.topTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>⏰ Routine Setup</Text>
+        <View style={styles.headerRightSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Let's personalize your schedule</Text>
-          <Text style={styles.infoBody}>
-            Reminders will follow your meal times so you never miss a dose. It's the easiest way to stay on track.
-          </Text>
+          <View style={styles.infoIconWrap}>
+            <Text style={styles.infoIcon}>🍽️</Text>
+          </View>
+          <View style={styles.infoTextWrap}>
+            <Text style={[styles.infoTitle, { fontSize: 27 * textScale, lineHeight: 32 * textScale }]}>Set Your Daily Times</Text>
+            <Text style={[styles.infoBody, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}>Medicine reminders follow these times.</Text>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -339,32 +377,41 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
           onPress={handleVoiceSetup}
         >
           <Text style={styles.voiceSetupIcon}>🎤</Text>
-          <Text style={styles.voiceSetupText}>{isListening ? 'Listening... Tap to Stop' : 'Set with Voice'}</Text>
+          <Text style={[styles.voiceSetupText, { fontSize: 19 * textScale }]}>{isListening ? 'Listening... Tap to Stop' : 'Set with Voice'}</Text>
         </TouchableOpacity>
 
         {!!voiceTranscript && (
           <View style={styles.voiceResultCard}>
-            <Text style={styles.voiceResultLabel}>Heard</Text>
-            <Text style={styles.voiceResultText}>{voiceTranscript}</Text>
+            <Text style={[styles.voiceResultLabel, { fontSize: 12 * textScale }]}>Heard</Text>
+            <Text style={[styles.voiceResultText, { fontSize: 16 * textScale }]}>{voiceTranscript}</Text>
           </View>
         )}
 
-        {cards.map((item, index) => (
+        {cards.map((item) => (
           <View
             key={item.key}
-            style={[styles.timeCard, index === 0 && styles.activeTimeCard]}
+            style={[
+              styles.timeCard,
+              {
+                backgroundColor: item.backgroundColor,
+                borderColor: item.borderColor,
+              },
+            ]}
           >
-            <View style={[styles.timeIconWrap, index === 0 && styles.activeTimeIconWrap]}>
+            <View style={[styles.timeIconWrap, { backgroundColor: item.accentColor }]}>
               <Text style={styles.timeIcon}>{item.icon}</Text>
             </View>
             <View style={styles.timeTextWrap}>
-              <Text style={styles.timeLabel}>{item.label}</Text>
-              <Text style={styles.timeValue}>{item.time}</Text>
+              <Text style={[styles.timeLabel, { fontSize: 20 * textScale, lineHeight: 25 * textScale }]}>{item.label}</Text>
+              <Text style={[styles.timeSubtitle, { fontSize: 14 * textScale, lineHeight: 18 * textScale }]}>{item.subtitle}</Text>
+              <Text style={[styles.timeValue, { fontSize: 31 * textScale, lineHeight: 37 * textScale }]}>{item.time}</Text>
             </View>
             <TouchableOpacity
-              style={styles.clockWrap}
+              style={[styles.clockWrap, { borderColor: item.borderColor }]}
               onPress={() => openTimePicker(item.key)}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Change ${item.label} time`}
             >
               <Text style={styles.clockIcon}>🕒</Text>
             </TouchableOpacity>
@@ -372,55 +419,108 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
         ))}
 
         <View style={styles.tipBox}>
-          <Text style={styles.tipBullet}>›</Text>
-          <Text style={styles.tipText}>Tap the clock icon to set your preferred meal or sleep time.</Text>
+          <Text style={styles.tipBullet}>💡</Text>
+          <Text style={[styles.tipText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>Tap a clock to change a time.</Text>
         </View>
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
-          <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Routine'}</Text>
+          <Text style={[styles.saveButtonText, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>{isSaving ? 'Saving...' : '✓ Save Routine'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.skipButton} onPress={onBackToMenu}>
-          <Text style={styles.skipButtonText}>Skip for now</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {showTimePicker && (
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerModal}>
-            <Text style={styles.pickerTitle}>Set Time</Text>
+            <View style={styles.pickerHeader}>
+              <View style={styles.pickerHeaderIconWrap}>
+                <Text style={styles.pickerHeaderIcon}>{selectedMeal?.icon || '⏰'}</Text>
+              </View>
+              <View style={styles.pickerHeaderTextWrap}>
+                <Text style={[styles.pickerMealLabel, { fontSize: 16 * textScale, lineHeight: 20 * textScale }]}>{selectedMeal?.label || 'Time'}</Text>
+                <Text style={[styles.pickerTitle, { fontSize: 25 * textScale, lineHeight: 31 * textScale }]}>Choose Time</Text>
+              </View>
+            </View>
 
-            <View style={styles.pickerControls}>
-              <View style={styles.pickerColumn}>
-                <TouchableOpacity onPress={() => adjustPickerHours(1)} style={styles.pickerUpButton}>
-                  <Text style={styles.pickerUpArrow}>▲</Text>
-                </TouchableOpacity>
-                <Text style={styles.pickerValue}>{pickerHours}</Text>
-                <TouchableOpacity onPress={() => adjustPickerHours(-1)} style={styles.pickerDownButton}>
-                  <Text style={styles.pickerDownArrow}>▼</Text>
-                </TouchableOpacity>
+            <View style={styles.pickerTimePreview}>
+              <Text style={[styles.pickerTimePreviewLabel, { fontSize: 14 * textScale }]}>Selected time</Text>
+              <Text style={[styles.pickerTimePreviewText, { fontSize: 40 * textScale, lineHeight: 48 * textScale }]}>
+                {pickerHours}:{pickerMinutes} {pickerPeriod}
+              </Text>
+            </View>
+
+            <View style={styles.simplePickerInlineRow}>
+              <View style={styles.simplePickerInlineCard}>
+                <Text style={[styles.simplePickerLabel, { fontSize: 16 * textScale }]}>Hour</Text>
+                <View style={styles.simplePickerInlineControls}>
+                  <Text style={[styles.simplePickerValue, { fontSize: 29 * textScale, lineHeight: 35 * textScale }]}>{pickerHours}</Text>
+                  <View style={styles.simplePickerArrowStack}>
+                    <TouchableOpacity
+                      onPress={() => adjustPickerHours(1)}
+                      style={styles.simplePickerButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Increase hour"
+                    >
+                      <Text style={[styles.simplePickerButtonText, { fontSize: 21 * textScale }]}>▲</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => adjustPickerHours(-1)}
+                      style={styles.simplePickerButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decrease hour"
+                    >
+                      <Text style={[styles.simplePickerButtonText, { fontSize: 21 * textScale }]}>▼</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
 
-              <Text style={styles.pickerSeparator}>:</Text>
-
-              <View style={styles.pickerColumn}>
-                <TouchableOpacity onPress={() => adjustPickerMinutes(1)} style={styles.pickerUpButton}>
-                  <Text style={styles.pickerUpArrow}>▲</Text>
-                </TouchableOpacity>
-                <Text style={styles.pickerValue}>{pickerMinutes}</Text>
-                <TouchableOpacity onPress={() => adjustPickerMinutes(-1)} style={styles.pickerDownButton}>
-                  <Text style={styles.pickerDownArrow}>▼</Text>
-                </TouchableOpacity>
+              <View style={styles.simplePickerInlineCard}>
+                <Text style={[styles.simplePickerLabel, { fontSize: 16 * textScale }]}>Minute</Text>
+                <View style={styles.simplePickerInlineControls}>
+                  <Text style={[styles.simplePickerValue, { fontSize: 29 * textScale, lineHeight: 35 * textScale }]}>{pickerMinutes}</Text>
+                  <View style={styles.simplePickerArrowStack}>
+                    <TouchableOpacity
+                      onPress={() => adjustPickerMinutes(1)}
+                      style={styles.simplePickerButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Increase minutes"
+                    >
+                      <Text style={[styles.simplePickerButtonText, { fontSize: 21 * textScale }]}>▲</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => adjustPickerMinutes(-1)}
+                      style={styles.simplePickerButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decrease minutes"
+                    >
+                      <Text style={[styles.simplePickerButtonText, { fontSize: 21 * textScale }]}>▼</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
+            </View>
 
-              <View style={styles.pickerColumn}>
-                <TouchableOpacity
-                  onPress={() => setPickerPeriod(pickerPeriod === 'AM' ? 'PM' : 'AM')}
-                  style={styles.pickerPeriodButton}
-                >
-                  <Text style={styles.pickerValue}>{pickerPeriod}</Text>
-                </TouchableOpacity>
-              </View>
+            <Text style={[styles.periodPickerLabel, { fontSize: 17 * textScale }]}>Choose morning or evening</Text>
+            <View style={styles.periodPickerRow}>
+              <TouchableOpacity
+                onPress={() => setPickerPeriod('AM')}
+                style={[styles.periodPickerButton, pickerPeriod === 'AM' && styles.periodPickerButtonActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Morning AM"
+              >
+                <Text style={[styles.periodPickerText, pickerPeriod === 'AM' && styles.periodPickerTextActive, { fontSize: 18 * textScale }]}>AM</Text>
+                <Text style={[styles.periodPickerSubText, pickerPeriod === 'AM' && styles.periodPickerTextActive, { fontSize: 12 * textScale }]}>Morning</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setPickerPeriod('PM')}
+                style={[styles.periodPickerButton, pickerPeriod === 'PM' && styles.periodPickerButtonActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Evening PM"
+              >
+                <Text style={[styles.periodPickerText, pickerPeriod === 'PM' && styles.periodPickerTextActive, { fontSize: 18 * textScale }]}>PM</Text>
+                <Text style={[styles.periodPickerSubText, pickerPeriod === 'PM' && styles.periodPickerTextActive, { fontSize: 12 * textScale }]}>Evening</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.pickerButtonRow}>
@@ -428,13 +528,13 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
                 style={styles.pickerCancelButton}
                 onPress={() => setShowTimePicker(false)}
               >
-                <Text style={styles.pickerCancelText}>Cancel</Text>
+                <Text style={[styles.pickerCancelText, { fontSize: 20 * textScale }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.pickerConfirmButton}
                 onPress={saveTimeFromPicker}
               >
-                <Text style={styles.pickerConfirmText}>Set</Text>
+                <Text style={[styles.pickerConfirmText, { fontSize: 20 * textScale }]}>Set</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -447,96 +547,131 @@ const RoutineSetupScreen = ({ onBackToMenu }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f3f5f8',
+    backgroundColor: '#f7efe4',
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f5f8',
+    backgroundColor: '#f7efe4',
   },
   loaderText: {
     marginTop: 12,
-    color: '#536272',
+    color: '#5d5045',
     fontSize: 15,
   },
   topBar: {
-    height: 72,
-    paddingHorizontal: 14,
+    minHeight: 58,
+    marginHorizontal: 14,
+    marginTop: 26,
+    marginBottom: 14,
+    paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ebedf0',
+    backgroundColor: '#2f5d50',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   backIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f2f6fb',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   backIcon: {
-    fontSize: 26,
-    color: '#3a5268',
-    marginTop: -2,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   topTitle: {
-    fontSize: 21,
-    fontWeight: '700',
-    color: '#1f2732',
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '900',
+    color: '#ffffff',
+    paddingHorizontal: 8,
   },
-  voiceIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#eef7ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voiceIcon: {
-    fontSize: 17,
+  headerRightSpacer: {
+    width: 46,
+    height: 46,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 30,
   },
   infoCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#d2dbe5',
-    backgroundColor: '#eaf2fb',
-    padding: 14,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    backgroundColor: '#2f5d50',
+    padding: 16,
     marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#315a4f',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  infoIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: '#f8d978',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: '#fff4c6',
+  },
+  infoIcon: {
+    fontSize: 30,
+  },
+  infoTextWrap: {
+    flex: 1,
   },
   infoTitle: {
-    fontSize: 31,
-    lineHeight: 36,
-    fontWeight: '700',
-    color: '#152739',
-    marginBottom: 8,
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: '900',
+    color: '#ffffff',
   },
   infoBody: {
-    fontSize: 21,
-    lineHeight: 27,
-    color: '#4c6277',
+    marginTop: 6,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#e9f7f1',
   },
   voiceSetupButton: {
-    height: 56,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#2e97e4',
-    backgroundColor: '#e9f5ff',
+    minHeight: 58,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     marginBottom: 12,
   },
   voiceSetupButtonActive: {
-    backgroundColor: '#d8ecff',
-    borderColor: '#1d7ec7',
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
   },
   voiceSetupIcon: {
     fontSize: 18,
@@ -544,14 +679,14 @@ const styles = StyleSheet.create({
   },
   voiceSetupText: {
     fontSize: 19,
-    fontWeight: '700',
-    color: '#2a81c7',
+    fontWeight: '900',
+    color: '#2f5d50',
   },
   voiceResultCard: {
     borderWidth: 1,
-    borderColor: '#d7e3ef',
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
+    borderColor: '#a8dbc8',
+    borderRadius: 16,
+    backgroundColor: '#fffdf8',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
@@ -568,109 +703,106 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   timeCard: {
-    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e0e5eb',
-    borderRadius: 14,
-    minHeight: 82,
-    paddingHorizontal: 12,
+    borderRadius: 20,
+    minHeight: 112,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  activeTimeCard: {
-    borderColor: '#2895e1',
-    shadowColor: '#2386d0',
-    shadowOpacity: 0.12,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    marginBottom: 12,
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   timeIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f3f7',
-    marginRight: 10,
-  },
-  activeTimeIconWrap: {
-    backgroundColor: '#2b92df',
+    marginRight: 14,
   },
   timeIcon: {
-    fontSize: 19,
+    fontSize: 29,
   },
   timeTextWrap: {
     flex: 1,
   },
   timeLabel: {
-    fontSize: 11,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '900',
+    letterSpacing: 0,
+    color: '#24352f',
+  },
+  timeSubtitle: {
+    marginTop: 2,
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#74665b',
     fontWeight: '700',
-    letterSpacing: 0.8,
-    color: '#66788a',
   },
   timeValue: {
-    marginTop: 3,
+    marginTop: 6,
     fontSize: 31,
-    fontWeight: '700',
-    color: '#1f2c3a',
+    lineHeight: 37,
+    fontWeight: '900',
+    color: '#2f5d50',
   },
   clockWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: '#d8dde4',
+    backgroundColor: 'rgba(255,255,255,0.82)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   clockIcon: {
-    fontSize: 16,
+    fontSize: 24,
   },
   tipBox: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e1e4e8',
-    paddingTop: 14,
+    marginTop: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
   },
   tipBullet: {
-    color: '#d4b888',
-    fontSize: 21,
+    fontSize: 22,
     marginRight: 8,
-    marginTop: -1,
   },
   tipText: {
     flex: 1,
-    color: '#7a838d',
-    fontSize: 12,
-    fontStyle: 'italic',
-    lineHeight: 17,
+    color: '#5d5045',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
   },
   saveButton: {
     marginTop: 16,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#2d89df',
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: '#2f5d50',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#17382f',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   saveButtonText: {
-    fontSize: 27,
+    fontSize: 22,
+    lineHeight: 28,
     color: '#ffffff',
-    fontWeight: '700',
-  },
-  skipButton: {
-    marginTop: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipButtonText: {
-    fontSize: 26,
-    color: '#2c3948',
-    fontWeight: '500',
+    fontWeight: '900',
   },
   pickerOverlay: {
     position: 'absolute',
@@ -678,71 +810,192 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(31, 44, 39, 0.58)',
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
   pickerModal: {
     width: '100%',
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: '#fff8ed',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 2,
+    borderBottomWidth: 0,
+    borderColor: '#f4cf75',
+    paddingHorizontal: 16,
+    paddingTop: 18,
     paddingBottom: 28,
   },
-  pickerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1f2732',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  pickerControls: {
+  pickerHeader: {
+    minHeight: 76,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  pickerHeaderIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: '#f8d978',
+    alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
+  },
+  pickerHeaderIcon: {
+    fontSize: 28,
+  },
+  pickerHeaderTextWrap: {
+    flex: 1,
+  },
+  pickerMealLabel: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '800',
+    color: '#e9f7f1',
+  },
+  pickerTitle: {
+    marginTop: 2,
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  pickerTimePreview: {
+    minHeight: 88,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    backgroundColor: '#e9f7f1',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#315a4f',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
-  pickerColumn: {
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  pickerUpButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  pickerUpArrow: {
-    fontSize: 22,
-    color: '#2d89df',
-    fontWeight: '700',
-  },
-  pickerValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#1f2732',
-    minWidth: 60,
+  pickerTimePreviewText: {
+    fontSize: 40,
+    lineHeight: 48,
+    fontWeight: '900',
+    color: '#2f5d50',
     textAlign: 'center',
   },
-  pickerDownButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  pickerTimePreviewLabel: {
+    marginBottom: 4,
+    fontSize: 14,
+    color: '#5d5045',
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
-  pickerDownArrow: {
-    fontSize: 22,
-    color: '#2d89df',
-    fontWeight: '700',
+  simplePickerInlineRow: {
+    flexDirection: 'row',
+    columnGap: 10,
+    marginBottom: 12,
   },
-  pickerSeparator: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#1f2732',
-    marginHorizontal: 4,
-    marginBottom: 20,
+  simplePickerInlineCard: {
+    flex: 1,
+    minHeight: 104,
+    borderRadius: 22,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
-  pickerPeriodButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  simplePickerInlineControls: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  simplePickerLabel: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#5d5045',
+    textAlign: 'center',
+  },
+  simplePickerArrowStack: {
+    width: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    rowGap: 6,
+  },
+  simplePickerButton: {
+    width: 42,
+    height: 32,
+    borderRadius: 13,
+    backgroundColor: '#2f5d50',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  simplePickerButtonText: {
+    fontSize: 21,
+    lineHeight: 25,
+    color: '#ffffff',
+    fontWeight: '900',
+  },
+  simplePickerValue: {
+    flex: 1,
+    minHeight: 70,
+    marginRight: 8,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    backgroundColor: '#e9f7f1',
+    color: '#24352f',
+    fontSize: 29,
+    lineHeight: 35,
+    fontWeight: '900',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    paddingVertical: 17,
+  },
+  periodPickerRow: {
+    flexDirection: 'row',
+    columnGap: 10,
+    marginBottom: 18,
+  },
+  periodPickerLabel: {
+    marginTop: 2,
+    marginBottom: 8,
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#5d5045',
+  },
+  periodPickerButton: {
+    flex: 1,
+    minHeight: 60,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodPickerButtonActive: {
+    borderColor: '#2f5d50',
+    backgroundColor: '#2f5d50',
+  },
+  periodPickerText: {
+    fontSize: 18,
+    color: '#5d5045',
+    fontWeight: '900',
+  },
+  periodPickerSubText: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#74665b',
+    fontWeight: '800',
+  },
+  periodPickerTextActive: {
+    color: '#ffffff',
   },
   pickerButtonRow: {
     flexDirection: 'row',
@@ -750,30 +1003,32 @@ const styles = StyleSheet.create({
   },
   pickerCancelButton: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#ebedf0',
+    minHeight: 58,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 8,
   },
   pickerCancelText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#536272',
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#5d5045',
   },
   pickerConfirmButton: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#2d89df',
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: '#2f5d50',
     alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 8,
   },
   pickerConfirmText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '900',
     color: '#ffffff',
   },
 });

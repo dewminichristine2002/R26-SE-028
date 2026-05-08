@@ -38,7 +38,7 @@ const getProgressColor = (item) => {
   return '#2f8fd0';
 };
 
-const MedicineStockScreen = ({ onBack }) => {
+const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [summary, setSummary] = useState({ totalMedications: 0, lowStockCount: 0, totalPills: 0, usedPills: 0 });
   const [inventory, setInventory] = useState([]);
@@ -49,6 +49,7 @@ const MedicineStockScreen = ({ onBack }) => {
   const [isRefilling, setIsRefilling] = useState(false);
   const [isRefillNotifying, setIsRefillNotifying] = useState(false);
   const [isRequestingRefill, setIsRequestingRefill] = useState({});
+  const textScale = reminderTextScale || 1;
 
   const loadStock = async () => {
     try {
@@ -161,39 +162,43 @@ const MedicineStockScreen = ({ onBack }) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backIcon}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Medicine Stock</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={loadStock}>
-          <Text style={styles.refreshIcon}>↻</Text>
-        </TouchableOpacity>
+    <View style={styles.page}>
+      <View style={styles.staticHeaderWrap}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backIcon}>‹</Text>
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>📦 Medicine Stock</Text>
+          <TouchableOpacity style={styles.refreshButton} onPress={loadStock}>
+            <Text style={styles.refreshIcon}>↻</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryBlock}>
-          <Text style={styles.summaryLabel}>Total Medications</Text>
-          <Text style={styles.summaryValue}>{summary.totalMedications}</Text>
-          <Text style={styles.summarySubText}>Pills: {summary.totalPills}</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Medicines</Text>
+          <Text style={[styles.summaryValue, { fontSize: 30 * textScale }]}>{summary.totalMedications}</Text>
+          <Text style={[styles.summarySubText, { fontSize: 13 * textScale }]}>Pills: {summary.totalPills}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryBlock}>
-          <Text style={styles.summaryLabel}>Low Stock</Text>
-          <Text style={styles.summaryDanger}>{summary.lowStockCount} Need refill soon</Text>
-          <Text style={styles.summarySubText}>Used: {summary.usedPills} pills</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Need refill</Text>
+          <Text style={[styles.summaryDanger, { fontSize: 18 * textScale }]}>{summary.lowStockCount} Need refill soon</Text>
+          <Text style={[styles.summarySubText, { fontSize: 13 * textScale }]}>Used: {summary.usedPills} pills</Text>
         </View>
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Current Inventory</Text>
+        <Text style={[styles.sectionTitle, { fontSize: 21 * textScale }]}>Current Stock</Text>
       </View>
 
       {isLoading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#2f8fd0" />
-          <Text style={styles.loaderText}>Loading inventory...</Text>
+          <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading inventory...</Text>
         </View>
       ) : (
         <View>
@@ -201,32 +206,32 @@ const MedicineStockScreen = ({ onBack }) => {
             <View key={item.id} style={styles.stockCard}>
               <View style={styles.stockTopRow}>
                 <View>
-                  <Text style={styles.medName}>{item.medicineName}</Text>
-                  <Text style={styles.medSub}>{item.dosageMg}mg • {item.dailyAmount}x daily</Text>
+                  <Text style={[styles.medName, { fontSize: 19 * textScale }]}>{item.medicineName}</Text>
+                  <Text style={[styles.medSub, { fontSize: 13 * textScale }]}>{item.dosageMg}mg • {item.dailyAmount} each time</Text>
                 </View>
                 <View style={[styles.stockTag, getStockTagStyle(item)]}>
-                  <Text style={styles.stockTagText}>{item.stockLabel}</Text>
+                  <Text style={[styles.stockTagText, { fontSize: 12 * textScale }]}>{item.stockLabel}</Text>
                 </View>
               </View>
 
               <View style={styles.stockMetaRow}>
-                <Text style={styles.pillsLeftText}>{item.pillsLeft} pills left</Text>
-                <Text style={styles.percentText}>{item.coveragePercent}%</Text>
+                <Text style={[styles.pillsLeftText, { fontSize: 16 * textScale }]}>{item.pillsLeft} pills left</Text>
+                <Text style={[styles.percentText, { fontSize: 14 * textScale }]}>{item.coveragePercent}%</Text>
               </View>
 
-              <Text style={styles.pillUsageText}>Total: {item.totalPills} pills • Used: {item.usedPills} pills</Text>
+              <Text style={[styles.pillUsageText, { fontSize: 12 * textScale }]}>Total: {item.totalPills} pills • Used: {item.usedPills} pills</Text>
 
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${item.coveragePercent}%`, backgroundColor: getProgressColor(item) }]} />
               </View>
 
               <View style={styles.refillInfoRow}>
-                <Text style={styles.refillInfoText}>Next Refill: {formatShortDate(item.nextRefillDate)} ({item.daysLeft} days left)</Text>
+                <Text style={[styles.refillInfoText, { fontSize: 13 * textScale }]}>Refill by {formatShortDate(item.nextRefillDate)} • {item.daysLeft} days left</Text>
               </View>
 
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.refillButton} onPress={() => openRefillModal(item)}>
-                  <Text style={styles.refillButtonText}>Refill Now</Text>
+                  <Text style={[styles.refillButtonText, { fontSize: 14 * textScale }]}>+ Add stock</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -234,8 +239,8 @@ const MedicineStockScreen = ({ onBack }) => {
                   onPress={() => handleRequestRefillFromCard(item)}
                   disabled={!!isRequestingRefill[item.id]}
                 >
-                  <Text style={styles.refillRequestButtonText}>
-                    {isRequestingRefill[item.id] ? 'Requesting...' : 'Request Refill'}
+                  <Text style={[styles.refillRequestButtonText, { fontSize: 14 * textScale }]}>
+                    {isRequestingRefill[item.id] ? 'Sending...' : 'Ask refill'}
                   </Text>
                 </TouchableOpacity>
 
@@ -248,22 +253,23 @@ const MedicineStockScreen = ({ onBack }) => {
                     onPress={() => handleManualNotify(item)}
                     disabled={!!isNotifying[item.id]}
                   >
-                    <Text style={styles.notifyButtonText}>{isNotifying[item.id] ? 'Notifying...' : 'Notify Caregiver'}</Text>
+                    <Text style={[styles.notifyButtonText, { fontSize: 14 * textScale }]}>{isNotifying[item.id] ? 'Sending...' : 'Tell caregiver'}</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
           ))}
 
-          {!sortedInventory.length && <Text style={styles.emptyText}>No medicine stock records yet.</Text>}
+          {!sortedInventory.length && <Text style={[styles.emptyText, { fontSize: 15 * textScale }]}>No medicine stock records yet.</Text>}
         </View>
       )}
+      </ScrollView>
 
       {showRefillModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Refill Tablets</Text>
-            <Text style={styles.modalSubtitle}>{refillTarget?.medicineName || 'Medicine'}</Text>
+            <Text style={[styles.modalTitle, { fontSize: 22 * textScale }]}>Add tablets</Text>
+            <Text style={[styles.modalSubtitle, { fontSize: 14 * textScale }]}>{refillTarget?.medicineName || 'Medicine'}</Text>
 
             <View style={styles.stepperRow}>
               <TouchableOpacity
@@ -274,7 +280,7 @@ const MedicineStockScreen = ({ onBack }) => {
                 <Text style={styles.stepperButtonText}>-</Text>
               </TouchableOpacity>
 
-              <Text style={styles.stepperValue}>{refillTablets} tablets</Text>
+              <Text style={[styles.stepperValue, { fontSize: 22 * textScale }]}>{refillTablets} tablets</Text>
 
               <TouchableOpacity
                 style={styles.stepperButton}
@@ -290,7 +296,7 @@ const MedicineStockScreen = ({ onBack }) => {
               onPress={handleConfirmRefill}
               disabled={isRefilling || isRefillNotifying}
             >
-              <Text style={styles.modalPrimaryButtonText}>{isRefilling ? 'Updating...' : 'Confirm Refill'}</Text>
+              <Text style={[styles.modalPrimaryButtonText, { fontSize: 15 * textScale }]}>{isRefilling ? 'Updating...' : '✓ Add Stock'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -298,7 +304,7 @@ const MedicineStockScreen = ({ onBack }) => {
               onPress={handleRefillNotifyCaregiver}
               disabled={isRefilling || isRefillNotifying}
             >
-              <Text style={styles.modalSecondaryButtonText}>{isRefillNotifying ? 'Notifying...' : 'Notify Caregiver'}</Text>
+              <Text style={[styles.modalSecondaryButtonText, { fontSize: 15 * textScale }]}>{isRefillNotifying ? 'Sending...' : 'Tell caregiver'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -306,68 +312,104 @@ const MedicineStockScreen = ({ onBack }) => {
               onPress={() => setShowRefillModal(false)}
               disabled={isRefilling || isRefillNotifying}
             >
-              <Text style={styles.modalCancelButtonText}>Close</Text>
+              <Text style={[styles.modalCancelButtonText, { fontSize: 15 * textScale }]}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: '#f7efe4',
+  },
+  staticHeaderWrap: {
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 26,
+    zIndex: 10,
+    elevation: 10,
+  },
+  scrollArea: {
+    flex: 1,
+  },
   container: {
-    padding: 14,
-    backgroundColor: '#f4f6f8',
     flexGrow: 1,
-    paddingBottom: 24,
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 0,
+    paddingBottom: 28,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 58,
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    paddingHorizontal: 10,
     marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    shadowColor: '#20382f',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   backIcon: {
-    fontSize: 24,
-    color: '#445a6d',
-    marginTop: -2,
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#2f5d50',
+    marginTop: -3,
+    fontWeight: '900',
   },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 22,
-    fontWeight: '700',
-    color: '#23313d',
+    lineHeight: 28,
+    fontWeight: '900',
+    color: '#ffffff',
+    paddingHorizontal: 8,
   },
   refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#f8d978',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fff4c6',
   },
   refreshIcon: {
-    fontSize: 17,
-    color: '#3a688f',
-    fontWeight: '700',
+    fontSize: 24,
+    color: '#2f5d50',
+    fontWeight: '900',
   },
   summaryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: '#fffdf8',
+    borderRadius: 22,
+    paddingVertical: 14,
     paddingHorizontal: 14,
     flexDirection: 'row',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
+    borderWidth: 2,
+    borderColor: '#eadcca',
   },
   summaryBlock: {
     flex: 1,
@@ -379,13 +421,14 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#6e7f8d',
+    color: '#5d5045',
+    fontWeight: '900',
   },
   summaryValue: {
     marginTop: 2,
     fontSize: 28,
-    fontWeight: '700',
-    color: '#243748',
+    fontWeight: '900',
+    color: '#2f5d50',
   },
   summaryDanger: {
     marginTop: 4,
@@ -404,16 +447,21 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    color: '#2b3d4c',
-    fontWeight: '700',
+    color: '#2d241d',
+    fontWeight: '900',
   },
   stockCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
+    backgroundColor: '#fffdf8',
+    borderRadius: 22,
     padding: 14,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e6ebf0',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    shadowColor: '#6b4b2d',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   stockTopRow: {
     flexDirection: 'row',
@@ -422,8 +470,8 @@ const styles = StyleSheet.create({
   },
   medName: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#273947',
+    fontWeight: '900',
+    color: '#24352f',
   },
   medSub: {
     marginTop: 2,
@@ -457,8 +505,8 @@ const styles = StyleSheet.create({
   },
   pillsLeftText: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#2c3f4e',
+    fontWeight: '900',
+    color: '#2f5d50',
   },
   percentText: {
     fontSize: 13,
@@ -486,10 +534,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d8e2eb',
-    backgroundColor: '#f7fbff',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#b9d4f2',
+    backgroundColor: '#eaf4ff',
   },
   refillInfoText: {
     color: '#5f7588',
@@ -504,31 +552,31 @@ const styles = StyleSheet.create({
   refillButton: {
     flex: 1,
     marginRight: 8,
-    backgroundColor: '#2f8fd0',
-    borderRadius: 10,
+    backgroundColor: '#2f5d50',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 38,
+    minHeight: 52,
   },
   refillButtonText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 13,
   },
   refillRequestButton: {
     flex: 1,
     marginLeft: 8,
-    borderWidth: 1,
-    borderColor: '#2f8fd0',
-    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#2f5d50',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 38,
-    backgroundColor: '#eef6ff',
+    minHeight: 52,
+    backgroundColor: '#fffdf8',
   },
   refillRequestButtonText: {
-    color: '#2f6f9f',
-    fontWeight: '700',
+    color: '#2f5d50',
+    fontWeight: '900',
     fontSize: 12,
   },
   secondaryActionRow: {
@@ -536,17 +584,17 @@ const styles = StyleSheet.create({
   },
   notifyButton: {
     width: '100%',
-    borderWidth: 1,
-    borderColor: '#2f8fd0',
-    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 38,
-    backgroundColor: '#f5faff',
+    minHeight: 52,
+    backgroundColor: '#fff4e8',
   },
   notifyButtonText: {
-    color: '#2f6f9f',
-    fontWeight: '700',
+    color: '#8a4a17',
+    fontWeight: '900',
     fontSize: 12,
   },
   loaderWrap: {
@@ -568,7 +616,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(28, 36, 46, 0.45)',
+    backgroundColor: 'rgba(31, 44, 39, 0.58)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 18,
@@ -576,14 +624,16 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#f4cf75',
     padding: 16,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#2a3b4b',
+    fontWeight: '900',
+    color: '#2d241d',
   },
   modalSubtitle: {
     marginTop: 2,
@@ -599,19 +649,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   stepperButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d4e0ea',
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#2f5d50',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f5faff',
+    backgroundColor: '#e9f7f1',
   },
   stepperButtonText: {
     fontSize: 22,
-    color: '#2f6f9f',
-    fontWeight: '700',
+    color: '#2f5d50',
+    fontWeight: '900',
     marginTop: -2,
   },
   stepperValue: {
@@ -620,35 +670,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modalPrimaryButton: {
-    borderRadius: 10,
-    backgroundColor: '#2f8fd0',
-    paddingVertical: 11,
+    borderRadius: 18,
+    backgroundColor: '#2f5d50',
+    paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
   },
   modalPrimaryButtonText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 14,
   },
   modalSecondaryButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2f8fd0',
-    backgroundColor: '#f4f9ff',
-    paddingVertical: 11,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#2f5d50',
+    backgroundColor: '#fffdf8',
+    paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
   },
   modalSecondaryButtonText: {
-    color: '#2f6f9f',
-    fontWeight: '700',
+    color: '#2f5d50',
+    fontWeight: '900',
     fontSize: 14,
   },
   modalCancelButton: {
-    borderRadius: 10,
-    backgroundColor: '#eef2f5',
-    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: '#f7efe4',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    paddingVertical: 14,
     alignItems: 'center',
   },
   modalCancelButtonText: {

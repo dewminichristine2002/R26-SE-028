@@ -19,11 +19,7 @@ const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
       const result = await authService.register({ fullName, email, password });
       onRegisterSuccess(result.user);
     } catch (error) {
-      const message = error.response?.data?.error
-        || (error.message === 'Network Error'
-          ? 'Cannot reach the backend. Check that the server is running and that EXPO_PUBLIC_API_URL points to your computer on the same network.'
-          : error.message)
-        || 'Registration failed';
+      const message = error.response?.data?.error || error.message || 'Registration failed';
       Alert.alert('Registration Failed', message);
     } finally {
       setLoading(false);

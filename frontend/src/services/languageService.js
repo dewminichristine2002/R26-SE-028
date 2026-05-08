@@ -17,12 +17,10 @@ export const languageService = {
    */
   getAvailableLanguages: () => [
     { code: 'en', name: 'English', nativeName: 'English' },
+    { code: 'si', name: 'Sinhala', nativeName: 'සිංහල' },
+    { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்' },
     { code: 'es', name: 'Spanish', nativeName: 'Español' },
     { code: 'fr', name: 'French', nativeName: 'Français' },
-    // Add more languages here in future:
-    // { code: 'de', name: 'German', nativeName: 'Deutsch' },
-    // { code: 'it', name: 'Italian', nativeName: 'Italiano' },
-    // { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
   ],
 
   /**
