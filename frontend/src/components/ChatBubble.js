@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 const ChatBubble = ({
@@ -10,9 +10,7 @@ const ChatBubble = ({
   onSpeak,
   isSpeaking = false,
 }) => {
-  const [showSource, setShowSource] = useState(false);
   const isAssistant = role === 'assistant' || role === 'system';
-  const hasSource = isAssistant && (sql || (Array.isArray(rows) && rows.length > 0));
 
   return (
     <View style={[styles.row, isAssistant ? styles.rowLeft : styles.rowRight]}>
@@ -54,44 +52,6 @@ const ChatBubble = ({
                   {isSpeaking ? 'Stop' : 'Listen'}
                 </Text>
               </Pressable>
-            ) : null}
-
-            {hasSource ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={showSource ? 'Hide details' : 'Show where this answer came from'}
-                onPress={() => setShowSource((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.metaButton,
-                  pressed && styles.metaButtonPressed,
-                ]}
-              >
-                <Text style={styles.metaButtonIcon}>{'\u{1F50D}'}</Text>
-                <Text style={styles.metaButtonText}>
-                  {showSource ? 'Hide details' : 'Where this came from'}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {showSource && hasSource ? (
-          <View style={styles.sourceBox}>
-            {sql ? (
-              <>
-                <Text style={styles.sourceTitle}>Question we asked your records</Text>
-                <Text style={styles.sourceCode}>{sql}</Text>
-              </>
-            ) : null}
-            {Array.isArray(rows) && rows.length > 0 ? (
-              <>
-                <Text style={styles.sourceTitle}>
-                  Records found ({rows.length}{rows.length > 5 ? ', showing first 5' : ''})
-                </Text>
-                <Text style={styles.sourceCode}>
-                  {JSON.stringify(rows.slice(0, 5), null, 2)}
-                </Text>
-              </>
             ) : null}
           </View>
         ) : null}
