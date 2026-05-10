@@ -1,7 +1,7 @@
-const { getDatabaseStatus } = require('../config/db');
+const { getPublicDatabaseStatus } = require('../config/db');
 
 const requireDatabase = (req, res, next) => {
-  const status = getDatabaseStatus();
+  const status = getPublicDatabaseStatus();
 
   if (!status.connected) {
     return res.status(503).json({

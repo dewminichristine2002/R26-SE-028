@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { URL } = require('url');
 
 const parseBoolean = (value, fallback = false) => {
   if (value == null || value === '') {
@@ -35,13 +36,28 @@ const hasExplicitDbFields = Boolean(
 const resolvedDatabaseUrl = hasExplicitDbFields ? '' : process.env.DATABASE_URL;
 const resolvedFamily = process.env.DB_FAMILY ? Number(process.env.DB_FAMILY) : undefined;
 
+const getConnectionStringHost = (connectionString) => {
+  if (!connectionString) {
+    return '';
+  }
+
+  try {
+    return new URL(connectionString).hostname || '';
+  } catch {
+    return '';
+  }
+};
+
+const resolvedConnectionHost = getConnectionStringHost(resolvedDatabaseUrl);
+const sslHost = resolvedDatabaseUrl ? (resolvedConnectionHost || resolvedHost) : resolvedHost;
+
 const dbConfig = resolvedDatabaseUrl
   ? {
       connectionString: resolvedDatabaseUrl,
       connectionTimeoutMillis: resolvedConnectionTimeout,
       query_timeout: Number(process.env.DB_QUERY_TIMEOUT_MS || 8000),
       statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS || 8000),
-      ssl: getSslConfig(resolvedHost),
+      ssl: getSslConfig(sslHost),
       keepAlive: true,
       max: Number(process.env.DB_POOL_MAX || 10),
       ...(resolvedFamily ? { family: resolvedFamily } : {}),
@@ -61,13 +77,39 @@ const dbConfig = resolvedDatabaseUrl
       ...(resolvedFamily ? { family: resolvedFamily } : {}),
     };
 
-const getResolvedDatabaseIdentity = () => ({
-  host: dbConfig.host || resolvedHost,
-  port: dbConfig.port || resolvedPort,
-  database: process.env.DB_NAME || 'postgres',
-  user: process.env.DB_USER || 'postgres',
-  usesConnectionString: Boolean(resolvedDatabaseUrl),
-});
+const parseConnectionStringIdentity = (connectionString) => {
+  if (!connectionString) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(connectionString);
+    return {
+      host: parsed.hostname || resolvedHost,
+      port: Number(parsed.port || resolvedPort),
+      database: parsed.pathname ? parsed.pathname.replace(/^\//, '') || 'postgres' : 'postgres',
+      user: decodeURIComponent(parsed.username || 'postgres'),
+      usesConnectionString: true,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const getResolvedDatabaseIdentity = () => {
+  const parsedIdentity = parseConnectionStringIdentity(resolvedDatabaseUrl);
+  if (parsedIdentity) {
+    return parsedIdentity;
+  }
+
+  return {
+    host: dbConfig.host || resolvedHost,
+    port: dbConfig.port || resolvedPort,
+    database: process.env.DB_NAME || 'postgres',
+    user: process.env.DB_USER || 'postgres',
+    usesConnectionString: Boolean(resolvedDatabaseUrl),
+  };
+};
 
 const getDatabaseTroubleshootingHints = (errorMessage = '') => {
   const { host, port } = getResolvedDatabaseIdentity();
@@ -145,10 +187,17 @@ const getDatabaseStatus = () => ({
   ...getResolvedDatabaseIdentity(),
 });
 
+const getPublicDatabaseStatus = () => ({
+  connected: dbState.connected,
+  lastAttemptAt: dbState.lastAttemptAt,
+  lastError: dbState.lastError ? 'Database connection failed.' : null,
+});
+
 module.exports = {
   pool,
   initializeDatabase,
   getDatabaseStatus,
+  getPublicDatabaseStatus,
   getDatabaseTroubleshootingHints,
   dbState,
 };

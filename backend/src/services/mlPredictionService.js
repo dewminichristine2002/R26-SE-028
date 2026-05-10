@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const {
+  resolveDrugClass,
+  extractDrugClassesFromText,
+} = require('./drugClassLookupService');
 
 const mlRoot = path.resolve(__dirname, '..', '..', 'ml');
 const modelPath = path.join(mlRoot, 'models', 'baseline_model.joblib');
@@ -59,6 +63,16 @@ const buildPredictionPayload = ({ analysisPayload, profile, questionnaireAnswers
     q_doctor_advice: answerMap.doctorAdvice || '',
     raw_input: analysisPayload.historyEntry?.rawInput || analysisPayload.medicineName || '',
   };
+  const drugClassInfo = resolveDrugClass(
+    analysisPayload.normalizedDrugName,
+    analysisPayload.medicineName,
+    analysisPayload.ingredientName,
+    analysisPayload.medicationKnowledge?.rxnormMatchedName
+  );
+  const profileDrugClasses = new Set([
+    ...extractDrugClassesFromText(profile?.knownAllergiesText),
+    ...extractDrugClassesFromText(answerMap.medicineName || ''),
+  ]);
 
   return {
     side_effect_count: Number(analysisPayload.sideEffectCount || 0),
@@ -70,6 +84,8 @@ const buildPredictionPayload = ({ analysisPayload, profile, questionnaireAnswers
     max_interaction_severity: analysisPayload.maxInteractionSeverity || 'none',
     has_medicine_allergy: String(profile?.hasMedicineAllergy ?? 'missing'),
     has_severe_reaction_log: '0',
+    drug_class: drugClassInfo?.drug_class || 'unknown',
+    same_class_allergy: profileDrugClasses.has(drugClassInfo?.drug_class || '') ? 1 : 0,
     combined_text: combineText(fields),
   };
 };

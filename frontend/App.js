@@ -30,10 +30,16 @@ export default function App() {
           const profile = await userService.getMyProfile();
           setCurrentUser(profile);
           setIsAuthenticated(true);
-          setIsLocalMode(await authService.isUsingLocalMode());
+          if (!authService.isLocalToken(token)) {
+            await authService.clearLocalMode();
+            setIsLocalMode(false);
+          } else {
+            setIsLocalMode(true);
+          }
         } catch (error) {
           const status = error.response?.status;
           const storedUser = await authService.getStoredUser();
+          const shouldUseLocalMode = authService.isLocalToken(token) || await authService.isUsingLocalMode();
 
           if (status === 401) {
             console.log('[App] Session restore failed with 401, clearing local auth.');
@@ -44,14 +50,19 @@ export default function App() {
               setCurrentUser(storedUser);
             }
             setIsAuthenticated(true);
-            setIsLocalMode(await authService.isUsingLocalMode());
+            setIsLocalMode(shouldUseLocalMode);
           } else {
-            console.log('[App] Session restore skipped because backend is unreachable:', error.message);
+            const detail = error.response?.data?.error || error.response?.data || error.message;
+            if (status) {
+              console.log(`[App] Session restore skipped (HTTP ${status}):`, detail);
+            } else {
+              console.log('[App] Session restore skipped (no HTTP response — network or timeout):', detail);
+            }
             if (storedUser) {
               setCurrentUser(storedUser);
             }
             setIsAuthenticated(true);
-            setIsLocalMode(await authService.isUsingLocalMode());
+            setIsLocalMode(shouldUseLocalMode);
           }
         }
       }

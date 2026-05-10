@@ -18,7 +18,9 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "ElderMeds reads prescription photos to help check medicine safety.",
-        "NSCameraUsageDescription": "ElderMeds can use the camera to capture a prescription for safety checking."
+        "NSCameraUsageDescription": "ElderMeds can use the camera to capture a prescription for safety checking.",
+        "NSSpeechRecognitionUsageDescription": "ElderMeds converts your speech to medicine names for allergy checks.",
+        "NSMicrophoneUsageDescription": "ElderMeds uses your microphone to capture medicine names for allergy checks."
       }
     },
     "android": {
@@ -26,8 +28,9 @@
       "package": "com.eldermeds.app",
       "versionCode": 1,
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -37,16 +40,23 @@
           "photosPermission": "ElderMeds reads prescription photos to help check medicine safety.",
           "cameraPermission": "ElderMeds can use the camera to capture a prescription for safety checking."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "ElderMeds uses your microphone to capture medicine names for allergy checks.",
+          "speechRecognitionPermission": "ElderMeds converts your speech to medicine names for allergy checks."
+        }
       ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "sandanima",
     "extra": {
       "eas": {
-        "projectId": "a4f3c948-9552-4422-bfb1-981aa85e78c8"
+        "projectId": "2abb35b2-c6d4-41d5-b07a-b134ed041012"
       }
-    }
+    },
+    "owner": "thyagaalwiss-organization"
   }
 }

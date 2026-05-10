@@ -2,6 +2,17 @@ const { pool } = require('../config/db');
 
 let allergyProfileColumnsEnsured = false;
 let analysisColumnsEnsured = false;
+const safeJsonParse = (value, fallback) => {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
 
 const ensureAllergyProfileColumns = async () => {
   if (allergyProfileColumnsEnsured) {
@@ -42,6 +53,9 @@ const ensureAnalysisColumns = async () => {
   await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS interaction_count INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS max_interaction_severity TEXT NOT NULL DEFAULT ''`);
   await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS knowledge_sources TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS guidelines_json TEXT NOT NULL DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS medication_knowledge_json TEXT NOT NULL DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE allergy_cards ADD COLUMN IF NOT EXISTS data_used_json TEXT NOT NULL DEFAULT '{}'`);
 
   await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS rxnorm_cui TEXT NOT NULL DEFAULT ''`);
   await pool.query(`ALTER TABLE medicine_check_history ADD COLUMN IF NOT EXISTS ingredient_name TEXT NOT NULL DEFAULT ''`);
@@ -94,6 +108,9 @@ const mapCardRow = (row) => ({
   interactionCount: row.interaction_count,
   maxInteractionSeverity: row.max_interaction_severity,
   knowledgeSources: row.knowledge_sources ? row.knowledge_sources.split('|').filter(Boolean) : [],
+  guidelines: safeJsonParse(row.guidelines_json, []),
+  medicationKnowledge: safeJsonParse(row.medication_knowledge_json, {}),
+  dataUsed: safeJsonParse(row.data_used_json, {}),
   explanation: row.explanation,
   recommendation: row.recommendation,
   createdAt: row.created_at,
@@ -330,11 +347,14 @@ const createCard = async (userId, payload) => {
           interaction_count,
           max_interaction_severity,
           knowledge_sources,
+          guidelines_json,
+          medication_knowledge_json,
+          data_used_json,
           explanation,
           recommendation,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
         RETURNING *
       `,
       [
@@ -354,6 +374,9 @@ const createCard = async (userId, payload) => {
         payload.interactionCount || 0,
         payload.maxInteractionSeverity || '',
         Array.isArray(payload.knowledgeSources) ? payload.knowledgeSources.join('|') : '',
+        JSON.stringify(Array.isArray(payload.guidelines) ? payload.guidelines : []),
+        JSON.stringify(payload.medicationKnowledge && typeof payload.medicationKnowledge === 'object' ? payload.medicationKnowledge : {}),
+        JSON.stringify(payload.dataUsed && typeof payload.dataUsed === 'object' ? payload.dataUsed : {}),
         payload.explanation,
         payload.recommendation,
       ]
@@ -473,10 +496,13 @@ const updateCard = async (userId, cardId, payload) => {
         interaction_count = COALESCE($13, interaction_count),
         max_interaction_severity = COALESCE($14, max_interaction_severity),
         knowledge_sources = COALESCE($15, knowledge_sources),
-        explanation = COALESCE($16, explanation),
-        recommendation = COALESCE($17, recommendation),
+        guidelines_json = COALESCE($16, guidelines_json),
+        medication_knowledge_json = COALESCE($17, medication_knowledge_json),
+        data_used_json = COALESCE($18, data_used_json),
+        explanation = COALESCE($19, explanation),
+        recommendation = COALESCE($20, recommendation),
         updated_at = NOW()
-      WHERE user_id = $18 AND id = $19
+      WHERE user_id = $21 AND id = $22
       RETURNING *
     `,
     [
@@ -495,6 +521,13 @@ const updateCard = async (userId, cardId, payload) => {
       payload.interactionCount,
       payload.maxInteractionSeverity,
       Array.isArray(payload.knowledgeSources) ? payload.knowledgeSources.join('|') : null,
+      Array.isArray(payload.guidelines) ? JSON.stringify(payload.guidelines) : null,
+      payload.medicationKnowledge && typeof payload.medicationKnowledge === 'object'
+        ? JSON.stringify(payload.medicationKnowledge)
+        : null,
+      payload.dataUsed && typeof payload.dataUsed === 'object'
+        ? JSON.stringify(payload.dataUsed)
+        : null,
       payload.explanation,
       payload.recommendation,
       userId,

@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
-const { requireAuth } = require('../middleware/authMiddleware');
 const { recognizePrescriptionImage } = require('../services/prescriptionOcrService');
+const { matchMedicinesFromText } = require('../services/medicationKnowledgeService');
 
 const router = express.Router();
 
@@ -30,17 +30,19 @@ const uploadImage = (req, res, next) => {
   });
 };
 
-router.post('/ocr', requireAuth, uploadImage, async (req, res) => {
+router.post('/ocr', uploadImage, async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.status(400).json({ error: 'Image file is required (field name: image)' });
   }
 
   try {
     const { rawText, confidence, preprocessing } = await recognizePrescriptionImage(req.file.buffer);
+    const matchedCandidates = matchMedicinesFromText(rawText);
     return res.json({
       rawText,
       confidence,
       preprocessing,
+      matchedCandidates,
       message:
         rawText.length > 0
           ? 'Text extracted. The app will let you edit it before any safety check.'

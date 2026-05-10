@@ -1,5 +1,5 @@
 const { createWorker } = require('tesseract.js');
-const Jimp = require('jimp');
+const { Jimp, JimpMime } = require('jimp');
 
 let workerPromise = null;
 let queue = Promise.resolve();
@@ -34,12 +34,11 @@ const runExclusive = (fn) => {
 async function preprocessPrescriptionImage(imageBuffer) {
   const image = await Jimp.read(imageBuffer);
 
-  image
-    .exifRotate()
-    .greyscale()
-    .normalize()
-    .contrast(0.35)
-    .blur(1);
+  if (typeof image.exifRotate === 'function') {
+    image.exifRotate();
+  }
+
+  image.greyscale().normalize().contrast(0.35).blur(1);
 
   image.scan(0, 0, image.bitmap.width, image.bitmap.height, function (_x, _y, idx) {
     const value = this.bitmap.data[idx];
@@ -49,7 +48,7 @@ async function preprocessPrescriptionImage(imageBuffer) {
     this.bitmap.data[idx + 2] = out;
   });
 
-  return image.getBufferAsync(Jimp.MIME_PNG);
+  return image.getBuffer(JimpMime.png);
 }
 
 /**

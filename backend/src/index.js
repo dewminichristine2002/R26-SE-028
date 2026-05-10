@@ -6,7 +6,7 @@ dotenv.config();
 
 const {
   initializeDatabase,
-  getDatabaseStatus,
+  getPublicDatabaseStatus,
   getDatabaseTroubleshootingHints,
   dbState,
 } = require('./config/db');
@@ -22,7 +22,7 @@ app.use(express.json());
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'Server is running',
-    database: getDatabaseStatus(),
+    database: getPublicDatabaseStatus(),
   });
 });
 

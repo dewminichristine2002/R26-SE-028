@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  InteractionManager,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +17,7 @@ import {
 import { allergyService } from '../services/allergyService';
 import { searchMedications } from '../services/medicationService';
 import { extractPrescriptionTextFromImage } from '../services/prescriptionOcrService';
+import { getBackendConnectionHelp } from '../services/apiConfig';
 import { authService } from '../services/authService';
 import {
   cleanExplanationText,
@@ -24,24 +26,29 @@ import {
   mergeChronicWithPregnancy,
   parsePregnancyFromChronic,
 } from '../utils/medicineFlowUtils';
-import { getExpoImagePicker, getExpoSpeech } from '../utils/optionalExpoModules';
+import {
+  getExpoImagePicker,
+  getExpoSpeech,
+  getExpoSpeechRecognitionModule,
+} from '../utils/optionalExpoModules';
 
 const palette = {
-  header: '#0a5c3e',
-  primary: '#157a52',
-  primaryMuted: '#e6f4ec',
-  bg: '#eef1f5',
+  header: '#0f5c3e',
+  primary: '#0d9d6d',
+  primaryMuted: '#e0f9f1',
+  primaryLight: '#f0fdf9',
+  bg: '#f8fafb',
   surface: '#ffffff',
-  text: '#0f172a',
-  textSecondary: '#475569',
-  textTertiary: '#64748b',
-  border: '#e2e8f0',
+  text: '#0a1428',
+  textSecondary: '#4a5568',
+  textTertiary: '#718096',
+  border: '#e5e8ed',
   borderStrong: '#cbd5e1',
   safe: '#0f766e',
   safeBg: '#ecfdf5',
-  warn: '#b45309',
-  warnBg: '#fffbeb',
-  danger: '#b91c1c',
+  warn: '#d97706',
+  warnBg: '#fef9e7',
+  danger: '#dc2626',
   dangerBg: '#fef2f2',
 };
 
@@ -84,6 +91,8 @@ const emptyInput = {
   dose: '',
   frequency: '',
   rawOcrText: '',
+  ocrSourceLine: '',
+  spokenText: '',
 };
 
 const emptyMinimal = {
@@ -140,12 +149,46 @@ const questionnaireComplete = (answers) => QUESTIONS.every((item) => Boolean(ans
 const isOnboardedUser = (profile, answers) =>
   profile.profileCompleted === true || (questionnaireComplete(answers) && profileComplete(profile));
 
-const errorText = (e, fallback) => e.response?.data?.error || e.message || fallback;
+const errorText = (e, fallback) => {
+  if (e?.response?.data?.error) {
+    return e.response.data.error;
+  }
+
+  if (e?.message === 'Network Error') {
+    return getBackendConnectionHelp();
+  }
+
+  return e?.message || fallback;
+};
 const formatDate = (v) => {
   if (!v) return 'No date';
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
 };
+
+/** One-line label for confirm step, e.g. "Amoxicillin 500 mg twice daily (tds)". */
+function formatParsedMedicineLine(parsed) {
+  if (!parsed) return '';
+  const name = String(parsed.medicineName || '').trim();
+  const dose = String(parsed.dose || '').trim();
+  const freq = String(parsed.displayFrequency || parsed.frequency || '').trim();
+  const parts = [name];
+  if (dose) parts.push(dose);
+  if (freq) parts.push(freq);
+  return parts.join(' ').trim();
+}
+
+function formatScanCandidateLine(candidate) {
+  if (!candidate) return '';
+  const fromFields = formatParsedMedicineLine({
+    medicineName: candidate.medicineName,
+    dose: candidate.dose,
+    displayFrequency: candidate.displayFrequency,
+    frequency: candidate.frequency,
+  });
+  if (fromFields) return fromFields;
+  return String(candidate.sourceLine || '').trim();
+}
 
 function speakAloud(text) {
   if (!text) return;
@@ -181,14 +224,25 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   const [suggestions, setSuggestions] = useState([]);
   const [searchBusy, setSearchBusy] = useState(false);
   const [ocrPhase, setOcrPhase] = useState(0);
+  const [ocrConfidence, setOcrConfidence] = useState(0);
   const [scanRawText, setScanRawText] = useState('');
+  const [scanMatchedCandidates, setScanMatchedCandidates] = useState([]);
+  const [selectedScanCandidateIndex, setSelectedScanCandidateIndex] = useState(0);
+  const [scanConfirmMedicineDraft, setScanConfirmMedicineDraft] = useState('');
   const [voiceDraft, setVoiceDraft] = useState('');
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
+  const [voiceDiagnostic, setVoiceDiagnostic] = useState('');
+  const [scanFlashOn, setScanFlashOn] = useState(false);
   const [followUp, setFollowUp] = useState({ symptoms: '', severity: 'mild', notes: '' });
   const [standaloneReaction, setStandaloneReaction] = useState({ symptoms: '', severity: 'mild', notes: '' });
   const dangerAlertShown = useRef(false);
   const searchTimer = useRef(null);
   const routeBootstrapped = useRef(false);
   const minimalReturnRoute = useRef('check-input');
+  const voiceListenerRefs = useRef([]);
+  const imagePickerLockRef = useRef(false);
+  const scanCameraAutoOpenedRef = useRef(false);
 
   useEffect(() => {
     authService.getStoredUser().then((u) => {
@@ -196,6 +250,36 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
       setUserFirstName(name.split(/\s+/)[0] || '');
     });
   }, []);
+
+  useEffect(() => {
+    return () => {
+      voiceListenerRefs.current.forEach((sub) => {
+        try {
+          sub?.remove?.();
+        } catch {
+          // Ignore listener cleanup issues.
+        }
+      });
+      voiceListenerRefs.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    if (route !== 'voice-input' && isVoiceListening) {
+      stopVoiceRecognition();
+    }
+  }, [route, isVoiceListening]);
+
+  useEffect(() => {
+    if (route === 'scan-capture') {
+      // Don't auto-open camera - let user click button instead
+      scanCameraAutoOpenedRef.current = true;
+      return undefined;
+    }
+
+    scanCameraAutoOpenedRef.current = false;
+    return undefined;
+  }, [route]);
 
   useEffect(() => {
     (async () => {
@@ -271,6 +355,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
   const latestHistoryItem = historyItems[0];
   const pregnancyApplicable = profile.gender === 'Female';
+  const speechRecognitionAvailable = useMemo(() => Boolean(getExpoSpeechRecognitionModule()), []);
 
   const runMedicationSearch = useCallback(async (text) => {
     const t = String(text || '').trim();
@@ -507,7 +592,88 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     }
   };
 
-  const startScanFlow = async () => {
+  const withImagePickerLock = async (fn) => {
+    if (imagePickerLockRef.current) return null;
+    imagePickerLockRef.current = true;
+    try {
+      await new Promise((resolve) => {
+        InteractionManager.runAfterInteractions(() => resolve());
+      });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return await fn();
+    } finally {
+      setTimeout(() => {
+        imagePickerLockRef.current = false;
+      }, 500);
+    }
+  };
+
+  const runOcrOnPickedImage = async (uri, mimeType) => {
+    setScanRawText('');
+    setScanMatchedCandidates([]);
+    setOcrConfidence(0);
+    setSelectedScanCandidateIndex(0);
+    setOcrPhase(1);
+    setRoute('scan-process');
+    const phaseTimer = setTimeout(() => setOcrPhase(2), 1500);
+    try {
+      const { rawText, confidence, message, preprocessing, matchedCandidates } = await extractPrescriptionTextFromImage(uri, mimeType);
+      const resolvedCandidates = Array.isArray(matchedCandidates) ? matchedCandidates : [];
+      setScanRawText(rawText);
+      setScanMatchedCandidates(resolvedCandidates);
+      setOcrConfidence(confidence);
+      setOcrPhase(3);
+      if (Array.isArray(preprocessing?.applied) && preprocessing.applied.length > 0) {
+        Alert.alert(
+          'OCR preprocessing applied',
+          `Image steps: ${preprocessing.applied.join(', ')}. Please review and correct extracted text before continuing.`
+        );
+      }
+      if (!String(rawText || '').trim() && message) {
+        Alert.alert('No text found', `${message} You can type the prescription below.`);
+      }
+
+      const primaryCandidate = resolvedCandidates[0];
+      const guessedLine =
+        (primaryCandidate?.medicineName?.trim() ? formatScanCandidateLine(primaryCandidate) : '') ||
+        formatParsedMedicineLine(extractMedicineFromText(String(rawText || '').trim()));
+      if (guessedLine.trim()) {
+        setSelectedScanCandidateIndex(0);
+        setScanConfirmMedicineDraft(guessedLine);
+        setRoute('scan-medicine-confirm');
+        return;
+      }
+    } catch (e) {
+      const status = e?.response?.status;
+      let serverMsg = errorText(e, 'Could not reach the server or process the image.');
+      const followUp = ' You can type or paste the prescription text on the next screen.';
+      if (status === 400) {
+        serverMsg = e?.response?.data?.error || 'The selected file could not be uploaded as an image.';
+        Alert.alert('Upload failed', `${serverMsg}${followUp}`);
+      } else if (status === 401) {
+        Alert.alert(
+          'Session issue',
+          `Sign in with the live server (not offline mode) so your session is valid, then try again.${followUp}`
+        );
+      } else if (status === 413) {
+        Alert.alert('Image too large', `Choose a smaller prescription photo.${followUp}`);
+      } else if (status === 500) {
+        serverMsg = e?.response?.data?.error || 'The server could not finish OCR for this image.';
+        Alert.alert('OCR failed on server', `${serverMsg}${followUp}`);
+      } else {
+        Alert.alert('Cannot reach OCR service', `${serverMsg}${followUp}`);
+      }
+      setScanRawText('');
+      setScanMatchedCandidates([]);
+    } finally {
+      clearTimeout(phaseTimer);
+      setRoute((currentRoute) =>
+        currentRoute === 'confirm' || currentRoute === 'scan-medicine-confirm' ? currentRoute : 'scan-text'
+      );
+    }
+  };
+
+  const startGalleryScanFlow = async () => {
     const ImagePicker = getExpoImagePicker();
     if (!ImagePicker) {
       Alert.alert(
@@ -519,18 +685,24 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     }
     let picked;
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission needed', 'Please allow photo access to scan a prescription image.');
-        return;
-      }
-      picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.85,
-        allowsEditing: false,
+      picked = await withImagePickerLock(async () => {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Permission needed', 'Please allow photo access to scan a prescription image.');
+          return { canceled: true };
+        }
+        return ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.85,
+          allowsEditing: false,
+        });
       });
     } catch (e) {
       const msg = errorText(e, '');
+      if (/Already resumed|resumeWith/i.test(msg)) {
+        Alert.alert('Photo picker closed unexpectedly', 'Try choosing the photo again.');
+        return;
+      }
       if (/ExponentImagePicker|native module/i.test(msg)) {
         Alert.alert(
           'Photo library unavailable',
@@ -542,78 +714,248 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
       Alert.alert('Could not open photos', errorText(e, 'Try again or enter text manually.'));
       return;
     }
-    if (picked.canceled) return;
+    if (!picked || picked.canceled) return;
     const asset = picked.assets?.[0];
     const uri = asset?.uri;
     if (!uri) {
       Alert.alert('No image', 'Could not read the selected photo. Try another image.');
       return;
     }
-    setScanRawText('');
-    setOcrPhase(1);
-    setRoute('scan-process');
-    const phaseTimer = setTimeout(() => setOcrPhase(2), 1500);
-    try {
-      const mimeType = asset.mimeType || 'image/jpeg';
-      const { rawText, message, preprocessing } = await extractPrescriptionTextFromImage(uri, mimeType);
-      setScanRawText(rawText);
-      setOcrPhase(3);
-      if (Array.isArray(preprocessing?.applied) && preprocessing.applied.length > 0) {
-        Alert.alert(
-          'OCR preprocessing applied',
-          `Image steps: ${preprocessing.applied.join(', ')}. Please review and correct extracted text before continuing.`
-        );
-      }
-      if (!String(rawText || '').trim() && message) {
-        Alert.alert('No text found', `${message} You can type the prescription below.`);
-      }
-    } catch (e) {
-      Alert.alert(
-        'OCR unavailable',
-        `${errorText(e, 'Could not reach the server or process the image.')} You can type or paste the prescription text on the next screen.`
-      );
-      setScanRawText('');
-    } finally {
-      clearTimeout(phaseTimer);
-      setRoute('scan-text');
+    await runOcrOnPickedImage(uri, asset.mimeType || 'image/jpeg');
+  };
+
+  const startCameraScanFlow = async (options = {}) => {
+    const { preferFlash = false } = options;
+    const ImagePicker = getExpoImagePicker();
+    if (!ImagePicker?.launchCameraAsync) {
+      Alert.alert('Camera unavailable', 'Rebuild the app with expo-image-picker, or upload from the gallery instead.');
+      return;
     }
+    let picked;
+    try {
+      picked = await withImagePickerLock(async () => {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Permission needed', 'Please allow camera access to photograph a prescription.');
+          return { canceled: true };
+        }
+        if (preferFlash) {
+          Alert.alert(
+            'Flash control',
+            'This build opens your phone camera app for capture. Turn on flash there if needed, then take the photo.'
+          );
+        }
+        return ImagePicker.launchCameraAsync({
+          quality: 0.85,
+          allowsEditing: false,
+        });
+      });
+    } catch (e) {
+      const msg = errorText(e, '');
+      if (/Already resumed|resumeWith/i.test(msg)) {
+        Alert.alert('Camera closed unexpectedly', 'Try taking the photo again.');
+        return;
+      }
+      Alert.alert('Could not use camera', errorText(e, 'Try the gallery option or enter text manually.'));
+      return;
+    }
+    if (!picked || picked.canceled) return;
+    const asset = picked.assets?.[0];
+    const uri = asset?.uri;
+    if (!uri) {
+      Alert.alert('No image', 'Could not read the photo. Try again.');
+      return;
+    }
+    await runOcrOnPickedImage(uri, asset.mimeType || 'image/jpeg');
   };
 
   const applyParsedPrescription = () => {
-    const parsed = extractMedicineFromText(scanRawText);
+    const candidates = scanMatchedCandidates;
+    const selectedCandidate =
+      candidates[selectedScanCandidateIndex] ||
+      candidates[0] || {
+        ...extractMedicineFromText(scanRawText),
+        sourceLine: scanRawText.split('\n')[0]?.trim() || '',
+      };
+    const draft =
+      formatScanCandidateLine(selectedCandidate) ||
+      formatParsedMedicineLine(extractMedicineFromText(scanRawText)) ||
+      scanRawText.split('\n')[0]?.trim() ||
+      '';
+    if (!draft.trim()) {
+      Alert.alert('No medicine found', 'Edit the prescription text so the medicine name is clear, then try again.');
+      return;
+    }
+    setScanConfirmMedicineDraft(draft);
+    setRoute('scan-medicine-confirm');
+  };
+
+  const confirmScanMedicineAndContinue = () => {
+    const line = scanConfirmMedicineDraft.trim();
+    if (!line) {
+      Alert.alert('Missing', 'Enter or confirm the medicine name.');
+      return;
+    }
+    const parsed = extractMedicineFromText(line);
+    const resolvedName = parsed.medicineName || line.split('\n')[0]?.trim() || '';
+    if (!resolvedName.trim()) {
+      Alert.alert('Missing', 'Could not read a medicine name. Edit the text and try again.');
+      return;
+    }
     setMedicineInput({
       inputMethod: 'scan',
-      medicineName: parsed.medicineName || scanRawText.split('\n')[0]?.trim() || '',
-      normalizedDrugName: (parsed.medicineName || '').toLowerCase(),
-      dose: parsed.dose,
-      frequency: parsed.displayFrequency || parsed.frequency,
+      medicineName: resolvedName,
+      normalizedDrugName: resolvedName.toLowerCase(),
+      dose: parsed.dose || '',
+      frequency: parsed.displayFrequency || parsed.frequency || '',
       rawOcrText: scanRawText,
+      ocrSourceLine: line,
+      spokenText: '',
     });
-    setRoute('confirm');
+    minimalReturnRoute.current = 'scan-medicine-confirm';
+    setMinimalCheck(emptyMinimal);
+    setRoute('check-minimal');
   };
 
   const startVoiceFlow = () => {
-    setVoiceDraft(medicineInput.medicineName);
+    setVoiceDraft('');
+    setIsVoiceListening(false);
+    setVoiceError('');
+    setVoiceDiagnostic(speechRecognitionAvailable ? '' : 'Native voice module not loaded — keyboard mic still works below.');
     setRoute('voice-input');
     setTimeout(() => {
-      speakAloud('Say the medicine name clearly. You can also type it below, or use the microphone on your keyboard.');
+      speakAloud('Say the medicine name clearly after tapping start microphone.');
     }, 400);
   };
 
-  const confirmVoice = () => {
-    const name = voiceDraft.trim();
-    if (!name) {
-      Alert.alert('Missing name', 'Type or dictate the medicine name.');
+  const stopVoiceRecognition = async () => {
+    const SpeechRecognition = getExpoSpeechRecognitionModule();
+    if (!SpeechRecognition) {
+      setIsVoiceListening(false);
       return;
     }
-    const parsed = extractMedicineFromText(name);
+    try {
+      await SpeechRecognition.stop();
+    } catch {
+      // no-op
+    }
+    setIsVoiceListening(false);
+  };
+
+  const startVoiceRecognition = async () => {
+    setVoiceError('');
+    setVoiceDiagnostic('');
+
+    const SpeechRecognition = getExpoSpeechRecognitionModule();
+    if (!SpeechRecognition) {
+      setVoiceError(
+        'Voice module not available in this build. Rebuild the dev client (npx expo prebuild + npm run android) so expo-speech-recognition is included, or use the keyboard microphone in the text box below.'
+      );
+      return;
+    }
+
+    const subscribe =
+      typeof SpeechRecognition.addSpeechRecognitionListener === 'function'
+        ? SpeechRecognition.addSpeechRecognitionListener
+        : SpeechRecognition.addListener?.bind(SpeechRecognition);
+    if (typeof subscribe !== 'function') {
+      setVoiceError('Voice listener API is unavailable in this build of expo-speech-recognition.');
+      return;
+    }
+
+    if (voiceListenerRefs.current.length === 0) {
+      const resultSub = subscribe('result', (event) => {
+        const phrase = event?.results?.[0]?.transcript || '';
+        if (phrase) {
+          setVoiceDraft(phrase);
+        }
+      });
+      const startSub = subscribe('start', () => {
+        setIsVoiceListening(true);
+        setVoiceDiagnostic('Listening — speak the medicine name clearly.');
+      });
+      const speechStartSub = subscribe('speechstart', () => {
+        setVoiceDiagnostic('We hear you — keep speaking…');
+      });
+      const endSub = subscribe('end', () => setIsVoiceListening(false));
+      const errorSub = subscribe('error', (event) => {
+        const code = event?.error || 'unknown';
+        const message = event?.message || '';
+        setIsVoiceListening(false);
+        const friendly =
+          code === 'not-allowed'
+            ? 'Microphone or speech permission denied. Allow it in app settings and try again.'
+            : code === 'no-speech' || code === 'speech-timeout'
+              ? 'No speech was detected. Tap the microphone and speak the medicine name.'
+              : code === 'network'
+                ? 'Network error during recognition. Check your internet connection.'
+                : code === 'service-not-allowed'
+                  ? 'Speech recognizer is not available on this device. Install / enable Google app, or use the keyboard mic.'
+                  : code === 'language-not-supported'
+                    ? 'English (en-US) is not supported by this recognizer.'
+                    : code === 'audio-capture'
+                      ? 'Could not access the microphone. Close other apps using the mic and retry.'
+                      : `Voice error: ${code}${message ? ` — ${message}` : ''}`;
+        setVoiceError(friendly);
+      });
+      voiceListenerRefs.current = [resultSub, startSub, speechStartSub, endSub, errorSub];
+    }
+
+    try {
+      const permission = await SpeechRecognition.requestPermissionsAsync();
+      if (!permission?.granted) {
+        setVoiceError('Microphone / speech recognition permission was not granted. Open settings and allow it for ElderMeds.');
+        return;
+      }
+
+      if (Platform.OS === 'android' && typeof SpeechRecognition.getSpeechRecognitionServices === 'function') {
+        try {
+          const services = SpeechRecognition.getSpeechRecognitionServices();
+          if (Array.isArray(services) && services.length === 0) {
+            setVoiceError(
+              'No speech recognition service is installed on this device. Install or enable the Google app (com.google.android.googlequicksearchbox), or use the keyboard mic in the text box below.'
+            );
+            return;
+          }
+          if (Array.isArray(services) && services.length) {
+            setVoiceDiagnostic(`Using recognizer: ${services[0]}`);
+          }
+        } catch {
+          // ignore — services lookup is informational only
+        }
+      }
+
+      setIsVoiceListening(true);
+      setVoiceDiagnostic('Starting microphone…');
+      await SpeechRecognition.start({
+        lang: 'en-US',
+        interimResults: true,
+        continuous: false,
+        maxAlternatives: 1,
+        requiresOnDeviceRecognition: false,
+        addsPunctuation: false,
+      });
+    } catch (e) {
+      setIsVoiceListening(false);
+      setVoiceError(errorText(e, 'Could not start voice recognition.'));
+    }
+  };
+
+  const confirmVoice = () => {
+    const spokenText = voiceDraft.trim();
+    if (!spokenText) {
+      Alert.alert('Missing name', 'Please speak the medicine name first.');
+      return;
+    }
+    const parsed = extractMedicineFromText(spokenText);
     setMedicineInput({
       inputMethod: 'voice',
-      medicineName: parsed.medicineName || name,
-      normalizedDrugName: (parsed.medicineName || name).toLowerCase(),
+      medicineName: parsed.medicineName || spokenText,
+      normalizedDrugName: (parsed.medicineName || spokenText).toLowerCase(),
       dose: parsed.dose,
       frequency: parsed.displayFrequency || parsed.frequency,
       rawOcrText: '',
+      spokenText,
     });
     setRoute('confirm');
   };
@@ -647,7 +989,14 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             pillText: s.pillWarnText,
             sub: 'Extra caution — confirm with pharmacist or doctor',
             barFill: palette.warn,
-          };
+        };
+
+  const confirmBackRoute =
+    medicineInput.inputMethod === 'voice'
+      ? 'voice-input'
+      : medicineInput.inputMethod === 'scan'
+        ? 'scan-text'
+        : 'check-input';
 
   const displaySideEffects = (effects = [], limit = 6) => (Array.isArray(effects) ? effects.filter(Boolean).slice(0, limit) : []);
   const displayInteractions = (items = [], limit = 5) => (Array.isArray(items) ? items.filter(Boolean).slice(0, limit) : []);
@@ -825,7 +1174,8 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                     else onBack();
                     return;
                   }
-                  if (route === 'scan-text' || route === 'scan-process') setRoute('medicine-hub');
+                  if (route === 'scan-capture' || route === 'scan-text' || route === 'scan-process') setRoute('medicine-hub');
+                  else if (route === 'scan-medicine-confirm') setRoute('scan-text');
                   else if (route === 'voice-input') setRoute('medicine-hub');
                   else if (route === 'check-input') setRoute('medicine-hub');
                   else if (route === 'check-minimal') setRoute(minimalReturnRoute.current || 'medicine-hub');
@@ -971,7 +1321,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'medicine-hub') {
-    const hubRead = 'Choose how to enter the medicine. Type medicine name, scan a prescription image, or speak medicine name.';
+    const hubRead = 'Choose how to enter the medicine. Type the name, upload or photograph a prescription for OCR, or speak the medicine name.';
     return (
       <View style={s.screen}>
         {header('How do you want to enter the medicine?', hubRead)}
@@ -987,13 +1337,13 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </View>
             <Text style={s.hubChevron}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.hubRow} onPress={startScanFlow} activeOpacity={0.88}>
+          <TouchableOpacity style={s.hubRow} onPress={() => setRoute('scan-capture')} activeOpacity={0.88}>
             <View style={[s.hubIcon, s.hubIconBlue]}>
-              <Text style={s.hubEmoji}>📷</Text>
+              <Text style={s.hubEmoji}>📄</Text>
             </View>
             <View style={s.hubRowBody}>
-              <Text style={s.hubRowTitle}>Scan prescription</Text>
-              <Text style={s.hubRowSub}>Prescription image → OCR text → parse dose/frequency</Text>
+              <Text style={s.hubRowTitle}>Prescription scan</Text>
+              <Text style={s.hubRowSub}>Open camera-style scan page for gallery or live capture</Text>
             </View>
             <Text style={s.hubChevron}>›</Text>
           </TouchableOpacity>
@@ -1015,49 +1365,481 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     );
   }
 
+  if (route === 'scan-capture') {
+    return (
+      <View style={s.scanCaptureScreen}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f7f7fb" />
+        <View style={[s.scanCaptureTop, { paddingTop: headerPadTop }]}>
+          <TouchableOpacity style={s.scanCaptureBack} onPress={() => setRoute('medicine-hub')} activeOpacity={0.86}>
+            <Text style={s.scanCaptureBackText}>‹</Text>
+          </TouchableOpacity>
+          <Text style={s.scanCaptureTitle}>Prescription Scan</Text>
+          <TouchableOpacity
+            style={s.scanCaptureInfo}
+            activeOpacity={0.86}
+            onPress={() =>
+              Alert.alert(
+                'Prescription scan tips',
+                'Capture the whole page, keep the camera steady, and avoid shadows across the medicine names.'
+              )
+            }
+          >
+            <Text style={s.scanCaptureInfoText}>i</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={s.scanCaptureContent} showsVerticalScrollIndicator={false}>
+          <View style={s.scanFlowRow}>
+            <View style={s.scanFlowStep}>
+              <Text style={s.scanFlowStepNumber}>1</Text>
+              <Text style={s.scanFlowStepLabel}>Capture</Text>
+            </View>
+            <View style={[s.scanFlowStep, s.scanFlowStepActive]}>
+              <Text style={[s.scanFlowStepNumber, s.scanFlowStepNumberActive]}>2</Text>
+              <Text style={[s.scanFlowStepLabel, s.scanFlowStepLabelActive]}>Read</Text>
+            </View>
+            <View style={s.scanFlowStep}>
+              <Text style={s.scanFlowStepNumber}>3</Text>
+              <Text style={s.scanFlowStepLabel}>Confirm</Text>
+            </View>
+          </View>
+          <View style={s.scanIntroCard}>
+            <View style={s.scanIntroIconWrap}>
+              <Text style={s.scanIntroIcon}>🧾</Text>
+            </View>
+            <View style={s.scanIntroBody}>
+              <Text style={s.scanIntroTitle}>Scan Prescription</Text>
+              <Text style={s.scanIntroText}>Capture a clear image of your prescription for medication safety analysis.</Text>
+            </View>
+          </View>
+
+          <View style={s.scanHighlightCard}>
+            <View style={s.scanHighlightBadge}>
+              <Text style={s.scanHighlightBadgeText}>Best results</Text>
+            </View>
+            <Text style={s.scanHighlightTitle}>One clean photo is enough</Text>
+            <Text style={s.scanHighlightText}>
+              Keep the entire prescription inside the frame and make sure the medicine lines are bright, flat, and readable.
+            </Text>
+          </View>
+
+          <View style={s.scanPreviewShell}>
+            <View style={s.scanPreviewCornerTl} />
+            <View style={s.scanPreviewCornerTr} />
+            <View style={s.scanPreviewCornerBl} />
+            <View style={s.scanPreviewCornerBr} />
+            <View style={s.scanPreviewGridVerticalLeft} />
+            <View style={s.scanPreviewGridVerticalRight} />
+            <View style={s.scanPreviewGridHorizontalTop} />
+            <View style={s.scanPreviewGridHorizontalBottom} />
+
+            <View style={s.scanLiveFrame}>
+              <View style={s.scanLiveFrameInner}>
+                <Text style={s.scanLiveFrameEyebrow}>Live camera opens automatically</Text>
+                <Text style={s.scanLiveFrameTitle}>Align the full prescription inside this frame</Text>
+                <Text style={s.scanLiveFrameText}>
+                  Hold the phone above the page, keep medicine lines flat, and avoid cutting off the bottom signature or top heading.
+                </Text>
+              </View>
+              <View style={s.scanLiveFrameFooter}>
+                <View style={s.scanLiveHintChip}>
+                  <Text style={s.scanLiveHintChipText}>Whole page visible</Text>
+                </View>
+                <View style={s.scanLiveHintChip}>
+                  <Text style={s.scanLiveHintChipText}>Good lighting</Text>
+                </View>
+                <View style={s.scanLiveHintChip}>
+                  <Text style={s.scanLiveHintChipText}>No blur</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={s.scanTipsCard}>
+            <Text style={s.scanTipsTitle}>Tips:</Text>
+            <Text style={s.scanTipsBullet}>• Ensure the text is clear and the lighting is good</Text>
+            <Text style={s.scanTipsBullet}>• Avoid shadows and blurry images</Text>
+            <Text style={s.scanTipsBullet}>Keep each medicine line fully visible whenever possible</Text>
+          </View>
+
+          <View style={s.scanCaptureActions}>
+            <TouchableOpacity style={s.scanSideAction} onPress={startGalleryScanFlow} activeOpacity={0.88}>
+              <View style={[s.scanSideActionIcon, s.scanSideActionIconGallery]}>
+                <Text style={s.scanSideActionIconText}>🖼️</Text>
+              </View>
+              <Text style={s.scanSideActionLabel}>Gallery</Text>
+              <Text style={s.scanSideActionMeta}>Use a saved image</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.scanCaptureButton} onPress={() => startCameraScanFlow({ preferFlash: scanFlashOn })} activeOpacity={0.9}>
+              <View style={s.scanCaptureButtonInner}>
+                <Text style={s.scanCaptureButtonIcon}>📷</Text>
+              </View>
+              <Text style={s.scanCaptureButtonLabel}>Take photo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.scanSideAction}
+              onPress={() => {
+                setScanFlashOn(true);
+                startCameraScanFlow({ preferFlash: true });
+              }}
+              activeOpacity={0.88}
+            >
+              <View style={[s.scanSideActionIcon, s.scanSideActionIconFlash, scanFlashOn ? s.scanSideActionIconActive : null]}>
+                <Text style={s.scanSideActionIconText}>🔦</Text>
+              </View>
+              <Text style={s.scanSideActionLabel}>{scanFlashOn ? 'Flash Ready' : 'Flash'}</Text>
+              <Text style={s.scanSideActionMeta}>Helpful in dim light</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={s.scanCaptureHint}>Tap the camera button to capture</Text>
+        </ScrollView>
+      </View>
+    );
+  }
+
   if (route === 'scan-process') {
     const labels = ['', 'Sending photo securely…', 'Extracting text (OCR)…', 'Almost done…'];
+    const currentPhase = Math.min(Math.max(ocrPhase, 1), 3);
+    const phaseNotes = [
+      'Uploading your image to the ElderMeds server.',
+      'Reading printed and handwritten text from the photo.',
+      'Preparing the editable prescription draft for your review.',
+    ];
     return (
       <View style={s.screen}>
         {header('Reading prescription', 'We are processing your prescription photo.')}
-        <View style={s.center}>
-          <ActivityIndicator size="large" color={palette.primary} />
-          <Text style={s.loadTitle}>Processing image…</Text>
-          <Text style={s.loadText}>{labels[ocrPhase] || 'Preparing…'}</Text>
-          <Text style={s.helpSmall}>
-            The server runs optical character recognition (Tesseract). Please wait—first run can take longer while language data loads. You will review every word before validation or safety checks.
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+          <View style={s.scanHero}>
+            <View style={s.scanHeroBadge}>
+              <Text style={s.scanHeroBadgeText}>Prescription OCR</Text>
+            </View>
+            <View style={s.scanHeroTop}>
+              <View style={s.scanOrb}>
+                <Text style={s.scanOrbIcon}>OCR</Text>
+              </View>
+              <View style={s.scanHeroTextWrap}>
+                <Text style={s.scanEyebrow}>OCR scan in progress</Text>
+                <Text style={s.scanTitle}>Reading your prescription photo</Text>
+                <Text style={s.scanSubtitle}>
+                  We extract the text first, then you review it before any medicine safety analysis runs.
+                </Text>
+              </View>
+            </View>
+            <View style={s.scanProgressTrack}>
+              {[1, 2, 3].map((step) => (
+                <View key={step} style={[s.scanProgressStep, currentPhase >= step ? s.scanProgressStepOn : null]} />
+              ))}
+            </View>
+            <Text style={s.scanPhaseLabel}>{labels[ocrPhase] || 'Preparing…'}</Text>
+            <Text style={s.scanPhaseHint}>{phaseNotes[Math.max(currentPhase - 1, 0)]}</Text>
+          </View>
+
+          <View style={s.scanLoadCard}>
+            <ActivityIndicator size="large" color={palette.primary} />
+            <Text style={s.loadTitle}>Processing image…</Text>
+            <Text style={s.loadText}>
+              The server is running OCR on the uploaded image. Handwritten prescriptions can take a little longer.
+            </Text>
+            <View style={s.scanStepRail}>
+              {labels.slice(1).map((label, index) => {
+                const step = index + 1;
+                const active = currentPhase >= step;
+                return (
+                  <View key={label} style={[s.scanStepPill, active ? s.scanStepPillOn : null]}>
+                    <Text style={[s.scanStepPillText, active ? s.scanStepPillTextOn : null]}>
+                      {step}. {label.replace('…', '')}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={s.scanChecklist}>
+            <Text style={s.scanChecklistTitle}>What happens next</Text>
+            <View style={s.scanChecklistRow}>
+              <Text style={s.scanChecklistBullet}>1</Text>
+              <Text style={s.scanChecklistText}>We extract prescription text from the photo.</Text>
+            </View>
+            <View style={s.scanChecklistRow}>
+              <Text style={s.scanChecklistBullet}>2</Text>
+              <Text style={s.scanChecklistText}>You review and correct the detected text if needed.</Text>
+            </View>
+            <View style={s.scanChecklistRow}>
+              <Text style={s.scanChecklistBullet}>3</Text>
+              <Text style={s.scanChecklistText}>You confirm the medicine name in one box, then run the safety check.</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (route === 'scan-medicine-confirm') {
+    const confirmRead =
+      'We combined OCR with medicine-library matching. Confirm the corrected medicine name before the safety check.';
+    return (
+      <View style={s.screen}>
+        {header('Confirm medicine', confirmRead)}
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={s.card}>
+              <Text style={s.fieldLabel}>Detected medicine name</Text>
+              <TextInput
+                style={s.input}
+                value={scanConfirmMedicineDraft}
+                onChangeText={setScanConfirmMedicineDraft}
+                placeholder="e.g. Amoxicillin 500 mg"
+                placeholderTextColor={palette.textTertiary}
+                autoCorrect={false}
+                autoCapitalize="words"
+              />
+              <Text style={s.helpSmall}>Please confirm the corrected medicine name before checking safety.</Text>
+            </View>
+            {scanMatchedCandidates.length > 0 ? (
+              <View style={s.scanExampleCard}>
+                <Text style={s.scanInfoTitle}>Suggested medicine names</Text>
+                <Text style={s.helpSmall}>Tap a suggestion from your medicine library if the draft above is not correct.</Text>
+                {scanMatchedCandidates.map((candidate, index) => {
+                  const selected = scanConfirmMedicineDraft.trim().toLowerCase() === String(candidate.medicineName || '').trim().toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={`${candidate.normalizedDrugName}-${candidate.sourceLine}-${index}`}
+                      style={[s.option, selected ? s.optionOn : null]}
+                      onPress={() => setScanConfirmMedicineDraft(candidate.medicineName || '')}
+                      activeOpacity={0.86}
+                    >
+                      <Text style={[s.optionText, selected ? s.optionTextOn : null]}>{candidate.medicineName}</Text>
+                      <Text style={s.helpSmall}>
+                        {candidate.confidence === 'medium' && candidate.ocrFragment
+                          ? `OCR read "${candidate.ocrFragment}" - corrected to ${candidate.medicineName}`
+                          : `Matched from medicine library${candidate.matchedAlias ? ` via ${candidate.matchedAlias}` : ''}`}
+                      </Text>
+                      <Text style={s.helpSmall}>{candidate.sourceLine}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
+            <TouchableOpacity style={s.bigPrimary} onPress={confirmScanMedicineAndContinue} activeOpacity={0.88}>
+              <Text style={s.bigPrimaryText}>Confirm medicine</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.secondaryBig, { marginTop: 12 }]} onPress={() => setRoute('scan-text')} activeOpacity={0.88}>
+              <Text style={s.secondaryBigText}>Edit full prescription text</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     );
   }
 
   if (route === 'scan-text') {
+    const trimmedScanText = scanRawText.trim();
+    const scanCandidates = scanMatchedCandidates;
+    const activeScanCandidateIndex =
+      scanCandidates.length > 0 && selectedScanCandidateIndex < scanCandidates.length ? selectedScanCandidateIndex : 0;
+    const confidenceTone = ocrConfidence >= 80 ? 'Strong' : ocrConfidence >= 55 ? 'Fair' : ocrConfidence > 0 ? 'Needs review' : 'Unknown';
+    const scanLineCount = trimmedScanText ? trimmedScanText.split(/\r?\n/).filter(Boolean).length : 0;
+    const scanWordCount = trimmedScanText ? trimmedScanText.split(/\s+/).filter(Boolean).length : 0;
+    const estimatedMedicineCount = trimmedScanText
+      ? trimmedScanText
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean).length
+      : 0;
+    const scanStatus = trimmedScanText ? 'Ready to guess' : 'Waiting for text';
     return (
       <View style={s.screen}>
-        {header('Prescription text', 'Check the text from your prescription. Edit it if needed, then parse.')}
+        {header('Prescription text', 'Review the OCR text, then choose a corrected medicine name from the medicine library.')}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={s.content}>
-            <Text style={s.lead}>
-              OCR may misread handwriting—correct any mistakes here. If the box is empty, type what is on the prescription or use the sample to try the flow.
-            </Text>
-            <TextInput
-              style={[s.input, s.areaLarge]}
-              value={scanRawText}
-              onChangeText={setScanRawText}
-              placeholder={'Example: Panadol 500 mg twice daily'}
-              multiline
-            />
+          <ScrollView
+            contentContainerStyle={s.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+          >
+            <View style={s.scanEditorHero}>
+              <View style={s.scanHeroBadge}>
+                <Text style={s.scanHeroBadgeText}>Review OCR result</Text>
+              </View>
+              <Text style={s.scanEyebrow}>Review before checking</Text>
+              <Text style={s.scanEditorTitle}>Clean up the extracted prescription text</Text>
+              <Text style={s.scanEditorSub}>
+                OCR may misread handwriting or abbreviations. Edit anything that looks wrong, then let the app guess the medicine name again.
+              </Text>
+              <View style={s.scanReviewBanner}>
+                <View style={s.scanReviewStat}>
+                  <Text style={s.scanReviewStatValue}>{ocrConfidence || '--'}</Text>
+                  <Text style={s.scanReviewStatLabel}>OCR confidence</Text>
+                </View>
+                <View style={s.scanReviewDivider} />
+                <View style={s.scanReviewBody}>
+                  <Text style={s.scanReviewTitle}>{confidenceTone}</Text>
+                  <Text style={s.scanReviewText}>
+                    {ocrConfidence >= 80
+                      ? 'This looks readable. Confirm medicine names before running the safety check.'
+                      : ocrConfidence >= 55
+                        ? 'Readable, but review strengths and abbreviations carefully.'
+                        : 'This scan needs a careful review. Retake the image if key medicine names look wrong.'}
+                  </Text>
+                </View>
+              </View>
+              <View style={s.scanMetaRow}>
+                <View style={[s.scanMetaChip, s.scanMetaChipTight]}>
+                  <Text style={s.scanMetaValue}>{scanLineCount}</Text>
+                  <Text style={s.scanMetaLabel}>Lines</Text>
+                </View>
+                <View style={[s.scanMetaChip, s.scanMetaChipTight]}>
+                  <Text style={s.scanMetaValue}>{scanWordCount}</Text>
+                  <Text style={s.scanMetaLabel}>Words</Text>
+                </View>
+                <View style={s.scanMetaChip}>
+                  <Text style={s.scanMetaValue}>{trimmedScanText ? 'Ready' : 'Empty'}</Text>
+                  <Text style={s.scanMetaLabel}>Status</Text>
+                </View>
+              </View>
+              <View style={s.scanRescanRow}>
+                <TouchableOpacity style={s.scanMiniAction} onPress={startGalleryScanFlow} activeOpacity={0.86}>
+                  <Text style={s.scanMiniActionTitle}>Choose photo</Text>
+                  <Text style={s.scanMiniActionSub}>Pick another prescription image</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.scanMiniAction, s.scanMiniActionLast]} onPress={startCameraScanFlow} activeOpacity={0.86}>
+                  <Text style={s.scanMiniActionTitle}>Use camera</Text>
+                  <Text style={s.scanMiniActionSub}>Retake with a clearer photo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={s.scanEditorCard}>
+              <View style={s.scanEditorCardTop}>
+                <View style={s.scanEditorCardTitleWrap}>
+                  <Text style={s.scanEditorLabel}>Detected prescription text</Text>
+                  <Text style={s.scanEditorMicrocopy}>One medicine instruction per line gives the parser the best chance.</Text>
+                </View>
+                <View style={[s.scanStatusPill, trimmedScanText ? s.scanStatusPillReady : s.scanStatusPillEmpty]}>
+                  <Text style={[s.scanStatusPillText, trimmedScanText ? s.scanStatusPillTextReady : s.scanStatusPillTextEmpty]}>
+                    {scanStatus}
+                  </Text>
+                </View>
+              </View>
+              <TextInput
+                style={[s.input, s.areaLarge, s.scanTextarea]}
+                value={scanRawText}
+                onChangeText={(value) => {
+                  setScanRawText(value);
+                  setScanMatchedCandidates([]);
+                  setSelectedScanCandidateIndex(0);
+                }}
+                placeholder={'Example: Panadol 500 mg twice daily'}
+                multiline
+                editable
+                autoFocus
+                textAlignVertical="top"
+                returnKeyType="default"
+              />
+              <Text style={s.scanEditorHint}>
+                Tip: keep one medicine instruction per line when possible. This helps the parser separate the name, dose, and frequency.
+              </Text>
+            </View>
+
+            <View style={s.scanInsightRow}>
+              <View style={[s.scanInfoCard, s.scanInfoCardHalf]}>
+                <Text style={s.scanInfoTitle}>Parser focus</Text>
+                <Text style={s.scanInfoText}>Medicine name, strength such as 500 mg, and timing such as twice daily or tds.</Text>
+              </View>
+              <View style={[s.scanInfoCard, s.scanInfoCardHalf, s.scanInfoCardWarm]}>
+                <Text style={s.scanInfoTitle}>Quick estimate</Text>
+                <Text style={s.scanInfoStat}>{estimatedMedicineCount}</Text>
+                <Text style={s.scanInfoText}>Possible instruction lines detected from your current text.</Text>
+              </View>
+            </View>
+
+            {scanCandidates.length > 0 ? (
+              <View style={s.scanSummaryCard}>
+                <View style={s.scanSummaryTop}>
+                  <Text style={s.scanSummaryTitle}>Parser preview</Text>
+                  <Text style={s.scanSummaryCount}>{scanCandidates.length} medicine{scanCandidates.length === 1 ? '' : 's'}</Text>
+                </View>
+                <Text style={s.scanSummaryText}>
+                  We found likely medicine lines below. Pick one, then continue to the confirmation step before the safety check.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={s.scanExampleCard}>
+              <Text style={s.scanInfoTitle}>Good format example</Text>
+              <Text style={s.scanExampleText}>Amoxicillin 500 mg tds{"\n"}Panadol 500 mg when needed{"\n"}Metformin 500 mg after dinner</Text>
+            </View>
+
+            {scanCandidates.length > 0 ? (
+              <View style={s.scanExampleCard}>
+                <Text style={s.scanInfoTitle}>Suggested medicine names</Text>
+                <Text style={s.helpSmall}>Tap the medicine you want to confirm. We never run the safety check from OCR text alone.</Text>
+                {scanCandidates.map((candidate, index) => {
+                  const selected = index === activeScanCandidateIndex;
+                  const detailParts = [candidate.dose, candidate.frequency].filter(Boolean);
+                  return (
+                    <TouchableOpacity
+                      key={`${candidate.normalizedDrugName}-${candidate.sourceLine}-${index}`}
+                      style={[s.option, selected ? s.optionOn : null]}
+                      onPress={() => setSelectedScanCandidateIndex(index)}
+                      activeOpacity={0.86}
+                    >
+                      <Text style={[s.optionText, selected ? s.optionTextOn : null]}>{candidate.medicineName}</Text>
+                      {detailParts.length > 0 ? (
+                        <Text style={s.helpSmall}>{detailParts.join(' | ')}</Text>
+                      ) : null}
+                      {candidate.confidence === 'medium' && candidate.ocrFragment ? (
+                        <Text style={s.helpSmall}>
+                          OCR read "{candidate.ocrFragment}" and the library corrected it to {candidate.medicineName}.
+                        </Text>
+                      ) : candidate.matchType ? (
+                        <Text style={s.helpSmall}>
+                          Library match: {candidate.matchType}
+                          {candidate.matchedAlias ? ` via ${candidate.matchedAlias}` : ''}
+                        </Text>
+                      ) : null}
+                      <Text style={s.helpSmall}>{candidate.sourceLine}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            <View style={s.scanUtilityRow}>
+              <TouchableOpacity
+                style={s.scanGhostButton}
+                onPress={() => {
+                  setScanRawText('');
+                  setScanMatchedCandidates([]);
+                  setSelectedScanCandidateIndex(0);
+                }}
+              >
+                <Text style={s.scanGhostButtonText}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.scanGhostButton}
+                onPress={() => {
+                  setScanRawText('Amoxicillin 500 mg tds');
+                  setScanMatchedCandidates([]);
+                  setSelectedScanCandidateIndex(0);
+                }}
+              >
+                <Text style={s.scanGhostButtonText}>Use sample</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={s.secondaryBig}
-              onPress={() => setScanRawText('Amoxicillin 500 mg tds')}
+              style={[s.scanPrimaryButton, s.scanPrimaryButtonBlock, !trimmedScanText && s.scanPrimaryButtonDisabled]}
+              onPress={applyParsedPrescription}
+              disabled={!trimmedScanText}
             >
-              <Text style={s.secondaryBigText}>Use sample line (demo)</Text>
+              <Text style={s.scanPrimaryButtonText}>Continue to confirm name</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.bigPrimary} onPress={applyParsedPrescription}>
-              <Text style={s.bigPrimaryText}>Parse & continue</Text>
-            </TouchableOpacity>
-            <Text style={s.helpSmall}>NLP splits name, dose, and frequency when it can (for example “500 mg” and “twice daily”).</Text>
+
+            <Text style={s.helpSmall}>We use the edited text only to guess the medicine name before the safety check.</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
@@ -1065,18 +1847,121 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'voice-input') {
+    const recognizedName = voiceDraft.trim();
+    const voiceStatusText = !speechRecognitionAvailable
+      ? 'Native voice not in this build — keyboard mic still works.'
+      : isVoiceListening
+        ? 'Listening now...'
+        : recognizedName
+          ? 'Voice captured.'
+          : 'Waiting to start.';
     return (
       <View style={s.screen}>
-        {header('Voice input', 'Say the medicine name clearly. You can type below.')}
+        {header('Voice input', 'Say the medicine name clearly.')}
         <ScrollView contentContainerStyle={s.content}>
-          <TouchableOpacity style={s.secondaryBig} onPress={() => speakAloud('Say the medicine name clearly. You can also type it below.')}>
-            <Text style={s.secondaryBigText}>Play instruction again</Text>
+          <View style={[s.voiceHero, isVoiceListening ? s.voiceHeroActive : !speechRecognitionAvailable ? s.voiceHeroDisabled : null]}>
+            <View style={s.voiceHeroTop}>
+              <View style={[s.voiceOrb, isVoiceListening ? s.voiceOrbActive : null]}>
+                <Text style={s.voiceOrbIcon}>{isVoiceListening ? '●' : '🎤'}</Text>
+              </View>
+              <View style={s.voiceHeroTextWrap}>
+                <Text style={s.voiceEyebrow}>Voice medicine check</Text>
+                <Text style={s.voiceTitle}>
+                  {isVoiceListening ? 'Listening for the medicine name' : recognizedName ? 'Medicine name captured' : 'Ready to listen'}
+                </Text>
+                <Text style={s.voiceSubtitle}>{voiceStatusText}</Text>
+              </View>
+            </View>
+            <View style={s.voiceProgressRow}>
+              <View style={[s.voiceProgressStep, s.voiceProgressOn]} />
+              <View style={[s.voiceProgressStep, recognizedName ? s.voiceProgressOn : null]} />
+              <View style={s.voiceProgressStep} />
+            </View>
+            <Text style={s.voiceHint}>
+              {speechRecognitionAvailable
+                ? isVoiceListening
+                  ? 'Speak only the medicine name as clearly as you can.'
+                  : 'Press the microphone button below, say the medicine name, then review the result.'
+                : 'This build does not include native speech recognition. Rebuild the app to use direct voice capture.'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[s.voiceMicButton, isVoiceListening ? s.voiceMicButtonActive : null]}
+            onPress={isVoiceListening ? stopVoiceRecognition : startVoiceRecognition}
+          >
+            <Text style={s.voiceMicIcon}>{isVoiceListening ? '■' : '🎙️'}</Text>
+            <Text style={s.voiceMicText}>
+              {isVoiceListening ? 'Stop listening' : 'Start microphone'}
+            </Text>
           </TouchableOpacity>
-          <Text style={s.lead}>Many phones offer a microphone on the keyboard for speech-to-text. Otherwise, type the name.</Text>
-          <TextInput style={s.input} value={voiceDraft} onChangeText={setVoiceDraft} placeholder="Medicine name" />
-          <TouchableOpacity style={s.bigPrimary} onPress={confirmVoice}>
-            <Text style={s.bigPrimaryText}>Continue</Text>
-          </TouchableOpacity>
+          {voiceError ? (
+            <View style={s.voiceErrorCard}>
+              <Text style={s.voiceErrorTitle}>Voice didn’t start</Text>
+              <Text style={s.voiceErrorText}>{voiceError}</Text>
+            </View>
+          ) : null}
+          {voiceDiagnostic ? (
+            <Text style={s.voiceDiagnostic}>{voiceDiagnostic}</Text>
+          ) : null}
+          <View style={s.voiceFallbackCard}>
+            <Text style={s.voiceFallbackTitle}>
+              {speechRecognitionAvailable ? 'Or type / use keyboard mic' : 'Type the medicine name'}
+            </Text>
+            <Text style={s.voiceFallbackText}>
+              {speechRecognitionAvailable
+                ? 'You can also tap here and use the microphone on your phone keyboard.'
+                : 'This build does not include native voice recognition. Use the keyboard microphone (the mic icon on your phone keyboard) to dictate the medicine name.'}
+            </Text>
+            <TextInput
+              style={s.input}
+              value={voiceDraft}
+              onChangeText={setVoiceDraft}
+              placeholder="Medicine name"
+              placeholderTextColor={palette.textTertiary}
+              autoCorrect={false}
+              autoCapitalize="words"
+            />
+          </View>
+          {recognizedName ? (
+            <View style={s.voiceTranscriptCard}>
+              <Text style={s.voiceTranscriptLabel}>Detected medicine</Text>
+              <Text style={s.voiceTranscriptText}>{recognizedName}</Text>
+              <Text style={s.voiceTranscriptHelp}>Check the name before continuing. You can retry if it does not look right.</Text>
+            </View>
+          ) : null}
+          <View style={s.voiceActionRow}>
+            {recognizedName ? (
+              <TouchableOpacity style={s.voiceSecondaryAction} onPress={() => setVoiceDraft('')}>
+                <Text style={s.voiceSecondaryActionText}>Try again</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={s.voiceSecondaryAction} onPress={() => speakAloud('Say the medicine name clearly after tapping start microphone.')}>
+                <Text style={s.voiceSecondaryActionText}>Play instructions</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[s.voicePrimaryAction, !recognizedName && { opacity: 0.55 }]}
+              onPress={confirmVoice}
+              disabled={!recognizedName}
+            >
+              <Text style={s.voicePrimaryActionText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.voiceStepsCard}>
+            <Text style={s.voiceStepsTitle}>How this works</Text>
+            <View style={s.voiceStepRow}>
+              <Text style={s.voiceStepNumber}>1</Text>
+              <Text style={s.voiceStepText}>Tap the microphone and say the medicine name.</Text>
+            </View>
+            <View style={s.voiceStepRow}>
+              <Text style={s.voiceStepNumber}>2</Text>
+              <Text style={s.voiceStepText}>We identify the name and show it back to you.</Text>
+            </View>
+            <View style={s.voiceStepRow}>
+              <Text style={s.voiceStepNumber}>3</Text>
+              <Text style={s.voiceStepText}>You confirm it, then the safety check runs.</Text>
+            </View>
+          </View>
         </ScrollView>
       </View>
     );
@@ -1452,7 +2337,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   if (route === 'check-input') {
     return (
       <View style={s.screen}>
-        {header('Type medicine', 'Type the medicine name. Suggestions appear from the drug list.')}
+        {header('Type medicine', 'Type the medicine name, then confirm it before the safety check.')}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
             <Text style={s.fieldLabel}>Medicine name</Text>
@@ -1493,13 +2378,11 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                   Alert.alert('Missing', 'Enter a medicine name.');
                   return;
                 }
-                setMedicineInput((m) => ({ ...m, inputMethod: 'manual' }));
-                minimalReturnRoute.current = 'check-input';
-                setMinimalCheck(emptyMinimal);
-                setRoute('check-minimal');
+                setMedicineInput((m) => ({ ...m, inputMethod: 'manual', spokenText: '' }));
+                setRoute('confirm');
               }}
             >
-              <Text style={s.bigPrimaryText}>Next: quick check</Text>
+              <Text style={s.bigPrimaryText}>Next: confirm medicine</Text>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -1508,32 +2391,113 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'confirm') {
+    const confirmCandidates =
+      medicineInput.inputMethod === 'scan'
+        ? scanMatchedCandidates
+        : [];
+    const confirmTitle =
+      medicineInput.inputMethod === 'voice'
+        ? 'Review the medicine we identified from your voice, then confirm before we analyse.'
+        : medicineInput.inputMethod === 'scan'
+          ? 'We guessed the medicine name from your photo. Confirm or edit the name before we analyse safety.'
+          : 'Please confirm the medicine details before we analyse.';
     return (
       <View style={s.screen}>
-        {header('Confirm medicine', 'Please confirm the medicine details before we analyse.')}
+        {header('Confirm medicine', confirmTitle)}
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
           <View style={s.confirmCard}>
-            <Text style={s.confirmLabel}>Medicine</Text>
-            <Text style={s.confirmValue}>{medicineInput.medicineName}</Text>
-            <View style={s.confirmDivider} />
-            <Text style={s.confirmLabel}>Dose</Text>
-            <Text style={s.confirmValue}>{medicineInput.dose || '—'}</Text>
-            <View style={s.confirmDivider} />
-            <Text style={s.confirmLabel}>How often</Text>
-            <Text style={s.confirmValue}>{medicineInput.frequency || '—'}</Text>
-            <Text style={s.helpSmall}>Names are matched to ingredients on the server when possible (e.g. brands → generic).</Text>
+            {medicineInput.inputMethod === 'voice' && medicineInput.spokenText ? (
+              <>
+                <Text style={s.confirmLabel}>Voice transcript</Text>
+                <Text style={s.confirmValue}>{medicineInput.spokenText}</Text>
+                <View style={s.confirmDivider} />
+              </>
+            ) : null}
+            <Text style={s.fieldLabel}>Medicine name</Text>
+            <TextInput
+              style={s.input}
+              value={medicineInput.medicineName}
+              onChangeText={(v) =>
+                setMedicineInput((m) => ({
+                  ...m,
+                  medicineName: v,
+                  normalizedDrugName: v.toLowerCase(),
+                }))
+              }
+              placeholder="Medicine name"
+              autoCorrect={false}
+            />
+            {medicineInput.inputMethod !== 'scan' ? (
+              <>
+                <Text style={s.fieldLabel}>Dose</Text>
+                <TextInput
+                  style={s.input}
+                  value={medicineInput.dose}
+                  onChangeText={(v) => setMedicineInput((m) => ({ ...m, dose: v }))}
+                  placeholder="Optional dose"
+                  autoCorrect={false}
+                />
+                <Text style={s.fieldLabel}>How often</Text>
+                <TextInput
+                  style={s.input}
+                  value={medicineInput.frequency}
+                  onChangeText={(v) => setMedicineInput((m) => ({ ...m, frequency: v }))}
+                  placeholder="Optional frequency"
+                  autoCorrect={false}
+                />
+              </>
+            ) : null}
+            <Text style={s.helpSmall}>
+              {medicineInput.inputMethod === 'scan'
+                ? 'Only the medicine name will be checked next. Edit it here if OCR guessed incorrectly.'
+                : 'You can correct the identified medicine name here before the safety check runs.'}
+            </Text>
+            {medicineInput.inputMethod === 'scan' && confirmCandidates.length > 1 ? (
+              <>
+                <Text style={s.fieldLabel}>Other medicine-name guesses</Text>
+                <Text style={s.helpSmall}>Tap a name below if the OCR guess should be replaced before the safety check.</Text>
+                {confirmCandidates.map((candidate, index) => {
+                  const selected = candidate.normalizedDrugName === String(medicineInput.normalizedDrugName || '').toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={`${candidate.normalizedDrugName}-${candidate.sourceLine}-${index}`}
+                      style={[s.option, selected ? s.optionOn : null]}
+                      onPress={() =>
+                        setMedicineInput((m) => ({
+                          ...m,
+                          medicineName: candidate.medicineName,
+                          normalizedDrugName: candidate.normalizedDrugName,
+                          dose: candidate.dose || '',
+                          frequency: candidate.frequency || '',
+                          ocrSourceLine: candidate.sourceLine || '',
+                        }))
+                      }
+                      activeOpacity={0.86}
+                    >
+                      <Text style={[s.optionText, selected ? s.optionTextOn : null]}>{candidate.medicineName}</Text>
+                      <Text style={s.helpSmall}>{candidate.sourceLine}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            ) : null}
           </View>
           <View style={s.split}>
-            <TouchableOpacity style={s.secondaryHalf} onPress={() => setRoute('medicine-hub')}>
+            <TouchableOpacity style={s.secondaryHalf} onPress={() => setRoute(confirmBackRoute)}>
               <Text style={s.secondaryText}>Back</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={s.primaryHalf}
+              style={[s.primaryHalf, !medicineInput.medicineName.trim() && { opacity: 0.55 }]}
               onPress={() => {
+                if (!medicineInput.medicineName.trim()) {
+                  Alert.alert('Missing medicine', 'Please confirm the medicine name before continuing.');
+                  return;
+                }
                 minimalReturnRoute.current = 'confirm';
                 setMinimalCheck(emptyMinimal);
                 setRoute('check-minimal');
               }}
+              disabled={!medicineInput.medicineName.trim()}
             >
               <Text style={s.primaryText}>Confirm</Text>
             </TouchableOpacity>
@@ -1783,6 +2747,493 @@ const cardShadow = Platform.select({
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.bg },
+  scanCaptureScreen: { flex: 1, backgroundColor: palette.primaryLight },
+  scanCaptureTop: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: palette.header,
+    borderBottomWidth: 0,
+  },
+  scanCaptureBack: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  scanCaptureBackText: {
+    fontSize: 32,
+    color: '#ffffff',
+    fontWeight: '300',
+    marginTop: -4,
+  },
+  scanCaptureTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginHorizontal: 10,
+    letterSpacing: -0.5,
+  },
+  scanCaptureInfo: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  scanCaptureInfoText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  scanCaptureContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 10,
+  },
+  scanFlowRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  scanFlowStep: {
+    width: '31.5%',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    borderWidth: 1,
+    borderColor: '#dde7f0',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  scanFlowStepActive: {
+    backgroundColor: '#e8f6ee',
+    borderColor: '#b9ddc8',
+  },
+  scanFlowStepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e9eef5',
+    color: '#334155',
+    textAlign: 'center',
+    lineHeight: 28,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  scanFlowStepNumberActive: {
+    backgroundColor: palette.primary,
+    color: '#ffffff',
+  },
+  scanFlowStepLabel: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  scanFlowStepLabelActive: {
+    color: palette.primary,
+  },
+  scanIntroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: palette.primaryMuted,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#c8e9dd',
+    marginBottom: 20,
+    ...cardShadow,
+  },
+  scanIntroIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  scanIntroIcon: {
+    fontSize: 32,
+  },
+  scanIntroBody: {
+    flex: 1,
+  },
+  scanIntroTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.header,
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  scanIntroText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#2d6a50',
+  },
+  scanHighlightCard: {
+    backgroundColor: '#0d3a2d',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  scanHighlightBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  scanHighlightBadgeText: {
+    color: '#a8e6d1',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  scanHighlightTitle: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+  },
+  scanHighlightText: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#d0e8df',
+  },
+  scanPreviewShell: {
+    height: 560,
+    borderRadius: 28,
+    backgroundColor: '#111827',
+    padding: 30,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 20,
+    ...cardShadow,
+  },
+  scanPreviewCornerTl: {
+    position: 'absolute',
+    top: 42,
+    left: 42,
+    width: 44,
+    height: 44,
+    borderLeftWidth: 6,
+    borderTopWidth: 6,
+    borderColor: '#58d2b6',
+    borderTopLeftRadius: 12,
+  },
+  scanPreviewCornerTr: {
+    position: 'absolute',
+    top: 42,
+    right: 42,
+    width: 44,
+    height: 44,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderColor: '#58d2b6',
+    borderTopRightRadius: 12,
+  },
+  scanPreviewCornerBl: {
+    position: 'absolute',
+    bottom: 42,
+    left: 42,
+    width: 44,
+    height: 44,
+    borderLeftWidth: 6,
+    borderBottomWidth: 6,
+    borderColor: '#58d2b6',
+    borderBottomLeftRadius: 12,
+  },
+  scanPreviewCornerBr: {
+    position: 'absolute',
+    bottom: 42,
+    right: 42,
+    width: 44,
+    height: 44,
+    borderRightWidth: 6,
+    borderBottomWidth: 6,
+    borderColor: '#58d2b6',
+    borderBottomRightRadius: 12,
+  },
+  scanPreviewGridVerticalLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '35%',
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  scanPreviewGridVerticalRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: '35%',
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  scanPreviewGridHorizontalTop: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '34%',
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  scanPreviewGridHorizontalBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '31%',
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  scanLiveFrame: {
+    flex: 1,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(15,23,42,0.54)',
+    justifyContent: 'space-between',
+    padding: 22,
+  },
+  scanLiveFrameInner: {
+    marginTop: 18,
+    maxWidth: '82%',
+  },
+  scanLiveFrameEyebrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#a7f3d0',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  scanLiveFrameTitle: {
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  scanLiveFrameText: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#d1d5db',
+  },
+  scanLiveFrameFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 18,
+  },
+  scanLiveHintChip: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  scanLiveHintChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  scanPaper: {
+    flex: 1,
+    alignSelf: 'center',
+    width: '74%',
+    backgroundColor: '#fffefe',
+    borderRadius: 2,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+  },
+  scanPaperHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  scanPaperRx: {
+    fontSize: 38,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  scanPaperDoctorBlock: {
+    alignItems: 'flex-end',
+  },
+  scanPaperDoctor: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  scanPaperDoctorMeta: {
+    fontSize: 10,
+    color: '#1f2937',
+    marginTop: 2,
+  },
+  scanPaperPatientRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  scanPaperLabel: {
+    fontSize: 10,
+    color: '#111827',
+    marginBottom: 6,
+  },
+  scanPaperPatientValues: {
+    marginLeft: 14,
+  },
+  scanPaperHand: {
+    fontSize: 10,
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  scanPaperDivider: {
+    height: 1,
+    backgroundColor: '#6b7280',
+    marginBottom: 14,
+  },
+  scanPaperMedicine: {
+    fontSize: 10,
+    color: '#111827',
+    marginBottom: 6,
+  },
+  scanPaperMedicineMeta: {
+    fontSize: 10,
+    color: '#1f2937',
+    marginBottom: 12,
+    marginLeft: 18,
+  },
+  scanPaperSignatureWrap: {
+    alignItems: 'flex-end',
+    marginTop: 'auto',
+  },
+  scanPaperSignature: {
+    fontSize: 20,
+    color: '#111827',
+    marginBottom: 2,
+  },
+  scanTipsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#e6ebf3',
+    marginBottom: 20,
+    ...cardShadow,
+  },
+  scanTipsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1d7b60',
+    marginBottom: 8,
+  },
+  scanTipsBullet: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#475569',
+    marginBottom: 4,
+  },
+  scanCaptureActions: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 14,
+  },
+  scanSideAction: {
+    flex: 0.32,
+    alignItems: 'center',
+  },
+  scanSideActionIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 20,
+    backgroundColor: palette.surface,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...cardShadow,
+  },
+  scanSideActionIconActive: {
+    backgroundColor: palette.primaryMuted,
+    borderColor: palette.primary,
+  },
+  scanSideActionIconGallery: {
+    backgroundColor: '#f0f4ff',
+    borderColor: '#d1e0ff',
+  },
+  scanSideActionIconFlash: {
+    backgroundColor: '#fffcf0',
+    borderColor: '#ffe5b4',
+  },
+  scanSideActionIconText: {
+    fontSize: 28,
+  },
+  scanSideActionLabel: {
+    marginTop: 12,
+    fontSize: 15,
+    color: palette.text,
+    textAlign: 'center',
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  scanSideActionMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    color: palette.textTertiary,
+    textAlign: 'center',
+  },
+  scanCaptureButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 0.4,
+  },
+  scanCaptureButtonInner: {
+    width: 120,
+    height: 120,
+    borderRadius: 30,
+    backgroundColor: palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...cardShadow,
+  },
+  scanCaptureButtonIcon: {
+    fontSize: 44,
+    color: '#fff',
+  },
+  scanCaptureButtonLabel: {
+    marginTop: 14,
+    fontSize: 16,
+    fontWeight: '800',
+    color: palette.text,
+    letterSpacing: -0.3,
+  },
+  scanCaptureHint: {
+    marginTop: 14,
+    textAlign: 'center',
+    fontSize: 15,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
   top: {
     backgroundColor: palette.header,
     paddingBottom: 14,
@@ -1818,6 +3269,506 @@ const s = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
   loadTitle: { marginTop: 16, fontSize: 20, fontWeight: '700', color: palette.text, textAlign: 'center' },
   loadText: { marginTop: 10, fontSize: 16, color: palette.textSecondary, textAlign: 'center', lineHeight: 24, maxWidth: 300 },
+  scanHero: {
+    backgroundColor: palette.primaryLight,
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 18,
+    borderWidth: 1.5,
+    borderColor: '#c8e9dd',
+    ...cardShadow,
+  },
+  scanHeroBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: palette.primaryMuted,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  scanHeroBadgeText: {
+    color: palette.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  scanHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scanOrb: {
+    width: 76,
+    height: 76,
+    borderRadius: 22,
+    backgroundColor: '#d8f2e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  scanOrbIcon: {
+    fontSize: 30,
+    color: palette.primary,
+    fontWeight: '700',
+  },
+  scanHeroTextWrap: {
+    flex: 1,
+  },
+  scanEyebrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: palette.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  scanTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+    color: palette.text,
+    letterSpacing: -0.4,
+  },
+  scanSubtitle: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
+  scanProgressTrack: {
+    flexDirection: 'row',
+    marginTop: 18,
+    gap: 8,
+  },
+  scanProgressStep: {
+    flex: 1,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#d9e7de',
+  },
+  scanProgressStepOn: {
+    backgroundColor: palette.primary,
+  },
+  scanPhaseLabel: {
+    marginTop: 14,
+    fontSize: 16,
+    fontWeight: '700',
+    color: palette.text,
+    letterSpacing: -0.3,
+  },
+  scanPhaseHint: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 21,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
+  scanLoadCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    ...cardShadow,
+  },
+  scanStepRail: {
+    width: '100%',
+    marginTop: 18,
+  },
+  scanStepPill: {
+    borderRadius: 16,
+    backgroundColor: '#f4f8f5',
+    borderWidth: 1.5,
+    borderColor: '#d9e7de',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  scanStepPillOn: {
+    backgroundColor: palette.primaryMuted,
+    borderColor: palette.primary,
+  },
+  scanStepPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: palette.textSecondary,
+  },
+  scanStepPillTextOn: {
+    color: palette.primary,
+    fontWeight: '700',
+  },
+  scanChecklist: {
+    backgroundColor: '#fef5e7',
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#f5d9a8',
+  },
+  scanChecklistTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: palette.text,
+    marginBottom: 14,
+    letterSpacing: -0.3,
+  },
+  scanChecklistRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  scanChecklistBullet: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fde7bf',
+    color: '#a16207',
+    textAlign: 'center',
+    lineHeight: 26,
+    fontSize: 14,
+    fontWeight: '700',
+    marginRight: 10,
+  },
+  scanChecklistText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textSecondary,
+  },
+  scanEditorHero: {
+    backgroundColor: palette.primaryLight,
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#c8e9dd',
+    ...cardShadow,
+  },
+  scanEditorTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+    color: palette.text,
+    letterSpacing: -0.4,
+  },
+  scanEditorSub: {
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
+  scanReviewBanner: {
+    marginTop: 16,
+    borderRadius: 20,
+    backgroundColor: palette.primaryMuted,
+    borderWidth: 1.5,
+    borderColor: '#c8e9dd',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scanReviewStat: {
+    width: 88,
+    alignItems: 'center',
+  },
+  scanReviewStatValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: palette.primary,
+  },
+  scanReviewStatLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '800',
+    color: palette.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    textAlign: 'center',
+  },
+  scanReviewDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: '#c8e9dd',
+    marginHorizontal: 14,
+  },
+  scanReviewBody: {
+    flex: 1,
+  },
+  scanReviewTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.primary,
+    letterSpacing: -0.3,
+  },
+  scanReviewText: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
+  scanMetaRow: {
+    flexDirection: 'row',
+    marginTop: 18,
+    gap: 10,
+  },
+  scanMetaChip: {
+    flex: 1,
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    alignItems: 'center',
+    ...cardShadow,
+  },
+  scanMetaChipTight: {
+    marginRight: 10,
+  },
+  scanMetaValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: palette.primary,
+    letterSpacing: -0.3,
+  },
+  scanMetaLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '800',
+    color: palette.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  scanRescanRow: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 10,
+  },
+  scanMiniAction: {
+    flex: 1,
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    ...cardShadow,
+  },
+  scanMiniActionLast: {
+    marginRight: 0,
+  },
+  scanMiniActionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  scanMiniActionSub: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: palette.textSecondary,
+  },
+  scanEditorCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    ...cardShadow,
+  },
+  scanEditorCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  scanEditorCardTitleWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  scanEditorLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: palette.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  scanEditorMicrocopy: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
+  scanStatusPill: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
+  scanStatusPillReady: {
+    backgroundColor: palette.primaryMuted,
+  },
+  scanStatusPillEmpty: {
+    backgroundColor: '#f0f4f8',
+  },
+  scanStatusPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  scanStatusPillTextReady: {
+    color: palette.primary,
+  },
+  scanStatusPillTextEmpty: {
+    color: palette.textTertiary,
+  },
+  scanTextarea: {
+    minHeight: 220,
+    backgroundColor: '#fcfdfd',
+    borderColor: palette.border,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  scanEditorHint: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: palette.textSecondary,
+    fontWeight: '500',
+  },
+  scanInsightRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  scanInfoCard: {
+    backgroundColor: '#eef6ff',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#cfe0f6',
+  },
+  scanInfoCardHalf: {
+    width: '48.5%',
+    marginBottom: 0,
+  },
+  scanInfoCardWarm: {
+    backgroundColor: '#fff8ed',
+    borderColor: '#f2dec0',
+  },
+  scanInfoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 6,
+  },
+  scanInfoText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: palette.textSecondary,
+  },
+  scanInfoStat: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: palette.text,
+    marginBottom: 4,
+  },
+  scanSummaryCard: {
+    backgroundColor: '#eef8f3',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#cfe7d9',
+  },
+  scanSummaryTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  scanSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f5132',
+  },
+  scanSummaryCount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: palette.primary,
+  },
+  scanSummaryText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: palette.textSecondary,
+  },
+  scanExampleCard: {
+    backgroundColor: '#f7fafc',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#dbe7f3',
+  },
+  scanExampleText: {
+    fontSize: 14,
+    lineHeight: 23,
+    color: palette.text,
+  },
+  scanUtilityRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  scanGhostButton: {
+    flex: 1,
+    backgroundColor: palette.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    paddingVertical: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    ...cardShadow,
+  },
+  scanGhostButtonText: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scanPrimaryButton: {
+    flex: 1.35,
+    backgroundColor: palette.primary,
+    borderRadius: 18,
+    paddingVertical: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    ...cardShadow,
+  },
+  scanPrimaryButtonBlock: {
+    flex: 0,
+    width: '100%',
+    marginLeft: 0,
+    marginBottom: 8,
+  },
+  scanPrimaryButtonDisabled: {
+    opacity: 0.55,
+  },
+  scanPrimaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   eyebrow: {
     fontSize: 12,
     fontWeight: '700',
@@ -1863,11 +3814,11 @@ const s = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: palette.primary,
   },
-  disclaimerText: { fontSize: 13, color: palette.textSecondary, lineHeight: 20 },
+  disclaimerText: { fontSize: 13, color: palette.textSecondary, lineHeight: 20, fontWeight: '500' },
   bigPrimary: {
     backgroundColor: palette.primary,
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderRadius: 18,
+    paddingVertical: 16,
     paddingHorizontal: 18,
     marginTop: 4,
     ...cardShadow,
@@ -1876,7 +3827,7 @@ const s = StyleSheet.create({
   ctaIconBubble: {
     width: 52,
     height: 52,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1884,66 +3835,66 @@ const s = StyleSheet.create({
   },
   ctaIcon: { fontSize: 26 },
   ctaTextCol: { flex: 1 },
-  bigPrimaryText: { color: '#fff', fontSize: 19, fontWeight: '700' },
-  bigPrimarySub: { color: 'rgba(255,255,255,0.9)', fontSize: 15, marginTop: 4 },
+  bigPrimaryText: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  bigPrimarySub: { color: 'rgba(255,255,255,0.95)', fontSize: 15, marginTop: 4, fontWeight: '500' },
   primaryActionCard: { borderWidth: 0 },
   secondaryBig: {
     backgroundColor: palette.surface,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: palette.border,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 14,
     ...cardShadow,
   },
-  secondaryBigText: { color: palette.text, fontSize: 16, fontWeight: '600' },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: palette.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 },
+  secondaryBigText: { color: palette.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  sectionTitle: { fontSize: 12, fontWeight: '800', color: palette.primary, textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 22, marginBottom: 14 },
   shortcutRow: { flexDirection: 'row', justifyContent: 'space-between' },
   shortcutHalf: {
     width: '48%',
     backgroundColor: palette.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: palette.border,
     ...cardShadow,
   },
   shortcutIcon: { fontSize: 28, marginBottom: 10 },
-  shortcutTitle: { fontSize: 17, fontWeight: '700', color: palette.text },
-  shortcutSub: { fontSize: 13, color: palette.textSecondary, marginTop: 4, lineHeight: 18 },
+  shortcutTitle: { fontSize: 16, fontWeight: '800', color: palette.text, letterSpacing: -0.2 },
+  shortcutSub: { fontSize: 13, color: palette.textSecondary, marginTop: 4, lineHeight: 18, fontWeight: '500' },
   tile: {
     backgroundColor: palette.surface,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: palette.border,
     padding: 18,
-    marginBottom: 12,
+    marginBottom: 14,
     ...cardShadow,
   },
-  tileTitle: { fontSize: 17, fontWeight: '700', color: palette.text },
-  tileSub: { marginTop: 6, fontSize: 15, color: palette.textSecondary, lineHeight: 22 },
+  tileTitle: { fontSize: 17, fontWeight: '800', color: palette.text, letterSpacing: -0.3 },
+  tileSub: { marginTop: 6, fontSize: 15, color: palette.textSecondary, lineHeight: 22, fontWeight: '500' },
   hubRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: palette.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: palette.border,
     ...cardShadow,
   },
-  hubIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  hubIconTeal: { backgroundColor: '#ccfbf1' },
+  hubIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  hubIconTeal: { backgroundColor: '#d0fdf3' },
   hubIconBlue: { backgroundColor: '#dbeafe' },
   hubIconViolet: { backgroundColor: '#ede9fe' },
-  hubEmoji: { fontSize: 24 },
+  hubEmoji: { fontSize: 26 },
   hubRowBody: { flex: 1 },
-  hubRowTitle: { fontSize: 17, fontWeight: '700', color: palette.text },
-  hubRowSub: { fontSize: 14, color: palette.textSecondary, marginTop: 4 },
+  hubRowTitle: { fontSize: 16, fontWeight: '800', color: palette.text, letterSpacing: -0.2 },
+  hubRowSub: { fontSize: 14, color: palette.textSecondary, marginTop: 4, fontWeight: '500' },
   hubChevron: { fontSize: 22, color: palette.textTertiary, fontWeight: '300' },
-  lead: { fontSize: 16, color: palette.textSecondary, lineHeight: 24, marginBottom: 16 },
+  lead: { fontSize: 15, color: palette.textSecondary, lineHeight: 23, marginBottom: 16, fontWeight: '500' },
   profileTop: { alignItems: 'center', paddingBottom: 12 },
   bigCircle: {
     width: 80,
@@ -1957,88 +3908,344 @@ const s = StyleSheet.create({
   bigCircleText: { color: '#fff', fontSize: 32, fontWeight: '700' },
   profileTitle: { marginTop: 14, fontSize: 22, fontWeight: '700', color: palette.text },
   profileMeta: { marginTop: 4, fontSize: 15, color: palette.textSecondary },
-  small: { fontSize: 12, fontWeight: '700', color: palette.textTertiary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  voiceHero: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#dbe7f3',
+    ...cardShadow,
+  },
+  voiceHeroActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fdba74',
+  },
+  voiceHeroDisabled: {
+    backgroundColor: '#f8fafc',
+    borderColor: palette.border,
+    opacity: 0.82,
+  },
+  voiceHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  voiceHeroTextWrap: {
+    flex: 1,
+  },
+  voiceEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: palette.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  voiceOrb: {
+    width: 76,
+    height: 76,
+    borderRadius: 24,
+    backgroundColor: '#dbeafe',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  voiceOrbActive: {
+    backgroundColor: '#fed7aa',
+  },
+  voiceOrbIcon: {
+    fontSize: 28,
+    color: palette.text,
+    fontWeight: '700',
+  },
+  voiceTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  voiceSubtitle: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textSecondary,
+  },
+  voiceProgressRow: {
+    flexDirection: 'row',
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  voiceProgressStep: {
+    flex: 1,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#dbe7f3',
+    marginRight: 8,
+  },
+  voiceProgressOn: {
+    backgroundColor: palette.primary,
+  },
+  voiceHint: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textSecondary,
+  },
+  small: { fontSize: 11, fontWeight: '800', color: palette.primary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.2 },
   card: {
+    backgroundColor: palette.surface,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: palette.border,
+    padding: 16,
+    marginBottom: 14,
+    ...cardShadow,
+  },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: palette.primary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.1 },
+  cardText: { fontSize: 15, lineHeight: 23, color: palette.text, fontWeight: '500' },
+  helpSmall: { fontSize: 13, color: palette.textSecondary, lineHeight: 20, marginTop: 8, fontWeight: '500' },
+  voiceMicButton: {
+    backgroundColor: palette.primary,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    ...cardShadow,
+  },
+  voiceMicButtonActive: {
+    backgroundColor: palette.warn,
+  },
+  voiceMicIcon: {
+    fontSize: 22,
+    color: '#fff',
+    marginRight: 10,
+  },
+  voiceMicText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  voiceErrorCard: {
+    backgroundColor: palette.dangerBg,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  voiceErrorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: palette.danger,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  voiceErrorText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: palette.text,
+  },
+  voiceDiagnostic: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: palette.textSecondary,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  voiceFallbackCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    ...cardShadow,
+  },
+  voiceFallbackTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 8,
+  },
+  voiceFallbackText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: palette.textSecondary,
+    marginBottom: 12,
+  },
+  voiceTranscriptCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#c7d8ec',
+    ...cardShadow,
+  },
+  voiceTranscriptLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: palette.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  voiceTranscriptText: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  voiceTranscriptHelp: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: palette.textSecondary,
+    marginTop: 10,
+  },
+  voiceActionRow: {
+    flexDirection: 'row',
+    marginBottom: 18,
+  },
+  voiceSecondaryAction: {
+    flex: 1,
     backgroundColor: palette.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: palette.border,
-    padding: 18,
-    marginBottom: 12,
+    borderColor: palette.borderStrong,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
     ...cardShadow,
   },
-  cardTitle: { fontSize: 14, fontWeight: '700', color: palette.textTertiary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
-  cardText: { fontSize: 16, lineHeight: 24, color: palette.text, fontWeight: '500' },
-  helpSmall: { fontSize: 14, color: palette.textSecondary, lineHeight: 20, marginTop: 8 },
+  voiceSecondaryActionText: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  voicePrimaryAction: {
+    flex: 1,
+    backgroundColor: palette.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    ...cardShadow,
+  },
+  voicePrimaryActionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  voiceStepsCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#dbe7f3',
+  },
+  voiceStepsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: palette.text,
+    marginBottom: 12,
+  },
+  voiceStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  voiceStepNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: palette.primaryMuted,
+    color: palette.primary,
+    textAlign: 'center',
+    lineHeight: 26,
+    fontSize: 14,
+    fontWeight: '700',
+    marginRight: 10,
+  },
+  voiceStepText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: palette.textSecondary,
+  },
   fieldLabel: { fontSize: 14, fontWeight: '600', color: palette.text, marginBottom: 8, marginTop: 4 },
   input: {
     backgroundColor: palette.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: palette.border,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 17,
+    fontSize: 16,
     color: palette.text,
-    marginBottom: 12,
+    marginBottom: 14,
     minHeight: 52,
   },
-  area: { minHeight: 100, textAlignVertical: 'top' },
-  areaLarge: { minHeight: 160, textAlignVertical: 'top' },
-  row: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 },
+  area: { minHeight: 120, textAlignVertical: 'top', paddingVertical: 12 },
+  areaLarge: { minHeight: 180, textAlignVertical: 'top', paddingVertical: 12 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
   chip: {
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: palette.borderStrong,
+    borderWidth: 1.5,
+    borderColor: palette.border,
     backgroundColor: palette.surface,
     marginRight: 8,
-    marginBottom: 8,
+    marginBottom: 10,
     minHeight: 46,
     justifyContent: 'center',
   },
   chipOn: { backgroundColor: palette.primary, borderColor: palette.primary },
-  chipText: { fontSize: 15, fontWeight: '600', color: palette.text },
+  chipText: { fontSize: 15, fontWeight: '700', color: palette.text, letterSpacing: -0.2 },
   chipTextOn: { color: '#fff' },
-  dots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 16 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.borderStrong, marginHorizontal: 4 },
-  dotOn: { width: 22, borderRadius: 4, backgroundColor: palette.primary },
-  title: { fontSize: 19, lineHeight: 28, fontWeight: '700', color: palette.text },
+  dots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 18 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.borderStrong, marginHorizontal: 5 },
+  dotOn: { width: 24, borderRadius: 4, backgroundColor: palette.primary },
+  title: { fontSize: 20, lineHeight: 28, fontWeight: '800', color: palette.text, letterSpacing: -0.4 },
   option: {
     backgroundColor: palette.surface,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
     borderColor: palette.border,
     paddingVertical: 16,
     paddingHorizontal: 16,
-    marginBottom: 10,
-    minHeight: 52,
+    marginBottom: 12,
+    minHeight: 54,
     justifyContent: 'center',
     ...cardShadow,
   },
   optionOn: { backgroundColor: palette.primaryMuted, borderColor: palette.primary, borderWidth: 2 },
-  optionText: { fontSize: 16, fontWeight: '600', color: palette.text },
+  optionText: { fontSize: 16, fontWeight: '700', color: palette.text, letterSpacing: -0.3 },
   optionTextOn: { color: palette.primary },
   suggestPanel: {
     backgroundColor: palette.surface,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
     borderColor: palette.border,
-    marginBottom: 12,
+    marginBottom: 14,
     overflow: 'hidden',
     ...cardShadow,
   },
   suggestRow: { padding: 16, borderBottomWidth: 1, borderBottomColor: palette.border },
-  suggestTitle: { fontSize: 16, fontWeight: '600', color: palette.text },
-  suggestSub: { fontSize: 14, color: palette.textSecondary, marginTop: 4 },
+  suggestTitle: { fontSize: 16, fontWeight: '700', color: palette.text, letterSpacing: -0.2 },
+  suggestSub: { fontSize: 14, color: palette.textSecondary, marginTop: 4, fontWeight: '500' },
   suggestEmpty: { padding: 16, fontSize: 14, color: palette.textSecondary, lineHeight: 20 },
   confirmCard: {
     backgroundColor: palette.surface,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: palette.border,
     ...cardShadow,
   },
@@ -2068,23 +4275,23 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 6,
   },
-  secondaryText: { color: palette.text, fontSize: 16, fontWeight: '600' },
-  primaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  resultMedLabel: { fontSize: 12, fontWeight: '700', color: palette.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 },
-  med: { fontSize: 26, fontWeight: '700', color: palette.text, marginTop: 6, marginBottom: 16 },
-  banner: { borderRadius: 16, padding: 18, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  bannerWarn: { backgroundColor: palette.warnBg },
-  bannerSafe: { backgroundColor: palette.safeBg },
-  bannerDanger: { backgroundColor: palette.dangerBg },
-  riskPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
-  pillSafe: { backgroundColor: '#99f6e4' },
-  pillSafeText: { color: '#0f766e', fontSize: 13, fontWeight: '800' },
-  pillWarn: { backgroundColor: '#fde68a' },
-  pillWarnText: { color: '#b45309', fontSize: 13, fontWeight: '800' },
-  pillDanger: { backgroundColor: '#fecaca' },
-  pillDangerText: { color: palette.danger, fontSize: 13, fontWeight: '800' },
-  bannerTitle: { fontSize: 15, fontWeight: '700', color: palette.text },
-  bannerSub: { fontSize: 14, marginTop: 4, lineHeight: 20, color: palette.textSecondary },
+  secondaryText: { color: palette.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  primaryText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  resultMedLabel: { fontSize: 11, fontWeight: '800', color: palette.primary, textTransform: 'uppercase', letterSpacing: 1.2 },
+  med: { fontSize: 24, fontWeight: '800', color: palette.text, marginTop: 6, marginBottom: 16, letterSpacing: -0.4 },
+  banner: { borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 16, ...cardShadow },
+  bannerWarn: { backgroundColor: palette.warnBg, borderWidth: 1.5, borderColor: '#fcd34d' },
+  bannerSafe: { backgroundColor: palette.safeBg, borderWidth: 1.5, borderColor: '#6ee7b7' },
+  bannerDanger: { backgroundColor: palette.dangerBg, borderWidth: 1.5, borderColor: '#fca5a5' },
+  riskPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+  pillSafe: { backgroundColor: '#d1fae5' },
+  pillSafeText: { color: '#065f46', fontSize: 12, fontWeight: '800', letterSpacing: -0.1 },
+  pillWarn: { backgroundColor: '#fef08a' },
+  pillWarnText: { color: '#92400e', fontSize: 12, fontWeight: '800', letterSpacing: -0.1 },
+  pillDanger: { backgroundColor: '#fee2e2' },
+  pillDangerText: { color: '#991b1b', fontSize: 12, fontWeight: '800', letterSpacing: -0.1 },
+  bannerTitle: { fontSize: 16, fontWeight: '800', color: palette.text, letterSpacing: -0.3 },
+  bannerSub: { fontSize: 14, marginTop: 4, lineHeight: 20, color: palette.textSecondary, fontWeight: '500' },
   emergencyBanner: {
     backgroundColor: palette.dangerBg,
     borderRadius: 16,

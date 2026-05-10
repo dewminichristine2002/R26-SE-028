@@ -4,6 +4,11 @@ const {
   resolveMedication,
 } = require('../services/medicationKnowledgeService');
 const { predictMedicineRisk } = require('../services/mlPredictionService');
+const {
+  resolveDrugClass,
+  getDrugClassTerms,
+  extractDrugClassesFromText,
+} = require('../services/drugClassLookupService');
 
 const normalizeText = (value) => (value == null ? '' : String(value).trim());
 
@@ -59,6 +64,22 @@ const sanitizeRiskFactors = (riskFactors) => {
     .filter((factor) => factor.factorLabel);
 };
 
+const sanitizeStringArray = (values) => {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values.map((value) => normalizeText(value)).filter(Boolean);
+};
+
+const sanitizePlainObject = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value;
+};
+
 const sanitizeHistoryEntry = (historyEntry, fallbackPayload) => {
   if (!historyEntry) {
     return null;
@@ -106,6 +127,9 @@ const sanitizeCardPayload = (body) => {
     knowledgeSources: Array.isArray(body.knowledgeSources)
       ? body.knowledgeSources.map((value) => normalizeText(value)).filter(Boolean)
       : [],
+    guidelines: sanitizeStringArray(body.guidelines),
+    medicationKnowledge: sanitizePlainObject(body.medicationKnowledge),
+    dataUsed: sanitizePlainObject(body.dataUsed),
     explanation: normalizeText(body.explanation),
     recommendation: normalizeText(body.recommendation),
     riskFactors: sanitizeRiskFactors(body.riskFactors),
@@ -309,7 +333,7 @@ const hasDangerousMedicationCombination = ({ medicineFlags, currentMedicationsTe
   return false;
 };
 
-const buildMedicationAllergyTerms = (payload, medicationKnowledge, fallbackMedication) => {
+const buildMedicationAllergyTerms = (payload, medicationKnowledge, fallbackMedication, drugClassInfo) => {
   const terms = new Set();
   const addTerm = (value) => {
     const normalized = normalizeText(value).toLowerCase();
@@ -328,6 +352,8 @@ const buildMedicationAllergyTerms = (payload, medicationKnowledge, fallbackMedic
     fallbackMedication.normalizedName,
     fallbackMedication.ingredientName,
   ].forEach(addTerm);
+
+  getDrugClassTerms(drugClassInfo).forEach(addTerm);
 
   const therapeuticText = normalizeText(
     medicationKnowledge.therapeuticClass || fallbackMedication.therapeuticClass
@@ -442,21 +468,33 @@ const buildAnalysis = (payload, profile, questionnaireAnswers, medicineHistory =
   const questionnaireText = questionnaireAnswers
     .map((item) => normalizeText(item.answerText).toLowerCase())
     .join(' ');
+  const currentDrugClassInfo = resolveDrugClass(
+    payload.normalizedDrugName,
+    payload.medicineName,
+    medicationKnowledge.ingredientName,
+    fallbackMedication.ingredientName,
+    medicationKnowledge.rxnormMatchedName
+  );
   const medicationFlags = getMedicationFlags(
     payload.medicineName,
     payload.normalizedDrugName,
     medicationKnowledge.ingredientName,
     medicationKnowledge.therapeuticClass,
     fallbackMedication.ingredientName,
-    fallbackMedication.therapeuticClass
+    fallbackMedication.therapeuticClass,
+    ...getDrugClassTerms(currentDrugClassInfo)
   );
 
   const riskFactors = [];
   let ruleScore = 0;
-  const allergyTerms = buildMedicationAllergyTerms(payload, medicationKnowledge, fallbackMedication);
+  const allergyTerms = buildMedicationAllergyTerms(payload, medicationKnowledge, fallbackMedication, currentDrugClassInfo);
   const severeReactionSignal = hasSevereReactionSignal(payload, questionnaireText);
   const userAllergyEvidence = includesAnyTerm(knownAllergiesText, allergyTerms);
   const questionnaireAllergyEvidence = includesAnyTerm(questionnaireText, allergyTerms);
+  const profileDrugClasses = new Set([
+    ...extractDrugClassesFromText(profile?.knownAllergiesText),
+    ...extractDrugClassesFromText(questionnaireText),
+  ]);
 
   const addFactor = (factorType, factorLabel, severity, score) => {
     riskFactors.push({
@@ -490,11 +528,17 @@ const buildAnalysis = (payload, profile, questionnaireAnswers, medicineHistory =
   }
 
   if (
-    medicationKnowledge.therapeuticClass &&
-    includesAnyTerm(knownAllergiesText, [medicationKnowledge.therapeuticClass]) &&
+    currentDrugClassInfo?.drug_class &&
+    currentDrugClassInfo.drug_class !== 'unknown' &&
+    profileDrugClasses.has(currentDrugClassInfo.drug_class) &&
     !riskFactors.some((factor) => factor.factorType === 'allergy_match')
   ) {
-    addFactor('allergy_class_match', 'This medicine belongs to the same drug class as a previous allergy in the profile.', 'high', 60);
+    addFactor(
+      'allergy_class_match',
+      `This medicine belongs to the same drug class/family (${currentDrugClassInfo.drug_class}) as a previous allergy in the profile or questionnaire.`,
+      'high',
+      60
+    );
   }
 
   if (payload.hadReactionBefore === true || questionnaireAllergyEvidence) {
@@ -823,6 +867,8 @@ const buildAnalysis = (payload, profile, questionnaireAnswers, medicineHistory =
       ],
       questionnaireAnswerCount: questionnaireAnswers.length,
       medicationKnowledgeSources: medicationKnowledge.knowledgeSources,
+      derivedDrugClass: currentDrugClassInfo?.drug_class || null,
+      derivedDrugClassAtcCode: currentDrugClassInfo?.atc_code || null,
       knowledgeMatched: medicationKnowledge.matched !== false,
       historyPriorCheckCount: historyRows.length,
       historyDangerousCount,

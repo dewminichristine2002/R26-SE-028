@@ -1,24 +1,40 @@
 {
-  "dataset": "medicine_safety_training_dataset.csv",
-  "rows": 4075,
+  "dataset": "medicine_safety_training_dataset.csv + medicine_safety_dataset.csv",
+  "dataset_sources": [
+    "medicine_safety_training_dataset.csv",
+    "medicine_safety_dataset.csv"
+  ],
+  "rows": 4150,
   "target": "risk_level",
   "risk_level_classes": [
     "Safe",
     "Warning",
     "Dangerous"
   ],
+  "n_jobs": 1,
   "numeric_features": [
     "side_effect_count",
     "severe_side_effect_count",
     "side_effect_match_count",
-    "interaction_count"
+    "interaction_count",
+    "age",
+    "reaction_count",
+    "age_risk_flag",
+    "current_medication_count",
+    "chronic_disease_count",
+    "known_allergy_count",
+    "same_class_allergy"
   ],
   "categorical_features": [
     "gender",
     "input_method",
     "max_interaction_severity",
     "has_medicine_allergy",
-    "has_severe_reaction_log"
+    "has_reaction_log",
+    "has_severe_reaction_log",
+    "q_past_reaction",
+    "q_antibiotic_painkiller_reaction",
+    "drug_class"
   ],
   "text_feature_name": "combined_text",
   "tuning": {
@@ -28,11 +44,11 @@
     "refit_metric": "f1_macro",
     "best_params": {
       "preprocessor__txt__tfidf__max_features": 300,
-      "classifier__n_estimators": 800,
-      "classifier__min_samples_split": 2,
+      "classifier__n_estimators": 400,
+      "classifier__min_samples_split": 4,
       "classifier__min_samples_leaf": 1,
-      "classifier__max_features": "sqrt",
-      "classifier__max_depth": 32
+      "classifier__max_features": 0.25,
+      "classifier__max_depth": 16
     }
   }
 }

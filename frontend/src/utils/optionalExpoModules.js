@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 let imagePickerModule;
 let speechModule;
+let speechRecognitionModule;
 
 /**
  * Dev clients built before expo-image-picker was added have no native ExponentImagePicker.
@@ -31,10 +32,44 @@ export function getExpoSpeech() {
   if (speechModule === false) return null;
   if (speechModule) return speechModule;
   try {
+    if (Platform.OS !== 'web') {
+      const { requireOptionalNativeModule } = require('expo-modules-core');
+      if (!requireOptionalNativeModule('ExpoSpeech')) {
+        speechModule = false;
+        return null;
+      }
+    }
     speechModule = require('expo-speech');
     return speechModule;
   } catch {
     speechModule = false;
+    return null;
+  }
+}
+
+export function getExpoSpeechRecognitionModule() {
+  if (speechRecognitionModule === false) return null;
+  if (speechRecognitionModule) return speechRecognitionModule;
+  try {
+    if (Platform.OS !== 'web') {
+      const { requireOptionalNativeModule } = require('expo-modules-core');
+      if (!requireOptionalNativeModule('ExpoSpeechRecognition')) {
+        speechRecognitionModule = false;
+        return null;
+      }
+    }
+    const pkg = require('expo-speech-recognition');
+    if (!pkg?.ExpoSpeechRecognitionModule) {
+      speechRecognitionModule = false;
+      return null;
+    }
+    speechRecognitionModule = {
+      ...pkg.ExpoSpeechRecognitionModule,
+      addSpeechRecognitionListener: pkg.addSpeechRecognitionListener,
+    };
+    return speechRecognitionModule;
+  } catch {
+    speechRecognitionModule = false;
     return null;
   }
 }

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { API_BASE_URL } from './apiConfig';
+import { API_BASE_URL, getBackendConnectionHelp } from './apiConfig';
 
 const TOKEN_KEY = 'eldermeds_token';
 const USER_KEY = 'eldermeds_user';
@@ -15,8 +15,14 @@ const authClient = axios.create({
   },
 });
 
+const isBackendUnavailableError = (error) =>
+  error?.response?.status === 503 || error?.message === 'Network Error';
+
+const toBackendUnavailableError = () => new Error(getBackendConnectionHelp());
+const isLocalTokenValue = (token) => String(token || '').startsWith('local-token-');
+
 export const authService = {
-  async register(payload) {
+  async register(payload, options = {}) {
     try {
       const response = await authClient.post('/auth/register', payload);
       await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
@@ -24,7 +30,7 @@ export const authService = {
       await AsyncStorage.removeItem(LOCAL_MODE_KEY);
       return response.data;
     } catch (error) {
-      if (error.response?.status === 503 || error.message === 'Network Error') {
+      if (isBackendUnavailableError(error) && options.allowOfflineFallback === true) {
         const accountsRaw = await AsyncStorage.getItem(LOCAL_ACCOUNTS_KEY);
         const accounts = accountsRaw ? JSON.parse(accountsRaw) : [];
         const normalizedEmail = String(payload.email || '').trim().toLowerCase();
@@ -59,11 +65,15 @@ export const authService = {
         };
       }
 
+      if (isBackendUnavailableError(error)) {
+        throw toBackendUnavailableError();
+      }
+
       throw error;
     }
   },
 
-  async login(payload) {
+  async login(payload, options = {}) {
     try {
       const response = await authClient.post('/auth/login', payload);
       await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
@@ -71,7 +81,7 @@ export const authService = {
       await AsyncStorage.removeItem(LOCAL_MODE_KEY);
       return response.data;
     } catch (error) {
-      if (error.response?.status === 503 || error.message === 'Network Error') {
+      if (isBackendUnavailableError(error) && options.allowOfflineFallback === true) {
         const accountsRaw = await AsyncStorage.getItem(LOCAL_ACCOUNTS_KEY);
         const accounts = accountsRaw ? JSON.parse(accountsRaw) : [];
         const normalizedEmail = String(payload.email || '').trim().toLowerCase();
@@ -101,6 +111,10 @@ export const authService = {
         };
       }
 
+      if (isBackendUnavailableError(error)) {
+        throw toBackendUnavailableError();
+      }
+
       throw error;
     }
   },
@@ -113,6 +127,10 @@ export const authService = {
     return AsyncStorage.getItem(TOKEN_KEY);
   },
 
+  isLocalToken(token) {
+    return isLocalTokenValue(token);
+  },
+
   async getStoredUser() {
     const user = await AsyncStorage.getItem(USER_KEY);
     return user ? JSON.parse(user) : null;
@@ -122,8 +140,16 @@ export const authService = {
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 
+  async clearLocalMode() {
+    await AsyncStorage.removeItem(LOCAL_MODE_KEY);
+  },
+
   async isUsingLocalMode() {
-    return (await AsyncStorage.getItem(LOCAL_MODE_KEY)) === 'true';
+    const [localMode, token] = await Promise.all([
+      AsyncStorage.getItem(LOCAL_MODE_KEY),
+      AsyncStorage.getItem(TOKEN_KEY),
+    ]);
+    return localMode === 'true' || isLocalTokenValue(token);
   },
 };
 

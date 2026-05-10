@@ -1,12 +1,26 @@
 Baseline training complete (tuned RandomForest + 5-fold CV).
-Dataset: medicine_safety_training_dataset.csv
-Rows: 4075
+Dataset: medicine_safety_training_dataset.csv + medicine_safety_dataset.csv
+Dataset sources: ['medicine_safety_training_dataset.csv', 'medicine_safety_dataset.csv']
+Rows: 4150
 Target: risk_level
-Best CV F1 (macro): 0.9948 (+/- 0.0021)
-Best CV accuracy: 0.9948 (+/- 0.0021)
-Hold-out accuracy (20%): 0.9939
-Hold-out F1 macro: 0.9938
-Best params: {'preprocessor__txt__tfidf__max_features': 300, 'classifier__n_estimators': 800, 'classifier__min_samples_split': 2, 'classifier__min_samples_leaf': 1, 'classifier__max_features': 'sqrt', 'classifier__max_depth': 32}
-Numeric features: ['side_effect_count', 'severe_side_effect_count', 'side_effect_match_count', 'interaction_count']
-Categorical features: ['gender', 'input_method', 'max_interaction_severity', 'has_medicine_allergy', 'has_severe_reaction_log']
+n_jobs: 1
+Best CV F1 (macro): 0.9940 (+/- 0.0037)
+Best CV accuracy: 0.9940 (+/- 0.0037)
+Hold-out accuracy (20%): 0.9940
+Hold-out F1 macro: 0.9940
+Dangerous precision: 1.0000
+Dangerous recall: 0.9929
+Dangerous F1: 0.9965
+Per-class hold-out metrics:
+  Safe: precision=0.9883, recall=1.0000, f1=0.9941, support=253
+  Warning: precision=0.9932, recall=0.9898, f1=0.9915, support=294
+  Dangerous: precision=1.0000, recall=0.9929, f1=0.9965, support=283
+Hold-out confusion matrix (rows=true, cols=pred):
+  labels=['Safe', 'Warning', 'Dangerous']
+  [253, 0, 0]
+  [3, 291, 0]
+  [0, 2, 281]
+Best params: {'preprocessor__txt__tfidf__max_features': 300, 'classifier__n_estimators': 400, 'classifier__min_samples_split': 4, 'classifier__min_samples_leaf': 1, 'classifier__max_features': 0.25, 'classifier__max_depth': 16}
+Numeric features: ['side_effect_count', 'severe_side_effect_count', 'side_effect_match_count', 'interaction_count', 'age', 'reaction_count', 'age_risk_flag', 'current_medication_count', 'chronic_disease_count', 'known_allergy_count', 'same_class_allergy']
+Categorical features: ['gender', 'input_method', 'max_interaction_severity', 'has_medicine_allergy', 'has_reaction_log', 'has_severe_reaction_log', 'q_past_reaction', 'q_antibiotic_painkiller_reaction', 'drug_class']
 Text feature: combined_text
