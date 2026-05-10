@@ -77,6 +77,8 @@ const emptyProfile = {
   currentMedicationsText: '',
   emergencyContact: '',
   caregiverDetails: '',
+  caregiverEmail: '',
+  caregiverPhone: '',
   profileCompleted: false,
   reactionSymptomsText: '',
   suspectedMedicineNamesText: '',
@@ -99,6 +101,13 @@ const emptyMinimal = {
   newMedicinesNote: '',
   recentReaction: null,
   recentReactionDetail: '',
+};
+
+const emptyScanQuality = {
+  status: 'unknown',
+  warnings: [],
+  blurScore: 0,
+  contrastScore: 0,
 };
 
 const buildQuestionnaireFromProfileFields = (p) => {
@@ -141,7 +150,6 @@ const profileComplete = (profile) =>
   Boolean(profile.age?.trim()) &&
   Boolean(profile.gender?.trim()) &&
   profile.hasMedicineAllergy !== null &&
-  Boolean(profile.emergencyContact?.trim()) &&
   (profile.hasMedicineAllergy === false || Boolean(profile.knownAllergiesText?.trim()));
 
 const questionnaireComplete = (answers) => QUESTIONS.every((item) => Boolean(answers[item.key]));
@@ -227,6 +235,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   const [ocrConfidence, setOcrConfidence] = useState(0);
   const [scanRawText, setScanRawText] = useState('');
   const [scanMatchedCandidates, setScanMatchedCandidates] = useState([]);
+  const [scanQuality, setScanQuality] = useState(emptyScanQuality);
   const [selectedScanCandidateIndex, setSelectedScanCandidateIndex] = useState(0);
   const [scanConfirmMedicineDraft, setScanConfirmMedicineDraft] = useState('');
   const [voiceDraft, setVoiceDraft] = useState('');
@@ -320,15 +329,12 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     if (latestResult.card.riskLevel !== 'Dangerous') return;
     if (dangerAlertShown.current) return;
     dangerAlertShown.current = true;
-    const caregiver = profile.caregiverDetails?.trim();
     Alert.alert(
       'Important safety alert',
-      caregiver
-        ? 'This result is dangerous. Do not take this medicine until a doctor says it is safe. Your caregiver on file should be informed — in a full deployment the app would send them an automatic alert.'
-        : 'This result is dangerous. Do not take this medicine until a doctor says it is safe. Add caregiver details in your profile so someone can be notified automatically in a connected build.',
+      'This result is dangerous. Do not take this medicine until a doctor says it is safe.',
       [{ text: 'I understand' }]
     );
-  }, [route, latestResult, profile.caregiverDetails]);
+  }, [route, latestResult]);
 
   const historyItems = useMemo(
     () =>
@@ -403,7 +409,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
   const saveProfile = async () => {
     if (!profileComplete(profile)) {
-      Alert.alert('Missing details', 'Please fill age, gender, medicine allergy, emergency contact, and known allergies if you said yes.');
+      Alert.alert('Missing details', 'Please fill age, gender, medicine allergy, and known allergies if you said yes.');
       return;
     }
     const chronicFull = mergeChronicWithPregnancy(profile.chronicDiseasesText, pregnancyNote, profile.gender);
@@ -611,16 +617,22 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   const runOcrOnPickedImage = async (uri, mimeType) => {
     setScanRawText('');
     setScanMatchedCandidates([]);
+    setScanQuality(emptyScanQuality);
     setOcrConfidence(0);
     setSelectedScanCandidateIndex(0);
     setOcrPhase(1);
     setRoute('scan-process');
     const phaseTimer = setTimeout(() => setOcrPhase(2), 1500);
     try {
-      const { rawText, confidence, message, preprocessing, matchedCandidates } = await extractPrescriptionTextFromImage(uri, mimeType);
+      const { rawText, confidence, message, preprocessing, quality, matchedCandidates } = await extractPrescriptionTextFromImage(uri, mimeType);
       const resolvedCandidates = Array.isArray(matchedCandidates) ? matchedCandidates : [];
       setScanRawText(rawText);
       setScanMatchedCandidates(resolvedCandidates);
+      setScanQuality({
+        ...emptyScanQuality,
+        ...(quality || {}),
+        warnings: Array.isArray(quality?.warnings) ? quality.warnings : [],
+      });
       setOcrConfidence(confidence);
       setOcrPhase(3);
       if (Array.isArray(preprocessing?.applied) && preprocessing.applied.length > 0) {
@@ -628,6 +640,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           'OCR preprocessing applied',
           `Image steps: ${preprocessing.applied.join(', ')}. Please review and correct extracted text before continuing.`
         );
+      }
+      if (Array.isArray(quality?.warnings) && quality.warnings.length > 0) {
+        Alert.alert('Scan quality warning', quality.warnings.join('\n'));
       }
       if (!String(rawText || '').trim() && message) {
         Alert.alert('No text found', `${message} You can type the prescription below.`);
@@ -657,6 +672,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         );
       } else if (status === 413) {
         Alert.alert('Image too large', `Choose a smaller prescription photo.${followUp}`);
+      } else if (status === 422) {
+        serverMsg = e?.response?.data?.error || 'The photo is too blurry for reliable OCR.';
+        Alert.alert('Retake photo', `${serverMsg}${followUp}`);
       } else if (status === 500) {
         serverMsg = e?.response?.data?.error || 'The server could not finish OCR for this image.';
         Alert.alert('OCR failed on server', `${serverMsg}${followUp}`);
@@ -665,6 +683,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
       }
       setScanRawText('');
       setScanMatchedCandidates([]);
+      setScanQuality(emptyScanQuality);
     } finally {
       clearTimeout(phaseTimer);
       setRoute((currentRoute) =>
@@ -694,7 +713,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         return ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           quality: 0.85,
-          allowsEditing: false,
+          allowsEditing: true,
         });
       });
     } catch (e) {
@@ -747,7 +766,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         }
         return ImagePicker.launchCameraAsync({
           quality: 0.85,
-          allowsEditing: false,
+          allowsEditing: true,
         });
       });
     } catch (e) {
@@ -1034,11 +1053,6 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               Contact your doctor or go to urgent care if you already took this medicine and feel unwell. If breathing is hard or swelling is
               severe, call emergency services.
             </Text>
-            {profile.caregiverDetails?.trim() ? (
-              <Text style={s.caregiverNote}>
-                Caregiver on file: {profile.caregiverDetails.trim()} — a full app build could message them automatically for dangerous results.
-              </Text>
-            ) : null}
           </View>
         ) : null}
 
@@ -1380,7 +1394,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             onPress={() =>
               Alert.alert(
                 'Prescription scan tips',
-                'Capture the whole page, keep the camera steady, and avoid shadows across the medicine names.'
+                'After taking or choosing the photo, crop it to only the medicine-name area. Keep the text clear and avoid shadows.'
               )
             }
           >
@@ -1409,7 +1423,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </View>
             <View style={s.scanIntroBody}>
               <Text style={s.scanIntroTitle}>Scan Prescription</Text>
-              <Text style={s.scanIntroText}>Capture a clear image of your prescription for medication safety analysis.</Text>
+              <Text style={s.scanIntroText}>Take or choose a prescription photo, then crop it to only the medicine area before OCR starts.</Text>
             </View>
           </View>
 
@@ -1419,7 +1433,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </View>
             <Text style={s.scanHighlightTitle}>One clean photo is enough</Text>
             <Text style={s.scanHighlightText}>
-              Keep the entire prescription inside the frame and make sure the medicine lines are bright, flat, and readable.
+              Crop tightly around the medicine lines you want to scan, and make sure that area is bright, flat, and readable.
             </Text>
           </View>
 
@@ -1436,14 +1450,14 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             <View style={s.scanLiveFrame}>
               <View style={s.scanLiveFrameInner}>
                 <Text style={s.scanLiveFrameEyebrow}>Live camera opens automatically</Text>
-                <Text style={s.scanLiveFrameTitle}>Align the full prescription inside this frame</Text>
+                <Text style={s.scanLiveFrameTitle}>Capture clearly, then crop to the medicine area</Text>
                 <Text style={s.scanLiveFrameText}>
-                  Hold the phone above the page, keep medicine lines flat, and avoid cutting off the bottom signature or top heading.
+                  Hold the phone above the page, keep medicine lines flat, then use the crop step to remove logos, signatures, and extra blank space.
                 </Text>
               </View>
               <View style={s.scanLiveFrameFooter}>
                 <View style={s.scanLiveHintChip}>
-                  <Text style={s.scanLiveHintChipText}>Whole page visible</Text>
+                  <Text style={s.scanLiveHintChipText}>Crop to medicines</Text>
                 </View>
                 <View style={s.scanLiveHintChip}>
                   <Text style={s.scanLiveHintChipText}>Good lighting</Text>
@@ -1457,6 +1471,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
           <View style={s.scanTipsCard}>
             <Text style={s.scanTipsTitle}>Tips:</Text>
+            <Text style={s.scanTipsBullet}>Crop to only the medicine-name section after capture</Text>
             <Text style={s.scanTipsBullet}>• Ensure the text is clear and the lighting is good</Text>
             <Text style={s.scanTipsBullet}>• Avoid shadows and blurry images</Text>
             <Text style={s.scanTipsBullet}>Keep each medicine line fully visible whenever possible</Text>
@@ -1468,7 +1483,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                 <Text style={s.scanSideActionIconText}>🖼️</Text>
               </View>
               <Text style={s.scanSideActionLabel}>Gallery</Text>
-              <Text style={s.scanSideActionMeta}>Use a saved image</Text>
+              <Text style={s.scanSideActionMeta}>Choose and crop image</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.scanCaptureButton} onPress={() => startCameraScanFlow({ preferFlash: scanFlashOn })} activeOpacity={0.9}>
@@ -1494,7 +1509,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             </TouchableOpacity>
           </View>
 
-          <Text style={s.scanCaptureHint}>Tap the camera button to capture</Text>
+          <Text style={s.scanCaptureHint}>Take or choose a photo, then crop to the medicine area</Text>
         </ScrollView>
       </View>
     );
@@ -1562,7 +1577,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             <Text style={s.scanChecklistTitle}>What happens next</Text>
             <View style={s.scanChecklistRow}>
               <Text style={s.scanChecklistBullet}>1</Text>
-              <Text style={s.scanChecklistText}>We extract prescription text from the photo.</Text>
+              <Text style={s.scanChecklistText}>We check image quality, then extract prescription text from the photo.</Text>
             </View>
             <View style={s.scanChecklistRow}>
               <Text style={s.scanChecklistBullet}>2</Text>
@@ -1642,6 +1657,8 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     const activeScanCandidateIndex =
       scanCandidates.length > 0 && selectedScanCandidateIndex < scanCandidates.length ? selectedScanCandidateIndex : 0;
     const confidenceTone = ocrConfidence >= 80 ? 'Strong' : ocrConfidence >= 55 ? 'Fair' : ocrConfidence > 0 ? 'Needs review' : 'Unknown';
+    const qualityTone =
+      scanQuality.status === 'good' ? 'Clear photo' : scanQuality.status === 'fair' ? 'Usable photo' : scanQuality.status === 'poor' ? 'Weak photo' : 'Unknown quality';
     const scanLineCount = trimmedScanText ? trimmedScanText.split(/\r?\n/).filter(Boolean).length : 0;
     const scanWordCount = trimmedScanText ? trimmedScanText.split(/\s+/).filter(Boolean).length : 0;
     const estimatedMedicineCount = trimmedScanText
@@ -1685,6 +1702,14 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                         ? 'Readable, but review strengths and abbreviations carefully.'
                         : 'This scan needs a careful review. Retake the image if key medicine names look wrong.'}
                   </Text>
+                  <Text style={s.helpSmall}>
+                    Photo quality: {qualityTone}
+                    {scanQuality.blurScore ? ` | Blur score ${scanQuality.blurScore}` : ''}
+                    {scanQuality.contrastScore ? ` | Contrast ${scanQuality.contrastScore}` : ''}
+                  </Text>
+                  {Array.isArray(scanQuality.warnings) && scanQuality.warnings.length > 0 ? (
+                    <Text style={s.helpSmall}>{scanQuality.warnings.join(' ')}</Text>
+                  ) : null}
                 </View>
               </View>
               <View style={s.scanMetaRow}>
@@ -1772,6 +1797,11 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             <View style={s.scanExampleCard}>
               <Text style={s.scanInfoTitle}>Good format example</Text>
               <Text style={s.scanExampleText}>Amoxicillin 500 mg tds{"\n"}Panadol 500 mg when needed{"\n"}Metformin 500 mg after dinner</Text>
+            </View>
+
+            <View style={s.scanExampleCard}>
+              <Text style={s.scanInfoTitle}>Photo tips</Text>
+              <Text style={s.scanExampleText}>Good lighting{"\n"}Keep the paper flat{"\n"}Avoid shadows{"\n"}Focus clearly{"\n"}Fill the frame with the prescription</Text>
             </View>
 
             {scanCandidates.length > 0 ? (
@@ -1990,9 +2020,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             ['Antibiotics / painkillers reaction', profile.antibioticPainkillerReaction?.trim() || 'Not added'],
             ['Chronic conditions', chronicDisplay || 'Not added'],
             ['Current medicines', profile.currentMedicationsText || 'Not added'],
-            ['Emergency contact', profile.emergencyContact || 'Not added'],
-            ['Caregiver', profile.caregiverDetails || 'Not added'],
-          ].map(([label, value]) => (
+            ['Caregiver email', profile.caregiverEmail || 'Not added'],
+            ['Caregiver phone', profile.caregiverPhone || 'Not added'],
+            ].map(([label, value]) => (
             <View key={label} style={s.card}>
               <Text style={s.small}>{label}</Text>
               <Text style={s.cardText}>{value}</Text>
@@ -2115,15 +2145,18 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             />
             <TextInput
               style={s.input}
-              value={profile.emergencyContact}
-              onChangeText={(v) => setProfile((p) => ({ ...p, emergencyContact: v }))}
-              placeholder="Emergency contact (name and phone)"
+              value={profile.caregiverEmail}
+              onChangeText={(v) => setProfile((p) => ({ ...p, caregiverEmail: v }))}
+              placeholder="Caregiver email"
+              autoCapitalize="none"
+              keyboardType="email-address"
             />
             <TextInput
               style={s.input}
-              value={profile.caregiverDetails}
-              onChangeText={(v) => setProfile((p) => ({ ...p, caregiverDetails: v }))}
-              placeholder="Caregiver (for alerts when a check is dangerous)"
+              value={profile.caregiverPhone}
+              onChangeText={(v) => setProfile((p) => ({ ...p, caregiverPhone: v }))}
+              placeholder="Caregiver phone number"
+              keyboardType="phone-pad"
             />
             <TouchableOpacity style={s.bigPrimary} onPress={saveProfile} disabled={saving}>
               <Text style={s.bigPrimaryText}>{saving ? 'Saving…' : 'Save and continue'}</Text>
@@ -2301,25 +2334,29 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               />
             </>
           ) : null}
-          {onboardingStep === 3 ? (
-            <>
-              <View style={s.card}>
-                <Text style={s.title}>Emergency & caregiver</Text>
-              </View>
-              <TextInput
-                style={s.input}
-                value={profile.emergencyContact}
-                onChangeText={(v) => setProfile((p) => ({ ...p, emergencyContact: v }))}
-                placeholder="Emergency contact (name and phone)"
-              />
-              <TextInput
-                style={s.input}
-                value={profile.caregiverDetails}
-                onChangeText={(v) => setProfile((p) => ({ ...p, caregiverDetails: v }))}
-                placeholder="Caregiver (optional)"
-              />
-            </>
-          ) : null}
+            {onboardingStep === 3 ? (
+              <>
+                <View style={s.card}>
+                  <Text style={s.title}>Review your profile</Text>
+                </View>
+                <TextInput
+                  style={s.input}
+                  value={profile.caregiverEmail}
+                  onChangeText={(v) => setProfile((p) => ({ ...p, caregiverEmail: v }))}
+                  placeholder="Caregiver email"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <TextInput
+                  style={s.input}
+                  value={profile.caregiverPhone}
+                  onChangeText={(v) => setProfile((p) => ({ ...p, caregiverPhone: v }))}
+                  placeholder="Caregiver phone number"
+                  keyboardType="phone-pad"
+                />
+                <Text style={s.helpSmall}>Check the details above, then finish setup.</Text>
+              </>
+            ) : null}
           {onboardingStep < 3 ? (
             <TouchableOpacity style={s.bigPrimary} onPress={advance}>
               <Text style={s.bigPrimaryText}>Next</Text>

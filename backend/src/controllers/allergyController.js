@@ -29,6 +29,8 @@ const sanitizeProfilePayload = (body) => ({
   currentMedicationsText: normalizeText(body.currentMedicationsText),
   emergencyContact: normalizeText(body.emergencyContact),
   caregiverDetails: normalizeText(body.caregiverDetails),
+  caregiverEmail: normalizeText(body.caregiverEmail),
+  caregiverPhone: normalizeText(body.caregiverPhone),
   profileCompleted: body.profileCompleted === true || body.profileCompleted === 'true',
   reactionSymptomsText: normalizeText(body.reactionSymptomsText),
   suspectedMedicineNamesText: normalizeText(body.suspectedMedicineNamesText),

@@ -118,6 +118,7 @@ async function postOcrOnce(baseURL, imageUri, mimeType) {
     confidence: typeof data?.confidence === 'number' ? data.confidence : 0,
     message: data?.message,
     preprocessing: data?.preprocessing,
+    quality: data?.quality,
     matchedCandidates: Array.isArray(data?.matchedCandidates) ? data.matchedCandidates : [],
   };
 }
@@ -126,7 +127,7 @@ async function postOcrOnce(baseURL, imageUri, mimeType) {
  * Sends a prescription photo to the backend for OCR.
  * @param {string} imageUri Local file URI from expo-image-picker
  * @param {string} [mimeType]
- * @returns {Promise<{ rawText: string, confidence: number, message?: string, preprocessing?: { applied?: string[] }, matchedCandidates?: Array<object> }>}
+ * @returns {Promise<{ rawText: string, confidence: number, message?: string, preprocessing?: { applied?: string[] }, quality?: object, matchedCandidates?: Array<object> }>}
  */
 export async function extractPrescriptionTextFromImage(imageUri, mimeType = 'image/jpeg') {
   const resolvedMimeType = normalizeMimeType(mimeType, imageUri);

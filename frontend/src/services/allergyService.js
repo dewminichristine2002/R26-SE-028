@@ -109,6 +109,8 @@ export const allergyService = {
           currentMedicationsText: '',
           emergencyContact: '',
           caregiverDetails: '',
+          caregiverEmail: '',
+          caregiverPhone: '',
           profileCompleted: false,
           reactionSymptomsText: '',
           suspectedMedicineNamesText: '',

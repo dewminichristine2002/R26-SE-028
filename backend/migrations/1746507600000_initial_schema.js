@@ -53,6 +53,36 @@ exports.up = (pgm) => {
   );
 
   pgm.createTable(
+    'user_medications',
+    {
+      id: 'id',
+      user_id: {
+        type: 'integer',
+        notNull: true,
+        references: '"users"',
+        onDelete: 'CASCADE',
+      },
+      medicine_name: { type: 'text', notNull: true, default: '' },
+      total_quantity: { type: 'numeric', notNull: true, default: 0 },
+      dosage_mg: { type: 'numeric', notNull: true, default: 0 },
+      daily_amount: { type: 'integer', notNull: true, default: 1 },
+      dose_form: { type: 'text', notNull: true, default: 'Tablet' },
+      take_with: { type: 'text', notNull: true, default: '' },
+      intake_timing: { type: 'text', notNull: true, default: '' },
+      selected_color: { type: 'text' },
+      selected_shape: { type: 'text' },
+      created_at: { type: 'timestamptz', notNull: true, default: pgm.func('NOW()') },
+      updated_at: { type: 'timestamptz', notNull: true, default: pgm.func('NOW()') },
+    },
+    { ifNotExists: true }
+  );
+
+  pgm.createIndex('user_medications', 'user_id', {
+    ifNotExists: true,
+    name: 'user_medications_user_id_idx',
+  });
+
+  pgm.createTable(
     'user_allergy_profiles',
     {
       id: 'id',
@@ -71,6 +101,8 @@ exports.up = (pgm) => {
       current_medications_text: { type: 'text', notNull: true, default: '' },
       emergency_contact: { type: 'text', notNull: true, default: '' },
       caregiver_details: { type: 'text', notNull: true, default: '' },
+      caregiver_email: { type: 'text', notNull: true, default: '' },
+      caregiver_phone: { type: 'text', notNull: true, default: '' },
       profile_completed: { type: 'boolean', notNull: true, default: false },
       reaction_symptoms_text: { type: 'text', notNull: true, default: '' },
       suspected_medicine_names_text: { type: 'text', notNull: true, default: '' },
@@ -235,6 +267,7 @@ exports.down = (pgm) => {
   pgm.dropTable('allergy_cards', { ifExists: true, cascade: true });
   pgm.dropTable('allergy_questionnaire_answers', { ifExists: true, cascade: true });
   pgm.dropTable('user_allergy_profiles', { ifExists: true, cascade: true });
+  pgm.dropTable('user_medications', { ifExists: true, cascade: true });
   pgm.dropTable('user_routines', { ifExists: true, cascade: true });
   pgm.dropTable('users', { ifExists: true, cascade: true });
   pgm.dropTable('routines', { ifExists: true, cascade: true });

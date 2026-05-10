@@ -2,6 +2,7 @@ const { pool } = require('../config/db');
 
 let allergyProfileColumnsEnsured = false;
 let analysisColumnsEnsured = false;
+let userMedicationTableEnsured = false;
 const safeJsonParse = (value, fallback) => {
   if (!value) {
     return fallback;
@@ -12,6 +13,218 @@ const safeJsonParse = (value, fallback) => {
   } catch {
     return fallback;
   }
+};
+
+const normalizeText = (value) => (value == null ? '' : String(value).trim());
+
+const parseDosageMg = (value) => {
+  const match = String(value || '').match(/(\d+(?:\.\d+)?)\s*mg\b/i);
+  return match ? Number(match[1]) : 0;
+};
+
+const parseDailyAmount = (value) => {
+  const text = String(value || '').toLowerCase();
+  if (/\b(qid|four\s+times)\b/.test(text)) {
+    return 4;
+  }
+  if (/\b(tds|tid|three\s+times)\b/.test(text)) {
+    return 3;
+  }
+  if (/\b(bd|bid|twice|two\s+times)\b/.test(text)) {
+    return 2;
+  }
+  if (/\b(od|once|daily|night|morning)\b/.test(text)) {
+    return 1;
+  }
+  return 1;
+};
+
+const parseDoseForm = (value) => {
+  const text = String(value || '').toLowerCase();
+  if (/\bcap(?:sule)?\b/.test(text)) return 'Capsule';
+  if (/\btab(?:let)?\b/.test(text)) return 'Tablet';
+  if (/\bsyrup|syp\b/.test(text)) return 'Syrup';
+  if (/\binj(?:ection)?\b/.test(text)) return 'Injection';
+  if (/\bcream\b/.test(text)) return 'Cream';
+  if (/\bdrops?\b/.test(text)) return 'Drops';
+  return 'Tablet';
+};
+
+const parseMedicineName = (value) =>
+  normalizeText(value)
+    .replace(/^\d+\s*[\).:-]?\s*/, '')
+    .replace(/\b(?:tab(?:let)?|cap(?:sule)?|syrup|syp|inj(?:ection)?|cream|drops?)\b\.?/gi, ' ')
+    .replace(/\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml)\b/gi, ' ')
+    .replace(/\b(?:od|bd|bid|tds|tid|qid|prn|once|twice|three|four|daily|after|before|food|night|morning|evening)\b/gi, ' ')
+    .replace(/[(),/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const parseMedicationTextItems = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return [];
+  }
+
+  const pieces = raw
+    .split(/\r?\n|;/)
+    .flatMap((segment) => segment.split(/,(?=\s*[A-Za-z])/))
+    .map((segment) => normalizeText(segment))
+    .filter(Boolean);
+
+  const seen = new Set();
+  const results = [];
+
+  pieces.forEach((piece) => {
+    const medicineName = parseMedicineName(piece);
+    if (!medicineName) {
+      return;
+    }
+
+    const key = medicineName.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+
+    results.push({
+      medicineName,
+      totalQuantity: 0,
+      dosageMg: parseDosageMg(piece),
+      dailyAmount: parseDailyAmount(piece),
+      doseForm: parseDoseForm(piece),
+    });
+  });
+
+  return results;
+};
+
+const formatUserMedicationRow = (row) => {
+  const name = normalizeText(row.medicine_name);
+  const dosage = Number(row.dosage_mg || 0) > 0 ? `${Number(row.dosage_mg)}mg` : '';
+  return [name, dosage].filter(Boolean).join(' ').trim();
+};
+
+const buildCurrentMedicationsTextFromRows = (rows) =>
+  rows
+    .map(formatUserMedicationRow)
+    .filter(Boolean)
+    .join(', ');
+
+const ensureUserMedicationTable = async () => {
+  if (userMedicationTableEnsured) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_medications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      medicine_name TEXT NOT NULL DEFAULT '',
+      total_quantity NUMERIC NOT NULL DEFAULT 0,
+      dosage_mg NUMERIC NOT NULL DEFAULT 0,
+      daily_amount INTEGER NOT NULL DEFAULT 1,
+      dose_form TEXT NOT NULL DEFAULT 'Tablet',
+      take_with TEXT NOT NULL DEFAULT '',
+      intake_timing TEXT NOT NULL DEFAULT '',
+      selected_color TEXT,
+      selected_shape TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS take_with TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS intake_timing TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_color TEXT`);
+  await pool.query(`ALTER TABLE user_medications ADD COLUMN IF NOT EXISTS selected_shape TEXT`);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS user_medications_user_id_idx
+    ON user_medications (user_id)
+  `);
+
+  userMedicationTableEnsured = true;
+};
+
+const listUserMedicationRows = async (executor, userId) => {
+  await ensureUserMedicationTable();
+  const result = await executor.query(
+    `
+      SELECT
+        id,
+        user_id,
+        medicine_name,
+        total_quantity,
+        dosage_mg,
+        daily_amount,
+        dose_form,
+        take_with,
+        intake_timing,
+        selected_color,
+        selected_shape,
+        created_at,
+        updated_at
+      FROM user_medications
+      WHERE user_id = $1
+      ORDER BY id ASC
+    `,
+    [userId]
+  );
+
+  return result.rows;
+};
+
+const replaceUserMedications = async (executor, userId, currentMedicationsText) => {
+  await ensureUserMedicationTable();
+
+  const parsedItems = parseMedicationTextItems(currentMedicationsText);
+  const existingRows = await listUserMedicationRows(executor, userId);
+  const existingByName = new Map(
+    existingRows.map((row) => [normalizeText(row.medicine_name).toLowerCase(), row])
+  );
+
+  await executor.query(`DELETE FROM user_medications WHERE user_id = $1`, [userId]);
+
+  for (const item of parsedItems) {
+    const existing = existingByName.get(item.medicineName.toLowerCase());
+    await executor.query(
+      `
+        INSERT INTO user_medications (
+          user_id,
+          medicine_name,
+          total_quantity,
+          dosage_mg,
+          daily_amount,
+          dose_form,
+          take_with,
+          intake_timing,
+          selected_color,
+          selected_shape,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+      `,
+      [
+        userId,
+        item.medicineName,
+        existing ? Number(existing.total_quantity || 0) : Number(item.totalQuantity || 0),
+        item.dosageMg > 0 ? item.dosageMg : Number(existing?.dosage_mg || 0),
+        item.dailyAmount > 0 ? item.dailyAmount : Number(existing?.daily_amount || 1),
+        existing?.dose_form || item.doseForm || 'Tablet',
+        existing?.take_with || '',
+        existing?.intake_timing || '',
+        existing?.selected_color || null,
+        existing?.selected_shape || null,
+      ]
+    );
+  }
+
+  const syncedRows = await listUserMedicationRows(executor, userId);
+  return {
+    rows: syncedRows,
+    currentMedicationsText: buildCurrentMedicationsTextFromRows(syncedRows),
+  };
 };
 
 const ensureAllergyProfileColumns = async () => {
@@ -36,7 +249,69 @@ const ensureAllergyProfileColumns = async () => {
   await pool.query(
     `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS antibiotic_painkiller_reaction TEXT NOT NULL DEFAULT ''`
   );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS caregiver_email TEXT NOT NULL DEFAULT ''`
+  );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS caregiver_phone TEXT NOT NULL DEFAULT ''`
+  );
   allergyProfileColumnsEnsured = true;
+};
+
+const getCaregiverContactFromAlerts = async (executor, userId) => {
+  try {
+    const result = await executor.query(
+      `
+        SELECT caregiver_email, caregiver_phone
+        FROM caregiver_alerts
+        WHERE user_id = $1
+          AND (
+            COALESCE(TRIM(caregiver_email), '') <> ''
+            OR COALESCE(TRIM(caregiver_phone), '') <> ''
+          )
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return { caregiverEmail: '', caregiverPhone: '' };
+    }
+
+    return {
+      caregiverEmail: normalizeText(result.rows[0].caregiver_email),
+      caregiverPhone: normalizeText(result.rows[0].caregiver_phone),
+    };
+  } catch {
+    return { caregiverEmail: '', caregiverPhone: '' };
+  }
+};
+
+const getHealthProfileAutofill = async (executor, userId) => {
+  try {
+    const result = await executor.query(
+      `
+        SELECT age, gender
+        FROM user_health_profiles
+        WHERE user_id = $1
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return { age: '', gender: '' };
+    }
+
+    return {
+      age: normalizeText(result.rows[0].age),
+      gender: normalizeText(result.rows[0].gender),
+    };
+  } catch {
+    return { age: '', gender: '' };
+  }
 };
 
 const ensureAnalysisColumns = async () => {
@@ -81,6 +356,8 @@ const mapProfileRow = (row) => ({
   currentMedicationsText: row.current_medications_text,
   emergencyContact: row.emergency_contact,
   caregiverDetails: row.caregiver_details,
+  caregiverEmail: row.caregiver_email || '',
+  caregiverPhone: row.caregiver_phone || '',
   profileCompleted: Boolean(row.profile_completed),
   reactionSymptomsText: row.reaction_symptoms_text || '',
   suspectedMedicineNamesText: row.suspected_medicine_names_text || '',
@@ -139,6 +416,7 @@ const listQuestionnaireAnswers = async (userId) => {
 
 const getProfile = async (userId) => {
   await ensureAllergyProfileColumns();
+  await ensureUserMedicationTable();
 
   const result = await pool.query(
     `
@@ -159,72 +437,126 @@ const getProfile = async (userId) => {
       [userId]
     );
 
-    return mapProfileRow(inserted.rows[0]);
+    const insertedProfile = mapProfileRow(inserted.rows[0]);
+    const medicationRows = await listUserMedicationRows(pool, userId);
+    const caregiverContact = await getCaregiverContactFromAlerts(pool, userId);
+    const healthProfile = await getHealthProfileAutofill(pool, userId);
+    return {
+      ...insertedProfile,
+      age: healthProfile.age || insertedProfile.age,
+      gender: healthProfile.gender || insertedProfile.gender,
+      currentMedicationsText:
+        medicationRows.length > 0
+          ? buildCurrentMedicationsTextFromRows(medicationRows)
+          : insertedProfile.currentMedicationsText,
+      caregiverEmail: caregiverContact.caregiverEmail || insertedProfile.caregiverEmail,
+      caregiverPhone: caregiverContact.caregiverPhone || insertedProfile.caregiverPhone,
+    };
   }
 
-  return mapProfileRow(result.rows[0]);
+  const profile = mapProfileRow(result.rows[0]);
+  const medicationRows = await listUserMedicationRows(pool, userId);
+  const caregiverContact = await getCaregiverContactFromAlerts(pool, userId);
+  const healthProfile = await getHealthProfileAutofill(pool, userId);
+  return {
+    ...profile,
+    age: healthProfile.age || profile.age,
+    gender: healthProfile.gender || profile.gender,
+    currentMedicationsText:
+      medicationRows.length > 0
+        ? buildCurrentMedicationsTextFromRows(medicationRows)
+        : profile.currentMedicationsText,
+    caregiverEmail: caregiverContact.caregiverEmail || profile.caregiverEmail,
+    caregiverPhone: caregiverContact.caregiverPhone || profile.caregiverPhone,
+  };
 };
 
 const upsertProfile = async (userId, payload) => {
   await ensureAllergyProfileColumns();
+  await ensureUserMedicationTable();
 
-  const result = await pool.query(
-    `
-      INSERT INTO user_allergy_profiles (
-        user_id,
-        age,
-        gender,
-        has_medicine_allergy,
-        known_allergies_text,
-        chronic_diseases_text,
-        current_medications_text,
-        emergency_contact,
-        caregiver_details,
-        profile_completed,
-        reaction_symptoms_text,
-        suspected_medicine_names_text,
-        avoided_medicines_text,
-        antibiotic_painkiller_reaction,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
-      ON CONFLICT (user_id)
-      DO UPDATE SET
-        age = EXCLUDED.age,
-        gender = EXCLUDED.gender,
-        has_medicine_allergy = EXCLUDED.has_medicine_allergy,
-        known_allergies_text = EXCLUDED.known_allergies_text,
-        chronic_diseases_text = EXCLUDED.chronic_diseases_text,
-        current_medications_text = EXCLUDED.current_medications_text,
-        emergency_contact = EXCLUDED.emergency_contact,
-        caregiver_details = EXCLUDED.caregiver_details,
-        profile_completed = EXCLUDED.profile_completed,
-        reaction_symptoms_text = EXCLUDED.reaction_symptoms_text,
-        suspected_medicine_names_text = EXCLUDED.suspected_medicine_names_text,
-        avoided_medicines_text = EXCLUDED.avoided_medicines_text,
-        antibiotic_painkiller_reaction = EXCLUDED.antibiotic_painkiller_reaction,
-        updated_at = NOW()
-      RETURNING *
-    `,
-    [
-      userId,
-      payload.age,
-      payload.gender,
-      payload.hasMedicineAllergy,
-      payload.knownAllergiesText,
-      payload.chronicDiseasesText,
-      payload.currentMedicationsText,
-      payload.emergencyContact,
-      payload.caregiverDetails,
-      payload.profileCompleted,
-      payload.reactionSymptomsText,
-      payload.suspectedMedicineNamesText,
-      payload.avoidedMedicinesText,
-      payload.antibioticPainkillerReaction,
-    ]
-  );
+  const client = await pool.connect();
 
-  return mapProfileRow(result.rows[0]);
+  try {
+    await client.query('BEGIN');
+
+    const syncedMedications = await replaceUserMedications(client, userId, payload.currentMedicationsText);
+    const profileCurrentMedicationsText = syncedMedications.currentMedicationsText;
+
+    const result = await client.query(
+      `
+        INSERT INTO user_allergy_profiles (
+          user_id,
+          age,
+          gender,
+          has_medicine_allergy,
+          known_allergies_text,
+          chronic_diseases_text,
+          current_medications_text,
+          emergency_contact,
+          caregiver_details,
+          caregiver_email,
+          caregiver_phone,
+          profile_completed,
+          reaction_symptoms_text,
+          suspected_medicine_names_text,
+          avoided_medicines_text,
+          antibiotic_painkiller_reaction,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          age = EXCLUDED.age,
+          gender = EXCLUDED.gender,
+          has_medicine_allergy = EXCLUDED.has_medicine_allergy,
+          known_allergies_text = EXCLUDED.known_allergies_text,
+          chronic_diseases_text = EXCLUDED.chronic_diseases_text,
+          current_medications_text = EXCLUDED.current_medications_text,
+          emergency_contact = EXCLUDED.emergency_contact,
+          caregiver_details = EXCLUDED.caregiver_details,
+          caregiver_email = EXCLUDED.caregiver_email,
+          caregiver_phone = EXCLUDED.caregiver_phone,
+          profile_completed = EXCLUDED.profile_completed,
+          reaction_symptoms_text = EXCLUDED.reaction_symptoms_text,
+          suspected_medicine_names_text = EXCLUDED.suspected_medicine_names_text,
+          avoided_medicines_text = EXCLUDED.avoided_medicines_text,
+          antibiotic_painkiller_reaction = EXCLUDED.antibiotic_painkiller_reaction,
+          updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        userId,
+        payload.age,
+        payload.gender,
+        payload.hasMedicineAllergy,
+        payload.knownAllergiesText,
+        payload.chronicDiseasesText,
+        profileCurrentMedicationsText,
+        payload.emergencyContact,
+        payload.caregiverDetails,
+        payload.caregiverEmail,
+        payload.caregiverPhone,
+        payload.profileCompleted,
+        payload.reactionSymptomsText,
+        payload.suspectedMedicineNamesText,
+        payload.avoidedMedicinesText,
+        payload.antibioticPainkillerReaction,
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      ...mapProfileRow(result.rows[0]),
+      currentMedicationsText: profileCurrentMedicationsText,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 const replaceQuestionnaireAnswers = async (userId, answers) => {
