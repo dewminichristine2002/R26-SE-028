@@ -1,0 +1,135 @@
+{
+  "selectedAlgorithm": "Logistic Regression",
+  "accuracy": 0.7465753424657534,
+  "precision": 0.1384083044982699,
+  "recall": 0.8,
+  "f1Score": 0.2359882005899705,
+  "rocAuc": 0.8425720164609054,
+  "confusionMatrix": [
+    [
+      723,
+      249
+    ],
+    [
+      10,
+      40
+    ]
+  ],
+  "featuresUsed": [
+    "age",
+    "hypertension",
+    "heart_disease",
+    "avg_glucose_level",
+    "bmi",
+    "gender",
+    "ever_married",
+    "work_type",
+    "Residence_type",
+    "smoking_status"
+  ],
+  "numericFeatures": [
+    "age",
+    "hypertension",
+    "heart_disease",
+    "avg_glucose_level",
+    "bmi"
+  ],
+  "categoricalFeatures": [
+    "gender",
+    "ever_married",
+    "work_type",
+    "Residence_type",
+    "smoking_status"
+  ],
+  "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\healthcare-dataset-stroke-data.csv",
+  "classBalance": {
+    "trainPositive": 199,
+    "trainNegative": 3889
+  },
+  "modelComparison": [
+    {
+      "algorithm": "Logistic Regression",
+      "metrics": {
+        "accuracy": 0.7465753424657534,
+        "precision": 0.1384083044982699,
+        "recall": 0.8,
+        "f1Score": 0.2359882005899705,
+        "rocAuc": 0.8425720164609054,
+        "confusionMatrix": [
+          [
+            723,
+            249
+          ],
+          [
+            10,
+            40
+          ]
+        ],
+        "positiveRate": 0.3189447331524576
+      }
+    },
+    {
+      "algorithm": "Decision Tree",
+      "metrics": {
+        "accuracy": 0.7906066536203522,
+        "precision": 0.13063063063063063,
+        "recall": 0.58,
+        "f1Score": 0.21323529411764705,
+        "rocAuc": 0.7083950617283951,
+        "confusionMatrix": [
+          [
+            779,
+            193
+          ],
+          [
+            21,
+            29
+          ]
+        ],
+        "positiveRate": 0.16880421797899595
+      }
+    },
+    {
+      "algorithm": "Random Forest",
+      "metrics": {
+        "accuracy": 0.9432485322896281,
+        "precision": 0.34615384615384615,
+        "recall": 0.18,
+        "f1Score": 0.23684210526315788,
+        "rocAuc": 0.7929423868312756,
+        "confusionMatrix": [
+          [
+            955,
+            17
+          ],
+          [
+            41,
+            9
+          ]
+        ],
+        "positiveRate": 0.12104301153346257
+      }
+    },
+    {
+      "algorithm": "XGBoost",
+      "metrics": {
+        "accuracy": 0.8649706457925636,
+        "precision": 0.20270270270270271,
+        "recall": 0.6,
+        "f1Score": 0.30303030303030304,
+        "rocAuc": 0.8251851851851852,
+        "confusionMatrix": [
+          [
+            854,
+            118
+          ],
+          [
+            20,
+            30
+          ]
+        ],
+        "positiveRate": 0.17931075394153595
+      }
+    }
+  ]
+}

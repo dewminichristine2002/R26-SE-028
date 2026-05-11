@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.services.nl2sql import generate_sql
 from app.services.ollama_client import OllamaError
+from app.services.health_advice_answer import generate_health_advice
 from app.services.rag_answer import generate_answer
 
 
@@ -52,6 +53,18 @@ class AnswerResponse(BaseModel):
     follow_ups: list[str] = Field(default_factory=list)
 
 
+class HealthAdviceRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    risk_type: str = Field(..., min_length=1)
+    prediction: dict[str, Any] = Field(default_factory=dict)
+    retrieved_chunks: list[dict[str, Any]] = Field(default_factory=list)
+    user_role: str = "user"
+
+
+class HealthAdviceResponse(BaseModel):
+    answer: str
+
+
 @router.post("/nl2sql", response_model=Nl2SqlResponse)
 async def nl2sql_endpoint(payload: Nl2SqlRequest) -> Nl2SqlResponse:
     try:
@@ -87,3 +100,19 @@ async def answer_endpoint(payload: AnswerRequest) -> AnswerResponse:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return AnswerResponse(answer=result.answer, follow_ups=result.follow_ups)
+
+
+@router.post("/health-advice", response_model=HealthAdviceResponse)
+async def health_advice_endpoint(payload: HealthAdviceRequest) -> HealthAdviceResponse:
+    try:
+        result = await generate_health_advice(
+            question=payload.question,
+            risk_type=payload.risk_type,
+            prediction=payload.prediction,
+            retrieved_chunks=payload.retrieved_chunks,
+            user_role=payload.user_role,
+        )
+    except OllamaError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return HealthAdviceResponse(answer=result.answer)

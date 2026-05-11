@@ -25,15 +25,99 @@ const tableExists = async (tableName) => {
   }
 };
 
+const roleContext = (userRole) => {
+  const isCaregiver = String(userRole || '').toLowerCase() === 'caregiver';
+  return {
+    isCaregiver,
+    subject: isCaregiver ? 'the elder' : 'you',
+    subjectCap: isCaregiver ? 'The elder' : 'You',
+    possessive: isCaregiver ? "the elder's" : 'your',
+    summaryLabel: isCaregiver ? 'caregiver' : 'elder',
+  };
+};
+
+const promptFor = (ctx, userPrompt, caregiverPrompt) => (
+  ctx.isCaregiver ? caregiverPrompt : userPrompt
+);
+
 /* ---------- individual cards ---------- */
 
-const adherenceCard = async (userId) => {
+const todayMedicationCard = async (userId, ctx) => {
+  const empty = {
+    id: 'medication_today',
+    title: 'Medication today',
+    headline: 'No dose logs today',
+    detail: `No medicine status has been logged for ${ctx.subject} today.`,
+    severity: 'warning',
+    chatPrompt: promptFor(
+      ctx,
+      'What medicine doses are due or logged for me today?',
+      'What medicine doses are due or logged for my elder today?'
+    ),
+  };
+
+  if (!(await tableExists('medication_status_events'))) {
+    return empty;
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        SUM(CASE WHEN status = 'taken'     THEN 1 ELSE 0 END)::int AS taken,
+        SUM(CASE WHEN status = 'not-taken' THEN 1 ELSE 0 END)::int AS missed,
+        SUM(CASE WHEN status = 'overdose'  THEN 1 ELSE 0 END)::int AS overdose,
+        SUM(CASE WHEN status = 'remind'    THEN 1 ELSE 0 END)::int AS reminders,
+        SUM(CASE WHEN status = 'speak'     THEN 1 ELSE 0 END)::int AS spoken,
+        COUNT(*)::int AS total
+      FROM medication_status_events
+      WHERE user_id = $1
+        AND event_time::date = CURRENT_DATE
+    `,
+    [userId]
+  );
+
+  const row = result.rows[0] || {};
+  const total = safeNumber(row.total);
+  if (total === 0) {
+    return empty;
+  }
+
+  const taken = safeNumber(row.taken);
+  const missed = safeNumber(row.missed);
+  const overdose = safeNumber(row.overdose);
+  const reminders = safeNumber(row.reminders);
+  const spoken = safeNumber(row.spoken);
+
+  return {
+    id: 'medication_today',
+    title: 'Medication today',
+    headline: overdose > 0
+      ? `${overdose} overdose alert${overdose === 1 ? '' : 's'}`
+      : missed > 0
+        ? `${missed} missed today`
+        : `${taken} taken today`,
+    detail: `${taken} taken, ${missed} missed, ${reminders} pending reminder${reminders === 1 ? '' : 's'}${overdose > 0 ? `, ${overdose} overdose` : ''}${spoken > 0 ? `, ${spoken} voice log${spoken === 1 ? '' : 's'}` : ''}.`,
+    metric: { taken, missed, overdose, reminders, spoken, total },
+    severity: overdose > 0 || missed >= 2 ? 'critical' : missed > 0 || reminders > 0 ? 'warning' : 'good',
+    chatPrompt: promptFor(
+      ctx,
+      'Show my medication timeline for today and explain anything I missed.',
+      'Show my elder medication timeline for today and explain anything missed.'
+    ),
+  };
+};
+
+const adherenceCard = async (userId, ctx) => {
   const empty = {
     id: 'medication_adherence',
     title: 'Medication adherence (7d)',
     headline: 'No data yet',
-    detail: 'Start logging your medicine intake to see your adherence here.',
-    chatPrompt: 'How has my medication adherence been this week?',
+    detail: `Start logging ${ctx.possessive} medicine intake to see adherence here.`,
+    chatPrompt: promptFor(
+      ctx,
+      'How has my medication adherence been this week?',
+      'How has my elder medication adherence been this week?'
+    ),
   };
 
   if (!(await tableExists('medication_status_events'))) {
@@ -73,18 +157,26 @@ const adherenceCard = async (userId) => {
     detail: `${taken} taken, ${missed} missed, ${overdose} overdose in the last 7 days.`,
     metric: { taken, missed, overdose, total, adherencePct },
     severity: adherencePct >= 85 ? 'good' : adherencePct >= 60 ? 'warning' : 'critical',
-    chatPrompt: 'Why was my adherence lower this week? Show the missed doses and any pattern with my mood.',
+    chatPrompt: promptFor(
+      ctx,
+      'Why was my adherence lower this week? Show the missed doses and any pattern with my mood.',
+      'Why was my elder adherence lower this week? Show missed doses and any mood pattern.'
+    ),
   };
 };
 
-const missedDosesCard = async (userId) => {
+const missedDosesCard = async (userId, ctx) => {
   const empty = {
     id: 'missed_doses',
     title: 'Missed doses (7d)',
     headline: 'No missed doses',
-    detail: 'You have logged no missed doses in the last 7 days.',
+    detail: `${ctx.subjectCap} logged no missed doses in the last 7 days.`,
     severity: 'good',
-    chatPrompt: 'Which doses did I miss recently and at what time of day?',
+    chatPrompt: promptFor(
+      ctx,
+      'Which doses did I miss recently and at what time of day?',
+      'Which doses did my elder miss recently and at what time of day?'
+    ),
   };
 
   if (!(await tableExists('medication_status_events'))) {
@@ -122,17 +214,25 @@ const missedDosesCard = async (userId) => {
       .join(', '),
     items: result.rows,
     severity: result.rows.length >= 3 ? 'critical' : 'warning',
-    chatPrompt: 'Tell me which medicines I missed in the last 7 days and at what times.',
+    chatPrompt: promptFor(
+      ctx,
+      'Tell me which medicines I missed in the last 7 days and at what times.',
+      'Tell me which medicines my elder missed in the last 7 days and at what times.'
+    ),
   };
 };
 
-const emotionalTrendCard = async (userId) => {
+const emotionalTrendCard = async (userId, ctx) => {
   const empty = {
     id: 'emotional_trend',
     title: 'Mood trend (7d)',
     headline: 'No mood check-ins yet',
     detail: 'Open Emotions to do a quick check-in.',
-    chatPrompt: 'How has my mood been recently?',
+    chatPrompt: promptFor(
+      ctx,
+      'How has my mood been recently?',
+      'How has my elder mood been recently?'
+    ),
   };
 
   if (!(await tableExists('emotional_support_emotion_sessions'))) {
@@ -180,18 +280,26 @@ const emotionalTrendCard = async (userId) => {
     detail: `${row.total} check-in${row.total === 1 ? '' : 's'} \u00b7 avg stress ${(avgStress * 100).toFixed(0)}%${highRisk > 0 ? ` \u00b7 ${highRisk} high-risk` : ''}.`,
     metric: { dominant, avgStress, highRisk, total: row.total },
     severity: highRisk > 0 || avgStress > 0.7 ? 'warning' : 'good',
-    chatPrompt: 'Summarise how my mood and stress have changed in the last week.',
+    chatPrompt: promptFor(
+      ctx,
+      'Summarise how my mood and stress have changed in the last week.',
+      'Summarise how my elder mood and stress have changed in the last week.'
+    ),
   };
 };
 
-const caregiverAlertsCard = async (userId) => {
+const caregiverAlertsCard = async (userId, ctx) => {
   const empty = {
     id: 'caregiver_alerts',
     title: 'Caregiver alerts',
     headline: 'No open alerts',
     detail: 'Nothing needs attention right now.',
     severity: 'good',
-    chatPrompt: 'Show me my recent caregiver alerts.',
+    chatPrompt: promptFor(
+      ctx,
+      'Show me my recent caregiver alerts.',
+      'Show me my elder recent caregiver alerts.'
+    ),
   };
 
   let medAlerts = 0;
@@ -225,18 +333,26 @@ const caregiverAlertsCard = async (userId) => {
     detail: `${medAlerts} medication, ${moodAlerts} mood`,
     metric: { medication: medAlerts, mood: moodAlerts, total },
     severity: total >= 3 ? 'critical' : 'warning',
-    chatPrompt: 'Show me my open caregiver alerts and explain each one.',
+    chatPrompt: promptFor(
+      ctx,
+      'Show me my open caregiver alerts and explain each one.',
+      'Show me my elder open caregiver alerts and explain each one.'
+    ),
   };
 };
 
-const lowStockCard = async (userId) => {
+const lowStockCard = async (userId, ctx) => {
   const empty = {
     id: 'low_stock',
     title: 'Medicine stock',
     headline: 'Stock OK',
     detail: 'No medicines are running low.',
     severity: 'good',
-    chatPrompt: 'Which medicines are running low and when should I refill?',
+    chatPrompt: promptFor(
+      ctx,
+      'Which medicines are running low and when should I refill?',
+      'Which of my elder medicines are running low and when should I refill?'
+    ),
   };
 
   if (!(await tableExists('user_medications'))) {
@@ -288,18 +404,26 @@ const lowStockCard = async (userId) => {
       .join(', '),
     items: lowStock,
     severity: lowStock.some((m) => m.daysLeft <= 3) ? 'critical' : 'warning',
-    chatPrompt: 'Which medicines are running low and how many days do I have left?',
+    chatPrompt: promptFor(
+      ctx,
+      'Which medicines are running low and how many days do I have left?',
+      'Which medicines are running low for my elder and how many days are left?'
+    ),
   };
 };
 
-const allergyRiskCard = async (userId) => {
+const allergyRiskCard = async (userId, ctx) => {
   const empty = {
     id: 'allergy_risk',
     title: 'Medicine safety',
     headline: 'No risky medicines',
     detail: 'Recent safety checks show no high-risk medicines.',
     severity: 'good',
-    chatPrompt: 'Are any of my recent medicine safety checks dangerous?',
+    chatPrompt: promptFor(
+      ctx,
+      'Are any of my recent medicine safety checks dangerous?',
+      'Are any recent medicine safety checks dangerous for my elder?'
+    ),
   };
 
   if (!(await tableExists('allergy_cards'))) {
@@ -334,18 +458,26 @@ const allergyRiskCard = async (userId) => {
     detail: result.rows.slice(0, 3).map((r) => `${r.medicine_name} (${r.risk_level})`).join(', '),
     items: result.rows,
     severity: dangerous > 0 ? 'critical' : 'warning',
-    chatPrompt: 'Which of my saved medicines were flagged as dangerous and why?',
+    chatPrompt: promptFor(
+      ctx,
+      'Which of my saved medicines were flagged as dangerous and why?',
+      'Which saved medicines were flagged as dangerous for my elder and why?'
+    ),
   };
 };
 
-const routineCard = async (userId) => {
+const routineCard = async (userId, ctx) => {
   const fallback = {
     id: 'routine',
     title: 'Daily routine',
     headline: 'Routine not set',
     detail: 'Set your meal and sleep times to anchor reminders.',
     severity: 'warning',
-    chatPrompt: 'What is my daily routine and which medicines line up with each meal?',
+    chatPrompt: promptFor(
+      ctx,
+      'What is my daily routine and which medicines line up with each meal?',
+      'What is my elder daily routine and which medicines line up with each meal?'
+    ),
   };
 
   if (!(await tableExists('user_routines'))) {
@@ -368,25 +500,32 @@ const routineCard = async (userId) => {
     headline: `Breakfast ${r.breakfast_time}`,
     detail: `Lunch ${r.lunch_time} \u00b7 Dinner ${r.dinner_time} \u00b7 Sleep ${r.sleep_time}`,
     severity: 'good',
-    chatPrompt: 'Which medicines line up with each meal in my routine?',
+    chatPrompt: promptFor(
+      ctx,
+      'Which medicines line up with each meal in my routine?',
+      'Which medicines line up with each meal in my elder routine?'
+    ),
   };
 };
 
 /* ---------- public ---------- */
 
-const buildSummary = async (userId) => {
+const buildSummary = async (userId, userRole = 'user') => {
+  const ctx = roleContext(userRole);
   const cards = await Promise.all([
-    adherenceCard(userId).catch(() => null),
-    missedDosesCard(userId).catch(() => null),
-    emotionalTrendCard(userId).catch(() => null),
-    caregiverAlertsCard(userId).catch(() => null),
-    lowStockCard(userId).catch(() => null),
-    allergyRiskCard(userId).catch(() => null),
-    routineCard(userId).catch(() => null),
+    todayMedicationCard(userId, ctx).catch(() => null),
+    adherenceCard(userId, ctx).catch(() => null),
+    missedDosesCard(userId, ctx).catch(() => null),
+    caregiverAlertsCard(userId, ctx).catch(() => null),
+    lowStockCard(userId, ctx).catch(() => null),
+    emotionalTrendCard(userId, ctx).catch(() => null),
+    allergyRiskCard(userId, ctx).catch(() => null),
+    routineCard(userId, ctx).catch(() => null),
   ]);
 
   return {
     generatedAt: new Date().toISOString(),
+    role: ctx.summaryLabel,
     cards: cards.filter(Boolean),
   };
 };

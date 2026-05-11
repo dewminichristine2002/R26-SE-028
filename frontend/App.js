@@ -13,6 +13,9 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import MedicineSafetyScreen from './src/screens/MedicineSafetyScreenFixed';
 import UnifiedDashboardScreen from './src/screens/UnifiedDashboardScreen';
 import AssistantChatScreen from './src/screens/AssistantChatScreen';
+import DiabetesPredictionScreen from './src/screens/DiabetesPredictionScreen';
+import StrokePredictionScreen from './src/screens/StrokePredictionScreen';
+import HypertensionPredictionScreen from './src/screens/HypertensionPredictionScreen';
 import AssistantFAB from './src/components/AssistantFAB';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
@@ -53,6 +56,14 @@ export default function App() {
       }
       if (activeScreen === 'assistant-chat') {
         setActiveScreen(assistantReturnScreen || 'home');
+        return true;
+      }
+      if (
+        activeScreen === 'diabetes-prediction' ||
+        activeScreen === 'stroke-prediction' ||
+        activeScreen === 'hypertension-prediction'
+      ) {
+        setActiveScreen('home');
         return true;
       }
       if (activeScreen === 'unified-dashboard') {
@@ -289,6 +300,36 @@ export default function App() {
           user={currentUser}
           onBack={() => setActiveScreen('home')}
           onOpenAssistant={openAssistant}
+          onOpenDiabetesPrediction={() => setActiveScreen('diabetes-prediction')}
+          onOpenStrokePrediction={() => setActiveScreen('stroke-prediction')}
+          onOpenHypertensionPrediction={() => setActiveScreen('hypertension-prediction')}
+        />
+      );
+    }
+
+    if (activeScreen === 'diabetes-prediction') {
+      return (
+        <DiabetesPredictionScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+        />
+      );
+    }
+
+    if (activeScreen === 'stroke-prediction') {
+      return (
+        <StrokePredictionScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+        />
+      );
+    }
+
+    if (activeScreen === 'hypertension-prediction') {
+      return (
+        <HypertensionPredictionScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
         />
       );
     }
@@ -313,6 +354,9 @@ export default function App() {
         launchIntent={homeLaunchIntent}
         onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
         onOpenDashboard={() => setActiveScreen('unified-dashboard')}
+        onOpenDiabetesPrediction={() => setActiveScreen('diabetes-prediction')}
+        onOpenStrokePrediction={() => setActiveScreen('stroke-prediction')}
+        onOpenHypertensionPrediction={() => setActiveScreen('hypertension-prediction')}
         onOpenAssistant={openAssistant}
         onLogout={handleLogout}
       />

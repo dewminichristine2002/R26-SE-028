@@ -31,12 +31,13 @@ const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
     right: 16,
-    bottom: 24,
+    bottom: 20,
     zIndex: 999,
     elevation: 14,
   },
   button: {
     backgroundColor: '#2563EB',
+    minHeight: 68,
     paddingLeft: 8,
     paddingRight: 18,
     paddingVertical: 8,
@@ -55,32 +56,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#1D4ED8',
   },
   iconBubble: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   icon: {
-    fontSize: 22,
+    fontSize: 26,
   },
   textBox: {
     paddingRight: 4,
   },
   title: {
     color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 16,
-    letterSpacing: 0.3,
+    fontWeight: '900',
+    fontSize: 18,
   },
   subtitle: {
     color: '#DBEAFE',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '800',
     marginTop: 1,
-    letterSpacing: 0.5,
   },
 });
 

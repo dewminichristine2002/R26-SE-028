@@ -15,6 +15,22 @@ const axios = require('axios');
 const { pool } = require('../config/db');
 const { validateAndPrepareSql } = require('./sqlValidator');
 const { buildPromptDigest } = require('../data/schemaDescription');
+const {
+  buildDiabetesResponseWithSummary,
+  extractHealthValuesFromMessage,
+} = require('./diabetesPredictionService');
+const {
+  buildStrokeResponseWithSummary,
+  extractStrokeValuesFromMessage,
+} = require('./strokePredictionService');
+const {
+  buildHypertensionResponseWithSummary,
+  extractHypertensionValuesFromMessage,
+} = require('./hypertensionPredictionService');
+const {
+  buildHealthAdviceResponse,
+  isHealthAdviceQuestion,
+} = require('./healthAdviceService');
 
 const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
@@ -79,6 +95,35 @@ const ensureConversation = async (userId, conversationId) => {
     [userId, 'New conversation']
   );
   return created.rows[0].id;
+};
+
+const getConversationHint = async (userId, conversationId) => {
+  if (!conversationId) {
+    return '';
+  }
+
+  const result = await pool.query(
+    `
+      SELECT title
+      FROM assistant_conversations
+      WHERE id = $1 AND user_id = $2
+      LIMIT 1
+    `,
+    [conversationId, userId]
+  );
+
+  const title = String(result.rows[0]?.title || '').toLowerCase();
+  if (/\bstroke\b/.test(title)) {
+    return 'Stroke';
+  }
+  if (/\b(hypertension|blood\s*pressure|\bbp\b)\b/.test(title)) {
+    return 'Hypertension';
+  }
+  if (/\b(diabetes|diabetic|blood\s*sugar|glucose)\b/.test(title)) {
+    return 'Diabetes';
+  }
+
+  return '';
 };
 
 const recentMessagesForContext = async (conversationId) => {
@@ -159,6 +204,32 @@ const runUserScopedQuery = async (sql, userId) => {
   }
 };
 
+const isDiabetesAssistantRequest = (message, extractedValues) => {
+  if (Object.keys(extractedValues || {}).length > 0) {
+    return true;
+  }
+
+  const normalized = String(message || '').toLowerCase();
+  return /\b(diabetes|diabetic|blood\s*sugar|glucose)\b/.test(normalized) &&
+    /\b(risk|predict|prediction|check|update|changed|new|now)\b/.test(normalized);
+};
+
+const isStrokeAssistantRequest = (message) => {
+  const normalized = String(message || '').toLowerCase();
+  return /\bstroke\b/.test(normalized) &&
+    /\b(risk|predict|prediction|check|update|changed|new|now)\b/.test(normalized);
+};
+
+const isHypertensionAssistantRequest = (message, extractedValues) => {
+  const normalized = String(message || '').toLowerCase();
+  if (/\b(hypertension|blood\s*pressure|bp|systolic|diastolic)\b/.test(normalized)) {
+    return true;
+  }
+  return Object.prototype.hasOwnProperty.call(extractedValues || {}, 'systolicBP') ||
+    Object.prototype.hasOwnProperty.call(extractedValues || {}, 'diastolicBP') ||
+    Object.prototype.hasOwnProperty.call(extractedValues || {}, 'cholesterol');
+};
+
 const handleChat = async ({ userId, role, message, conversationId }) => {
   const startedAt = Date.now();
   const trimmedMessage = String(message || '').trim();
@@ -167,6 +238,135 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     const err = new Error('Message text is required');
     err.statusCode = 400;
     throw err;
+  }
+
+  if (isHealthAdviceQuestion(trimmedMessage)) {
+    const conversationRiskType = await getConversationHint(userId, conversationId);
+    const result = await buildHealthAdviceResponse({
+      userId,
+      userRole: role || 'user',
+      question: trimmedMessage,
+      riskType: conversationRiskType,
+      conversationId,
+    });
+
+    return {
+      conversationId: result.conversationId,
+      answer: result.answer,
+      sql: '',
+      rows: result.sources || [],
+      sources: result.sources || [],
+      safetyNote: result.safetyNote,
+      fallback: Boolean(result.fallback),
+      intent: 'health_risk_advice',
+      followUps: result.followUps || [
+        'How can I reduce this risk?',
+        'Why is this risk high?',
+        'What should my caregiver monitor?',
+      ],
+    };
+  }
+
+  if (isStrokeAssistantRequest(trimmedMessage)) {
+    const extractedStrokeValues = extractStrokeValuesFromMessage(trimmedMessage);
+    const result = await buildStrokeResponseWithSummary({
+      userId,
+      userRole: role || 'user',
+      values: extractedStrokeValues,
+      userMessage: trimmedMessage,
+      conversationId,
+    });
+
+    return {
+      conversationId: result.conversationId,
+      answer: result.summary,
+      sql: '',
+      rows: [
+        {
+          riskType: result.riskType,
+          riskLevel: result.riskLevel,
+          confidence: result.confidence,
+          selectedAlgorithm: result.selectedAlgorithm,
+          factors: result.factors || [],
+          updatedValues: extractedStrokeValues,
+        },
+      ],
+      fallback: false,
+      intent: 'stroke_prediction',
+      followUps: [
+        'Check my stroke risk.',
+        'My BP is 145 over 90',
+        'My weight is 60kg',
+      ],
+    };
+  }
+
+  const extractedHypertensionValues = extractHypertensionValuesFromMessage(trimmedMessage);
+  if (isHypertensionAssistantRequest(trimmedMessage, extractedHypertensionValues)) {
+    const result = await buildHypertensionResponseWithSummary({
+      userId,
+      userRole: role || 'user',
+      values: extractedHypertensionValues,
+      userMessage: trimmedMessage,
+      conversationId,
+    });
+
+    return {
+      conversationId: result.conversationId,
+      answer: result.summary,
+      sql: '',
+      rows: [
+        {
+          riskType: result.riskType,
+          riskLevel: result.riskLevel,
+          confidence: result.confidence,
+          selectedAlgorithm: result.selectedAlgorithm,
+          factors: result.factors || [],
+          updatedValues: extractedHypertensionValues,
+        },
+      ],
+      fallback: false,
+      intent: 'hypertension_prediction',
+      followUps: [
+        'Check my hypertension risk.',
+        'My BP is 145 over 90',
+        'My cholesterol is 240',
+      ],
+    };
+  }
+
+  const extractedDiabetesValues = extractHealthValuesFromMessage(trimmedMessage);
+  if (isDiabetesAssistantRequest(trimmedMessage, extractedDiabetesValues)) {
+    const result = await buildDiabetesResponseWithSummary({
+      userId,
+      userRole: role || 'user',
+      values: extractedDiabetesValues,
+      userMessage: trimmedMessage,
+      conversationId,
+    });
+
+    return {
+      conversationId: result.conversationId,
+      answer: result.summary,
+      sql: '',
+      rows: [
+        {
+          riskType: result.riskType,
+          riskLevel: result.riskLevel,
+          confidence: result.confidence,
+          selectedAlgorithm: result.selectedAlgorithm,
+          factors: result.factors || [],
+          updatedValues: extractedDiabetesValues,
+        },
+      ],
+      fallback: false,
+      intent: 'diabetes_prediction',
+      followUps: [
+        'Now my weight is 60kg',
+        'My sugar is 150 today',
+        'My BP is 145 over 90',
+      ],
+    };
   }
 
   const conversation = await ensureConversation(userId, conversationId);

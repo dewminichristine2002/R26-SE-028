@@ -18,6 +18,7 @@ import { assistantService } from '../services/assistantService';
 
 let SpeechModule = null;
 let SpeechRecognitionModule = null;
+let ExpoEventEmitter = null;
 
 try {
   SpeechModule = require('expo-speech');
@@ -31,7 +32,21 @@ try {
   console.log('[AssistantChat] expo-speech-recognition unavailable:', error?.message || error);
 }
 
+try {
+  const expoModulesCore = require('expo-modules-core');
+  ExpoEventEmitter = expoModulesCore.EventEmitter;
+} catch (error) {
+  console.log('[AssistantChat] expo-modules-core EventEmitter unavailable:', error?.message || error);
+}
+
 const SUGGESTED_PROMPTS = [
+  'Check my diabetes risk.',
+  'Now my weight is 60kg',
+  'Check my stroke risk.',
+  'Check my hypertension risk.',
+  'How can I reduce this risk?',
+  'Why is this risk high?',
+  'What should my caregiver monitor?',
   'Did I miss any medicine this week?',
   'How has my mood been recently?',
   'Which medicines are running low?',
@@ -68,12 +83,20 @@ const getCompactPromptLabel = (prompt, maxLength = 44) => {
   return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 };
 
+const extractSourcesFromRows = (rows) => (Array.isArray(rows) ? rows : [])
+  .map((row) => ({
+    name: row.name || row.source_name || row.sourceName,
+    url: row.url || row.source_url || row.sourceUrl,
+  }))
+  .filter((source) => source.name || source.url);
+
 const mapServerMessageToBubble = (row) => ({
   id: `srv-${row.id}`,
   role: row.role || 'assistant',
   content: row.content || '',
   sql: row.sql_used || '',
   rows: Array.isArray(row.rows_returned) ? row.rows_returned : [],
+  sources: extractSourcesFromRows(row.rows_returned),
   fallback: Boolean(row.fallback_reason),
   followUps: [],
 });
@@ -94,8 +117,10 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
+  const [followUpsCollapsed, setFollowUpsCollapsed] = useState(true);
   const scrollRef = useRef(null);
   const sentInitial = useRef(false);
+  const finalTranscriptRef = useRef('');
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -156,6 +181,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
     setInput('');
     setConversationId(null);
     setError('');
+    setFollowUpsCollapsed(true);
     sentInitial.current = true;
     closeHistory();
   }, [closeHistory, stopSpeaking]);
@@ -171,6 +197,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
         const mapped = (serverMessages || []).map(mapServerMessageToBubble);
         setMessages(mapped);
         setConversationId(entry.id);
+        setFollowUpsCollapsed(true);
         sentInitial.current = true;
         setShowHistory(false);
         setHistoryError('');
@@ -281,6 +308,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
       stopSpeaking();
       setError('');
       setSending(true);
+      setFollowUpsCollapsed(true);
 
       const userBubble = {
         id: generateId(),
@@ -307,9 +335,14 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           content: response.answer || '',
           sql: response.sql || '',
           rows: Array.isArray(response.rows) ? response.rows : [],
+          sources: Array.isArray(response.sources) ? response.sources : extractSourcesFromRows(response.rows),
+          safetyNote: response.safetyNote || '',
           fallback: Boolean(response.fallback),
           followUps: Array.isArray(response.followUps) ? response.followUps : [],
         };
+        if (assistantBubble.followUps.length) {
+          setFollowUpsCollapsed(true);
+        }
         setMessages((prev) => [...prev, assistantBubble]);
       } catch (err) {
         const errMsg = err.response?.data?.error || err.message || 'Failed to get a reply';
@@ -338,6 +371,58 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
     }
   }, [initialPrompt, sendMessage]);
 
+  const submitVoiceTranscript = useCallback(() => {
+    const transcript = String(finalTranscriptRef.current || '').trim();
+    finalTranscriptRef.current = '';
+    if (transcript) {
+      sendMessage(transcript);
+    }
+  }, [sendMessage]);
+
+  useEffect(() => {
+    const ExpoSpeechRecognitionModule = SpeechRecognitionModule?.ExpoSpeechRecognitionModule;
+    if (!ExpoSpeechRecognitionModule || !ExpoEventEmitter) {
+      return undefined;
+    }
+
+    const speechEventEmitter = new ExpoEventEmitter(ExpoSpeechRecognitionModule);
+
+    const onStart = speechEventEmitter.addListener('start', () => {
+      setIsListening(true);
+    });
+
+    const onEnd = speechEventEmitter.addListener('end', () => {
+      setIsListening(false);
+      submitVoiceTranscript();
+    });
+
+    const onError = speechEventEmitter.addListener('error', (event) => {
+      setIsListening(false);
+      finalTranscriptRef.current = '';
+      console.log('[AssistantChat] voice recognition error:', event?.message || event);
+      Alert.alert('Voice error', event?.message || 'Voice recognition failed. Please try again.');
+    });
+
+    const onResult = speechEventEmitter.addListener('result', (event) => {
+      const latest = event?.results?.[0]?.transcript || '';
+      if (latest) {
+        finalTranscriptRef.current = latest;
+        setInput(latest);
+      }
+
+      if (event?.isFinal && latest) {
+        submitVoiceTranscript();
+      }
+    });
+
+    return () => {
+      onStart?.remove?.();
+      onEnd?.remove?.();
+      onError?.remove?.();
+      onResult?.remove?.();
+    };
+  }, [submitVoiceTranscript]);
+
   useEffect(() => {
     return () => {
       stopSpeaking();
@@ -352,46 +437,37 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
   }, [stopSpeaking]);
 
   const startListening = useCallback(async () => {
-    if (!SpeechRecognitionModule) {
+    const ExpoSpeechRecognitionModule = SpeechRecognitionModule?.ExpoSpeechRecognitionModule;
+    if (!ExpoSpeechRecognitionModule || !ExpoEventEmitter) {
       Alert.alert(
         'Voice not available',
-        'Speech recognition is not installed on this build. You can still type your question.'
+        'Speech recognition is not included in this app build. Rebuild the development client to enable voice input.'
       );
       return;
     }
     try {
-      const { ExpoSpeechRecognitionModule } = SpeechRecognitionModule;
-      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync?.();
-      if (permission && permission.status && permission.status !== 'granted') {
+      if (Platform.OS === 'web' && !ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
+        Alert.alert('Voice not available', 'Speech recognition is not available in this browser.');
+        return;
+      }
+
+      if (isListening) {
+        ExpoSpeechRecognitionModule.stop();
+        return;
+      }
+
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission?.granted && permission?.status !== 'granted') {
         Alert.alert('Microphone permission needed', 'Please grant microphone access to use voice.');
         return;
       }
 
-      setIsListening(true);
-      let finalTranscript = '';
-
-      const transcriptHandler = (event) => {
-        const result = event?.results?.[0];
-        if (result?.transcript) {
-          finalTranscript = result.transcript;
-          setInput(result.transcript);
-        }
-      };
-
-      const endHandler = () => {
-        setIsListening(false);
-        if (finalTranscript.trim()) {
-          sendMessage(finalTranscript);
-        }
-      };
-
-      ExpoSpeechRecognitionModule.addListener?.('result', transcriptHandler);
-      ExpoSpeechRecognitionModule.addListener?.('end', endHandler);
-      ExpoSpeechRecognitionModule.addListener?.('error', () => setIsListening(false));
-
+      finalTranscriptRef.current = '';
+      setInput('');
       ExpoSpeechRecognitionModule.start({
         lang: 'en-US',
         interimResults: true,
+        maxAlternatives: 1,
         continuous: false,
       });
     } catch (err) {
@@ -399,7 +475,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
       console.log('[AssistantChat] voice error:', err?.message || err);
       Alert.alert('Voice error', 'Could not start voice input. Please type your question.');
     }
-  }, [sendMessage]);
+  }, [isListening]);
 
   const stopListening = useCallback(() => {
     if (SpeechRecognitionModule?.ExpoSpeechRecognitionModule?.stop) {
@@ -512,6 +588,8 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
             content={m.content}
             sql={m.sql}
             rows={m.rows}
+            sources={m.sources}
+            safetyNote={m.safetyNote}
             fallback={m.fallback}
             isSpeaking={speakingId === m.id}
             onSpeak={SpeechModule ? () => speakMessage(m) : null}
@@ -527,19 +605,36 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
       </ScrollView>
 
       {lastFollowUps.length > 0 && !sending ? (
-        <View style={styles.followUpRow}>
-          {lastFollowUps.map((q) => (
-            <Pressable
-              key={q}
-              accessibilityRole="button"
-              onPress={() => sendMessage(q)}
-              style={({ pressed }) => [styles.followUpChip, pressed && styles.followUpChipPressed]}
-            >
-              <Text style={styles.followUpText} numberOfLines={2} ellipsizeMode="tail">
-                {getCompactPromptLabel(q)}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={styles.followUpPanel}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={followUpsCollapsed ? 'Show suggested questions' : 'Hide suggested questions'}
+            onPress={() => setFollowUpsCollapsed((prev) => !prev)}
+            style={({ pressed }) => [styles.followUpHeader, pressed && styles.followUpHeaderPressed]}
+          >
+            <Text style={styles.followUpHeaderText}>Suggested questions</Text>
+            <Text style={styles.followUpHeaderCount}>{lastFollowUps.length}</Text>
+            <Text style={styles.followUpHeaderArrow}>
+              {followUpsCollapsed ? '\u25BE' : '\u25B4'}
+            </Text>
+          </Pressable>
+
+          {!followUpsCollapsed ? (
+            <View style={styles.followUpRow}>
+              {lastFollowUps.map((q) => (
+                <Pressable
+                  key={q}
+                  accessibilityRole="button"
+                  onPress={() => sendMessage(q)}
+                  style={({ pressed }) => [styles.followUpChip, pressed && styles.followUpChipPressed]}
+                >
+                  <Text style={styles.followUpText} numberOfLines={2} ellipsizeMode="tail">
+                    {getCompactPromptLabel(q)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -796,9 +891,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
-    paddingTop: 56,
+    paddingTop: 34,
     paddingHorizontal: 18,
-    paddingBottom: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
@@ -817,6 +912,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
+    minHeight: 46,
     paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: '#EEF2FF',
@@ -827,42 +923,43 @@ const styles = StyleSheet.create({
   headerPillIcon: { fontSize: 16, marginRight: 6 },
   headerPillText: {
     color: '#1E3A8A',
-    fontWeight: '700',
-    fontSize: 15,
+    fontWeight: '900',
+    fontSize: 16,
   },
-  backButton: { paddingVertical: 6, paddingRight: 8 },
-  backButtonText: { color: '#2563EB', fontWeight: '700', fontSize: 17 },
+  backButton: { minHeight: 46, justifyContent: 'center', paddingVertical: 6, paddingRight: 8 },
+  backButtonText: { color: '#2563EB', fontWeight: '900', fontSize: 18 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
   },
-  titleEmoji: { fontSize: 32, marginRight: 10 },
-  title: { fontSize: 26, fontWeight: '800', color: '#111827' },
-  subtitle: { fontSize: 16, color: '#6B7280', marginTop: 2, lineHeight: 22 },
+  titleEmoji: { fontSize: 36, marginRight: 10 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#111827' },
+  subtitle: { fontSize: 18, color: '#4B5563', marginTop: 2, lineHeight: 25 },
 
   scroll: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollContent: { paddingVertical: 14, paddingBottom: 24 },
   emptyState: { padding: 20 },
   emptyEmoji: { fontSize: 48, textAlign: 'center', marginBottom: 6 },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '900',
     color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
   },
   emptyHint: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#4B5563',
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 24,
+    lineHeight: 27,
   },
   suggestion: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    minHeight: 64,
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -876,13 +973,13 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   suggestionPressed: { backgroundColor: '#EFF6FF' },
-  suggestionEmoji: { fontSize: 20, marginRight: 12 },
+  suggestionEmoji: { fontSize: 22, marginRight: 12 },
   suggestionText: {
     flex: 1,
     color: '#111827',
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '500',
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '800',
   },
   disclaimerCard: {
     flexDirection: 'row',
@@ -897,9 +994,10 @@ const styles = StyleSheet.create({
   disclaimerCardIcon: { fontSize: 20, marginRight: 10 },
   disclaimerCardText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     color: '#92400E',
-    lineHeight: 20,
+    lineHeight: 24,
+    fontWeight: '700',
   },
   thinkingRow: {
     flexDirection: 'row',
@@ -907,17 +1005,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  thinkingText: { marginLeft: 10, color: '#4B5563', fontSize: 15 },
+  thinkingText: { marginLeft: 10, color: '#4B5563', fontSize: 17, fontWeight: '700' },
 
+  followUpPanel: {
+    backgroundColor: '#F3F4F6',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  followUpHeader: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  followUpHeaderPressed: { backgroundColor: '#E5E7EB' },
+  followUpHeaderText: {
+    flex: 1,
+    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  followUpHeaderCount: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 10,
+    backgroundColor: '#DBEAFE',
+    color: '#1D4ED8',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    fontSize: 15,
+    fontWeight: '900',
+    paddingTop: 3,
+  },
+  followUpHeaderArrow: {
+    color: '#1D4ED8',
+    fontSize: 18,
+    fontWeight: '900',
+  },
   followUpRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    paddingBottom: 10,
   },
   followUpChip: {
     flexShrink: 1,
@@ -926,11 +1058,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#3B82F6',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    minHeight: 52,
+    paddingVertical: 12,
     borderRadius: 22,
   },
   followUpChipPressed: { backgroundColor: '#EFF6FF' },
-  followUpText: { color: '#1D4ED8', fontWeight: '700', fontSize: 15 },
+  followUpText: { color: '#1D4ED8', fontWeight: '900', fontSize: 16, lineHeight: 21 },
 
   errorBar: {
     backgroundColor: '#FEE2E2',
@@ -939,7 +1072,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#FCA5A5',
   },
-  errorBarText: { color: '#991B1B', fontSize: 15, fontWeight: '600' },
+  errorBarText: { color: '#991B1B', fontSize: 16, lineHeight: 22, fontWeight: '800' },
 
   inputBar: {
     flexDirection: 'row',
@@ -968,8 +1101,8 @@ const styles = StyleSheet.create({
   },
   micIcon: { fontSize: 24 },
   micLabel: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '900',
     color: '#166534',
     marginTop: 2,
     letterSpacing: 0.4,
@@ -978,14 +1111,14 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     maxHeight: 140,
-    minHeight: 56,
+    minHeight: 60,
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: '#F3F4F6',
     borderRadius: 28,
-    fontSize: 17,
+    fontSize: 18,
     color: '#111827',
-    lineHeight: 22,
+    lineHeight: 25,
   },
   sendButton: {
     marginLeft: 10,
@@ -996,12 +1129,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 72,
-    minHeight: 56,
+    minHeight: 60,
     flexDirection: 'row',
   },
   sendButtonDisabled: { backgroundColor: '#9CA3AF' },
   sendButtonIcon: { color: '#FFFFFF', fontSize: 16, marginRight: 6 },
-  sendButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+  sendButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 17 },
 
   modalOverlay: {
     flex: 1,
@@ -1023,15 +1156,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#111827' },
-  modalSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 2 },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
+  modalSubtitle: { fontSize: 16, lineHeight: 22, color: '#6B7280', marginTop: 2 },
   modalCloseButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: '#F3F4F6',
     borderRadius: 999,
   },
-  modalCloseText: { color: '#374151', fontWeight: '700', fontSize: 15 },
+  modalCloseText: { color: '#374151', fontWeight: '900', fontSize: 16 },
 
   newChatRow: {
     flexDirection: 'row',
@@ -1052,13 +1185,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
   },
-  historyLoadingText: { marginLeft: 10, color: '#4B5563', fontSize: 15 },
+  historyLoadingText: { marginLeft: 10, color: '#4B5563', fontSize: 16, fontWeight: '700' },
   historyErrorText: {
     paddingHorizontal: 20,
     paddingVertical: 14,
     color: '#991B1B',
     backgroundColor: '#FEE2E2',
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 22,
   },
   historyEmptyBox: {
     paddingHorizontal: 20,
@@ -1067,14 +1201,14 @@ const styles = StyleSheet.create({
   },
   historyEmptyEmoji: { fontSize: 44, marginBottom: 8 },
   historyEmptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '900',
     color: '#111827',
     marginBottom: 4,
   },
   historyEmptyText: {
     color: '#6B7280',
-    fontSize: 15,
+    fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -1103,18 +1237,18 @@ const styles = StyleSheet.create({
   historyRowEmoji: { fontSize: 22, marginRight: 10, marginTop: 2 },
   historyRowMain: { flex: 1 },
   historyRowTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: '#111827',
   },
   historyRowSnippet: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#4B5563',
     marginTop: 4,
-    lineHeight: 20,
+    lineHeight: 23,
   },
   historyRowTime: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6B7280',
     marginTop: 6,
     fontWeight: '600',

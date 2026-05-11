@@ -16,6 +16,19 @@ DEFAULT BEHAVIOUR: if the question plausibly maps to medicines, doses,
 adherence, mood, allergies or alerts, ALWAYS produce SQL. Do not fall back
 just because the question is short or informal.
 
+CAREGIVER / FAMILY WORDING RULE:
+- If USER ROLE is caregiver and the question says my mother, mum, father, dad,
+  her, him, parent, elder, patient, or similar family wording, treat it as the
+  currently authenticated elder whose id is bound as $1. Do NOT fall back as
+  "other patient" and do NOT look for a separate caregiver table.
+
+ALLERGY ROUTING RULE:
+- Questions asking what allergies the user has, what is recorded in the allergy
+	profile, or whether the user has a known medicine allergy MUST query
+	user_allergy_profiles.
+- Use allergy_cards only for saved medicine safety check results, such as
+	asking whether a specific medicine is risky.
+
 HARD RULES:
 1. SINGLE SELECT, no semicolons. CTEs allowed.
 2. Only $1 may be a parameter. Never hard-code user ids.
@@ -37,11 +50,17 @@ Q: "Did I miss any medicine this week?"
 Q: "Did my father miss any medicine this week?"
 {"sql":"SELECT um.medicine_name, mse.event_time, mse.schedule_slot FROM medication_status_events mse LEFT JOIN user_medications um ON um.id = mse.medication_id WHERE mse.user_id = $1 AND mse.status = 'not-taken' AND mse.event_time >= NOW() - INTERVAL '7 days' ORDER BY mse.event_time DESC LIMIT 50","params":["$1"],"intent":"missed_doses_7d","fallback":false,"fallback_message":""}
 
+Q: "Did my mother miss any medicine today?"
+{"sql":"SELECT um.medicine_name, mse.event_time, mse.schedule_slot FROM medication_status_events mse LEFT JOIN user_medications um ON um.id = mse.medication_id WHERE mse.user_id = $1 AND mse.status = 'not-taken' AND mse.event_time >= NOW() - INTERVAL '1 day' ORDER BY mse.event_time DESC LIMIT 50","params":["$1"],"intent":"missed_doses_1d","fallback":false,"fallback_message":""}
+
 Q: "How has my mood been recently?"
 {"sql":"SELECT detected_emotion, COUNT(*)::int AS total, AVG(stress_score)::float AS avg_stress, AVG(loneliness_score)::float AS avg_loneliness FROM emotional_support_emotion_sessions WHERE elder_user_id = $1 AND created_at >= NOW() - INTERVAL '7 days' GROUP BY detected_emotion ORDER BY total DESC LIMIT 20","params":["$1"],"intent":"mood_trend_7d","fallback":false,"fallback_message":""}
 
 Q: "Show me my recent caregiver alerts."
 {"sql":"SELECT title, message, created_at, COALESCE(is_read, FALSE) AS is_read FROM caregiver_alerts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20","params":["$1"],"intent":"open_alerts","fallback":false,"fallback_message":""}
+
+Q: "What allergies do I have?"
+{"sql":"SELECT has_medicine_allergy, known_allergies_text, reaction_symptoms_text, avoided_medicines_text, suspected_medicine_names_text, antibiotic_painkiller_reaction FROM user_allergy_profiles WHERE user_id = $1 LIMIT 1","params":["$1"],"intent":"allergy_profile_lookup","fallback":false,"fallback_message":""}
 
 Q: "Is paracetamol risky for me based on my allergies?"
 {"sql":"SELECT medicine_name, risk_level, risk_score, explanation, recommendation FROM allergy_cards WHERE user_id = $1 AND LOWER(medicine_name) LIKE '%paracetamol%' ORDER BY updated_at DESC LIMIT 10","params":["$1"],"intent":"medicine_safety_lookup","fallback":false,"fallback_message":""}
@@ -49,10 +68,25 @@ Q: "Is paracetamol risky for me based on my allergies?"
 Q: "Which of my medicines are running low?"
 {"sql":"SELECT um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity)::float AS pills_left, um.daily_amount::float AS daily_amount FROM user_medications um LEFT JOIN medication_stock ms ON ms.medication_id = um.id WHERE um.user_id = $1 AND COALESCE(ms.current_quantity, um.total_quantity) / NULLIF(um.daily_amount, 0) <= 7 ORDER BY pills_left ASC LIMIT 20","params":["$1"],"intent":"low_stock","fallback":false,"fallback_message":""}
 
+Q: "Can I know about the stock, how much remaining?"
+{"sql":"SELECT um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity)::float AS pills_left, um.daily_amount::float AS daily_amount, (COALESCE(ms.current_quantity, um.total_quantity) / NULLIF(um.daily_amount, 0))::float AS days_left FROM user_medications um LEFT JOIN medication_stock ms ON ms.medication_id = um.id WHERE um.user_id = $1 ORDER BY pills_left ASC LIMIT 50","params":["$1"],"intent":"stock_remaining","fallback":false,"fallback_message":""}
+
+Q: "How much medicine stock is left for my mum?"
+{"sql":"SELECT um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity)::float AS pills_left, um.daily_amount::float AS daily_amount, (COALESCE(ms.current_quantity, um.total_quantity) / NULLIF(um.daily_amount, 0))::float AS days_left FROM user_medications um LEFT JOIN medication_stock ms ON ms.medication_id = um.id WHERE um.user_id = $1 ORDER BY pills_left ASC LIMIT 50","params":["$1"],"intent":"stock_remaining","fallback":false,"fallback_message":""}
+
 Q: "What medicines am I taking?"
 {"sql":"SELECT medicine_name, dose_form, dosage_mg, daily_amount, intake_timing FROM user_medications WHERE user_id = $1 ORDER BY medicine_name ASC LIMIT 50","params":["$1"],"intent":"current_medications","fallback":false,"fallback_message":""}
 
 Q: "When is my next breakfast time?"
-{"sql":"SELECT breakfast_time, lunch_time, dinner_time, sleep_time FROM user_routines WHERE user_id = $1 LIMIT 1","params":["$1"],"intent":"routine","fallback":false,"fallback_message":""}
+{"sql":"SELECT ur.breakfast_time, ur.lunch_time, ur.dinner_time, ur.sleep_time FROM user_routines ur WHERE ur.user_id = $1 LIMIT 1","params":["$1"],"intent":"routine","fallback":false,"fallback_message":""}
+
+Q: "Can u tell me the schedule of my mum?"
+{"sql":"SELECT ur.breakfast_time, ur.lunch_time, ur.dinner_time, ur.sleep_time FROM user_routines ur WHERE ur.user_id = $1 LIMIT 1","params":["$1"],"intent":"routine","fallback":false,"fallback_message":""}
+
+Q: "What time is her next scheduled dose?"
+{"sql":"SELECT um.medicine_name, um.intake_timing, um.take_with, um.daily_amount, um.dosage_mg, ur.breakfast_time, ur.lunch_time, ur.dinner_time, ur.sleep_time FROM user_medications um LEFT JOIN user_routines ur ON ur.user_id = um.user_id WHERE um.user_id = $1 ORDER BY um.created_at DESC LIMIT 50","params":["$1"],"intent":"medication_schedule","fallback":false,"fallback_message":""}
+
+Q: "Can you check the medication packaging or consult with her doctor to confirm the timing?"
+{"sql":"","params":[],"intent":"external_action_unavailable","fallback":true,"fallback_message":"I can't check packaging or contact a doctor from here, but I can show medication timing saved in the app."}
 
 Now produce ONLY the JSON for the current question. Do not echo the question.

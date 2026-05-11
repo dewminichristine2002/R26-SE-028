@@ -57,6 +57,161 @@ _FALLBACK_OUT_OF_SCOPE = Nl2SqlResult(
 )
 
 
+def _result(sql: str, intent: str) -> Nl2SqlResult:
+    return Nl2SqlResult(
+        sql=sql,
+        params=["$1"],
+        intent=intent,
+        fallback=False,
+        fallback_message="",
+        raw_response="rule_based",
+    )
+
+
+def _fallback(message: str, intent: str = "out_of_scope") -> Nl2SqlResult:
+    return Nl2SqlResult(
+        sql="",
+        params=[],
+        intent=intent,
+        fallback=True,
+        fallback_message=message,
+        raw_response="rule_based",
+    )
+
+
+def _rule_based_sql(question: str) -> Nl2SqlResult | None:
+    """Fast path for common caregiver wording that local LLMs often overthink."""
+    normalized = re.sub(r"\s+", " ", (question or "").lower()).strip()
+    if not normalized:
+        return None
+
+    external_action_patterns = [
+        r"\b(check|read|scan|look at|look on|inspect)\b.*\b(packaging|package|label|box|bottle)\b",
+        r"\b(contact|call|message|consult|ask)\b.*\b(doctor|pharmacist|clinic)\b",
+    ]
+    if any(re.search(pattern, normalized) for pattern in external_action_patterns):
+        return _fallback(
+            "I can't check packaging or contact a doctor from here, but I can show medication timing saved in the app.",
+            "external_action_unavailable",
+        )
+
+    asks_missed_dose = re.search(r"\b(miss|missed|not[-\s]?taken|did(?:n't| not)\s+take|forget)\b", normalized)
+    if asks_missed_dose and re.search(r"\b(medicine|medication|dose|tablet|pill|meds?)\b", normalized):
+        if re.search(r"\b(today|tonight|this morning|this afternoon|this evening)\b", normalized):
+            return _result(
+                "SELECT um.medicine_name, mse.event_time, mse.schedule_slot "
+                "FROM medication_status_events mse "
+                "LEFT JOIN user_medications um ON um.id = mse.medication_id "
+                "WHERE mse.user_id = $1 AND mse.status = 'not-taken' "
+                "AND mse.event_time >= NOW() - INTERVAL '1 day' "
+                "ORDER BY mse.event_time DESC LIMIT 50",
+                "missed_doses_1d",
+            )
+        return _result(
+            "SELECT um.medicine_name, mse.event_time, mse.schedule_slot "
+            "FROM medication_status_events mse "
+            "LEFT JOIN user_medications um ON um.id = mse.medication_id "
+            "WHERE mse.user_id = $1 AND mse.status = 'not-taken' "
+            "AND mse.event_time >= NOW() - INTERVAL '7 days' "
+            "ORDER BY mse.event_time DESC LIMIT 50",
+            "missed_doses_7d",
+        )
+
+    asks_med_schedule = (
+        re.search(r"\b(next|scheduled|schedule|timing|time|when)\b", normalized)
+        and re.search(r"\b(dose|medicine|medication|tablet|pill|meds?)\b", normalized)
+    )
+    if asks_med_schedule:
+        return _result(
+            "SELECT um.medicine_name, um.intake_timing, um.take_with, "
+            "um.daily_amount, um.dosage_mg, ur.breakfast_time, ur.lunch_time, "
+            "ur.dinner_time, ur.sleep_time "
+            "FROM user_medications um "
+            "LEFT JOIN user_routines ur ON ur.user_id = um.user_id "
+            "WHERE um.user_id = $1 "
+            "ORDER BY um.created_at DESC LIMIT 50",
+            "medication_schedule",
+        )
+
+    asks_routine = re.search(r"\b(schedule|routine|timetable|meal\s+time|breakfast|lunch|dinner|sleep)\b", normalized)
+    if asks_routine:
+        return _result(
+            "SELECT ur.breakfast_time, ur.lunch_time, ur.dinner_time, ur.sleep_time "
+            "FROM user_routines ur "
+            "WHERE ur.user_id = $1 LIMIT 1",
+            "routine",
+        )
+
+    asks_mood = re.search(
+        r"\b(mood|emotion|emotions|stress|stressed|lonely|loneliness|check[-\s]?ins?)\b",
+        normalized,
+    )
+    if asks_mood:
+        return _result(
+            "SELECT detected_emotion, COUNT(*)::int AS total, "
+            "AVG(stress_score)::float AS avg_stress, "
+            "AVG(loneliness_score)::float AS avg_loneliness "
+            "FROM emotional_support_emotion_sessions "
+            "WHERE elder_user_id = $1 AND created_at >= NOW() - INTERVAL '7 days' "
+            "GROUP BY detected_emotion ORDER BY total DESC LIMIT 20",
+            "mood_trend_7d",
+        )
+
+    asks_alerts = re.search(r"\b(alert|alerts|notification|notifications|warning|warnings)\b", normalized)
+    if asks_alerts:
+        return _result(
+            "SELECT title, message, created_at, COALESCE(is_read, FALSE) AS is_read "
+            "FROM caregiver_alerts WHERE user_id = $1 "
+            "ORDER BY created_at DESC LIMIT 20",
+            "caregiver_alerts_recent",
+        )
+
+    asks_stock_remaining = re.search(r"\b(stock|remaining|left|supply|how much)\b", normalized) and not re.search(
+        r"\b(low|refill|run out|running out)\b",
+        normalized,
+    )
+    if asks_stock_remaining:
+        return _result(
+            "SELECT um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity)::float AS pills_left, "
+            "um.daily_amount::float AS daily_amount, "
+            "(COALESCE(ms.current_quantity, um.total_quantity) / NULLIF(um.daily_amount, 0))::float AS days_left "
+            "FROM user_medications um "
+            "LEFT JOIN medication_stock ms ON ms.medication_id = um.id "
+            "WHERE um.user_id = $1 "
+            "ORDER BY pills_left ASC LIMIT 50",
+            "stock_remaining",
+        )
+
+    asks_low_stock = (
+        re.search(r"\b(low|refill|run out|running out)\b", normalized)
+        and re.search(r"\b(medicine|medicines|medication|medications|tablet|tablets|pill|pills|meds?)\b", normalized)
+    )
+    if asks_low_stock:
+        return _result(
+            "SELECT um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity)::float AS pills_left, "
+            "um.daily_amount::float AS daily_amount "
+            "FROM user_medications um "
+            "LEFT JOIN medication_stock ms ON ms.medication_id = um.id "
+            "WHERE um.user_id = $1 "
+            "AND COALESCE(ms.current_quantity, um.total_quantity) / NULLIF(um.daily_amount, 0) <= 7 "
+            "ORDER BY pills_left ASC LIMIT 20",
+            "low_stock",
+        )
+
+    asks_current_meds = re.search(r"\b(what|which|list|show|tell|current|taking|takes)\b", normalized) and re.search(
+        r"\b(medicine|medicines|medication|medications|tablet|tablets|pill|pills|meds?)\b", normalized
+    )
+    if asks_current_meds:
+        return _result(
+            "SELECT medicine_name, dose_form, dosage_mg, daily_amount, intake_timing "
+            "FROM user_medications WHERE user_id = $1 "
+            "ORDER BY medicine_name ASC LIMIT 50",
+            "current_medications",
+        )
+
+    return None
+
+
 def _truncate(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
@@ -135,6 +290,17 @@ async def generate_sql(
 ) -> Nl2SqlResult:
     if not (question or "").strip():
         return _FALLBACK_OUT_OF_SCOPE
+
+    rule_based = _rule_based_sql(question)
+    if rule_based is not None:
+        logger.info(
+            "[NL2SQL] rule-based result question=%r role=%s intent=%s fallback=%s",
+            question,
+            user_role,
+            rule_based.intent,
+            rule_based.fallback,
+        )
+        return rule_based
 
     hints = preprocess(question)
     user_prompt = _build_user_prompt(

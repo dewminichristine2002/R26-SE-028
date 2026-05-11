@@ -25,7 +25,7 @@ const chat = async (req, res) => {
 
 const summary = async (req, res) => {
   try {
-    const data = await buildSummary(req.user.id);
+    const data = await buildSummary(req.user.id, req.user.role || 'user');
     return res.json(data);
   } catch (error) {
     console.error('[Assistant] summary error:', error.message);

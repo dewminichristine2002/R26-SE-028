@@ -21,7 +21,14 @@ const getGreeting = () => {
   return { text: 'Good night', emoji: '\u{1F319}' };
 };
 
-const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
+const UnifiedDashboardScreen = ({
+  user,
+  onBack,
+  onOpenAssistant,
+  onOpenDiabetesPrediction,
+  onOpenStrokePrediction,
+  onOpenHypertensionPrediction,
+}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -65,6 +72,29 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
   );
 
   const cardCount = summary?.cards?.length || 0;
+  const isCaregiver = user?.role === 'caregiver';
+  const subjectName = firstName || (isCaregiver ? 'your elder' : 'you');
+  const dashboardSubtitle = isCaregiver
+    ? `Here is how ${subjectName} is doing today.`
+    : 'Here is how you are doing today.';
+  const sectionHeading = isCaregiver ? 'Elder day at a glance' : 'Your day at a glance';
+  const emptyText = isCaregiver
+    ? "Once the elder logs medicines, stock, mood, or routine data, the caregiver summary will appear here."
+    : 'Add a medicine or do a quick mood check-in, and your summary will appear here.';
+  const advicePrompts = isCaregiver
+    ? [
+        'What should I monitor as a caregiver?',
+        'Which risks need attention today?',
+        'How can I help reduce this risk?',
+      ]
+    : [
+        'How can I reduce this risk?',
+        'Why is this risk high?',
+        'What should my caregiver monitor?',
+      ];
+  const overallSummaryPrompt = isCaregiver
+    ? 'Give me a short overall summary of how my elder is doing today.'
+    : 'Give me a short overall summary of how I am doing today.';
 
   return (
     <View style={styles.container}>
@@ -86,7 +116,7 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
             <Text style={styles.greeting}>
               {greeting.text}{firstName ? `, ${firstName}` : ''}
             </Text>
-            <Text style={styles.subtitle}>Here is how you are doing today.</Text>
+            <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
           </View>
         </View>
       </View>
@@ -122,7 +152,7 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
 
         {!loading && !error && cardCount > 0 ? (
           <>
-            <Text style={styles.sectionHeading}>Your day at a glance</Text>
+            <Text style={styles.sectionHeading}>{sectionHeading}</Text>
             {summary.cards.map((card) => (
               <SummaryCard key={card.id} card={card} onAskAssistant={askWithPrompt} />
             ))}
@@ -134,8 +164,98 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
             <Text style={styles.emptyEmoji}>{'\u{1F33F}'}</Text>
             <Text style={styles.emptyTitle}>Nothing to show yet</Text>
             <Text style={styles.emptyText}>
-              Add a medicine or do a quick mood check-in, and your summary will appear here.
+              {emptyText}
             </Text>
+          </View>
+        ) : null}
+
+        {!loading && !error ? (
+          <View style={styles.diabetesCard}>
+            <View style={styles.diabetesHeaderRow}>
+              <Text style={styles.diabetesIcon}>🩺</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.diabetesTitle}>Diabetes Risk Prediction</Text>
+                <Text style={styles.diabetesSubtitle}>
+                  Check possible diabetes risk using saved health and lifestyle values.
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Start diabetes risk check"
+              onPress={onOpenDiabetesPrediction}
+              style={({ pressed }) => [styles.diabetesButton, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.diabetesButtonText}>Start Diabetes Check</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!loading && !error ? (
+          <View style={styles.strokeCard}>
+            <View style={styles.diabetesHeaderRow}>
+              <Text style={styles.diabetesIcon}>🧠</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.strokeTitle}>Stroke Risk Prediction</Text>
+                <Text style={styles.strokeSubtitle}>
+                  Check possible stroke risk using BP, glucose, BMI, and history values.
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Start stroke risk check"
+              onPress={onOpenStrokePrediction}
+              style={({ pressed }) => [styles.strokeButton, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.diabetesButtonText}>Start Stroke Check</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!loading && !error ? (
+          <View style={styles.hypertensionCard}>
+            <View style={styles.diabetesHeaderRow}>
+              <Text style={styles.diabetesIcon}>❤️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.hypertensionTitle}>Hypertension Risk Prediction</Text>
+                <Text style={styles.hypertensionSubtitle}>
+                  Check possible high blood pressure risk using BP, BMI, glucose, and lifestyle values.
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Start hypertension risk check"
+              onPress={onOpenHypertensionPrediction}
+              style={({ pressed }) => [styles.hypertensionButton, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.diabetesButtonText}>Start BP Check</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!loading && !error ? (
+          <View style={styles.healthAdviceCard}>
+            <Text style={styles.healthAdviceTitle}>Health risk advice</Text>
+            <Text style={styles.healthAdviceSubtitle}>
+              Ask for simple guidance from trusted health sources.
+            </Text>
+            <View style={styles.healthAdviceChipRow}>
+              {advicePrompts.map((prompt) => (
+                <Pressable
+                  key={prompt}
+                  accessibilityRole="button"
+                  onPress={() => askWithPrompt(prompt)}
+                  style={({ pressed }) => [styles.healthAdviceChip, pressed && { opacity: 0.8 }]}
+                >
+                  <Text style={styles.healthAdviceChipText}>{prompt}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         ) : null}
 
@@ -143,7 +263,7 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
           <View style={styles.disclaimerBox}>
             <Text style={styles.disclaimerIcon}>{'\u2139\uFE0F'}</Text>
             <Text style={styles.disclaimerText}>
-              This summary uses your own health records. It is here to help you,
+              {isCaregiver ? "This summary uses the elder's health records." : 'This summary uses your own health records.'} It is here to help you,
               but it is not a replacement for your doctor.
             </Text>
           </View>
@@ -151,7 +271,7 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
       </ScrollView>
 
       <AssistantFAB
-        onPress={() => askWithPrompt('Give me a short overall summary of how I am doing today.')}
+        onPress={() => askWithPrompt(overallSummaryPrompt)}
       />
     </View>
   );
@@ -160,9 +280,9 @@ const UnifiedDashboardScreen = ({ user, onBack, onOpenAssistant }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 18,
+    paddingTop: 30,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -170,8 +290,8 @@ const styles = StyleSheet.create({
   backButton: {
     alignSelf: 'flex-start',
     paddingHorizontal: 4,
-    paddingVertical: 6,
-    marginBottom: 8,
+    paddingVertical: 4,
+    marginBottom: 4,
   },
   backButtonPressed: { opacity: 0.6 },
   backButtonText: { color: '#2563EB', fontWeight: '700', fontSize: 17 },
@@ -179,21 +299,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  greetingEmoji: { fontSize: 36, marginRight: 12 },
+  greetingEmoji: { fontSize: 32, marginRight: 10 },
   greeting: {
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: '800',
     color: '#111827',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#4B5563',
     marginTop: 2,
-    lineHeight: 22,
+    lineHeight: 24,
   },
-  scroll: { padding: 18, paddingBottom: 140 },
+  scroll: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 140 },
   sectionHeading: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
     color: '#374151',
     marginBottom: 12,
@@ -204,7 +325,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 14,
     color: '#4B5563',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '500',
   },
   errorBox: {
@@ -216,7 +337,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   errorEmoji: { fontSize: 28, marginBottom: 6 },
-  errorText: { color: '#991B1B', fontSize: 16, lineHeight: 24, fontWeight: '500' },
+  errorText: { color: '#991B1B', fontSize: 18, lineHeight: 27, fontWeight: '700' },
   retryButton: {
     marginTop: 14,
     paddingHorizontal: 16,
@@ -226,7 +347,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#EF4444',
   },
-  retryButtonText: { color: '#991B1B', fontWeight: '800', fontSize: 15 },
+  retryButtonText: { color: '#991B1B', fontWeight: '900', fontSize: 17 },
 
   emptyBox: {
     paddingVertical: 60,
@@ -235,16 +356,151 @@ const styles = StyleSheet.create({
   },
   emptyEmoji: { fontSize: 56, marginBottom: 10 },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: '#111827',
     marginBottom: 8,
   },
   emptyText: {
     color: '#4B5563',
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 27,
+  },
+  diabetesCard: {
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    marginTop: 8,
+  },
+  diabetesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  diabetesIcon: { fontSize: 28, marginRight: 10 },
+  diabetesTitle: {
+    color: '#065F46',
+    fontWeight: '900',
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  diabetesSubtitle: {
+    color: '#047857',
+    marginTop: 2,
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  diabetesButton: {
+    alignSelf: 'flex-start',
+    minHeight: 54,
+    backgroundColor: '#0F766E',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  diabetesButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 16,
+  },
+  strokeCard: {
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    marginTop: 12,
+  },
+  strokeTitle: {
+    color: '#5B21B6',
+    fontWeight: '900',
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  strokeSubtitle: {
+    color: '#6D28D9',
+    marginTop: 2,
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  strokeButton: {
+    alignSelf: 'flex-start',
+    minHeight: 54,
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  hypertensionCard: {
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginTop: 12,
+  },
+  hypertensionTitle: {
+    color: '#991B1B',
+    fontWeight: '900',
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  hypertensionSubtitle: {
+    color: '#B91C1C',
+    marginTop: 2,
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  hypertensionButton: {
+    alignSelf: 'flex-start',
+    minHeight: 54,
+    backgroundColor: '#B91C1C',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  healthAdviceCard: {
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    marginTop: 12,
+  },
+  healthAdviceTitle: {
+    color: '#064E3B',
+    fontWeight: '900',
+    fontSize: 20,
+  },
+  healthAdviceSubtitle: {
+    color: '#047857',
+    marginTop: 4,
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  healthAdviceChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+  healthAdviceChip: {
+    minHeight: 52,
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  healthAdviceChipText: {
+    color: '#047857',
+    fontWeight: '900',
+    fontSize: 16,
   },
 
   disclaimerBox: {
@@ -261,8 +517,8 @@ const styles = StyleSheet.create({
   disclaimerText: {
     flex: 1,
     color: '#3730A3',
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
   },
 });
 

@@ -6,6 +6,8 @@
  *   - which is a SELECT
  *   - against tables present in `schemaDescription.ALLOWED_TABLES`
  *   - with `WHERE <table>.<userIdColumn> = $1` for every user-scoped table
+ *     (or an unqualified `<userIdColumn> = $1` when the generated SELECT uses
+ *     a single-table shorthand)
  *   - with a hard LIMIT (added if missing)
  *
  * Anything else \u2192 thrown error \u2192 the controller turns it into a polite
@@ -40,7 +42,7 @@ const collectTables = (normalizedSql) => {
   return referenced;
 };
 
-const hasUserScopeClause = (normalizedSql, table) => {
+const hasUserScopeClause = (normalizedSql, table, referencedTables) => {
   const meta = TABLES[table];
   if (!meta || meta.userIdColumn === null) {
     return true;
@@ -49,6 +51,7 @@ const hasUserScopeClause = (normalizedSql, table) => {
   const col = meta.userIdColumn;
   // Accepts:   table.col = $1
   //            "table"."col" = $1
+  //            col = $1          (single-table shorthand emitted by some examples)
   //            <alias>.col = $1   (we cannot fully resolve alias->table without a parser,
   //                                 so we accept any "<ident>.col = $1" clause that exists
   //                                 alongside this table being referenced. Combined with the
@@ -61,7 +64,20 @@ const hasUserScopeClause = (normalizedSql, table) => {
   }
 
   const aliasRe = new RegExp(`(?:^|[\\s(,.])[a-zA-Z_][a-zA-Z0-9_]*\\.${col}\\s*=\\s*\\$1(?![0-9])`, 'iu');
-  return aliasRe.test(normalizedSql);
+  if (aliasRe.test(normalizedSql)) {
+    return true;
+  }
+
+  const sameScopeColumnTables = Array.from(referencedTables || []).filter((tableName) => {
+    const tableMeta = TABLES[tableName];
+    return tableMeta && tableMeta.userIdColumn === col;
+  });
+  if (sameScopeColumnTables.length !== 1) {
+    return false;
+  }
+
+  const unqualifiedRe = new RegExp(`(?:^|[\\s(,])${col}\\s*=\\s*\\$1(?![0-9])`, 'iu');
+  return unqualifiedRe.test(normalizedSql);
 };
 
 const ensureLimit = (sql) => {
@@ -121,7 +137,7 @@ const validateAndPrepareSql = (rawSql) => {
       continue;
     }
 
-    if (!hasUserScopeClause(sanitized, tableName)) {
+    if (!hasUserScopeClause(sanitized, tableName, referenced)) {
       const err = new Error(`Missing user scope WHERE ${tableName}.${meta.userIdColumn} = $1`);
       err.code = 'SQL_NOT_USER_SCOPED';
       err.table = tableName;

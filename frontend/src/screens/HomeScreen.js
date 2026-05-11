@@ -13,10 +13,10 @@ import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenAssistant, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenDiabetesPrediction, onOpenStrokePrediction, onOpenHypertensionPrediction, onOpenAssistant, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
-  const [largeTextMode, setLargeTextMode] = useState(false);
+  const [largeTextMode, setLargeTextMode] = useState(true);
   const [caregiverAlerts, setCaregiverAlerts] = useState([]);
   const [caregiverUnreadCount, setCaregiverUnreadCount] = useState(0);
   const [caregiverTimeline, setCaregiverTimeline] = useState([]);
@@ -47,10 +47,10 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
   };
 
   const menuItems = [
-    { id: 1, label: 'Reminder', icon: '\u{1F514}' },
-    { id: 2, label: 'Allergy', icon: '\u26A0\uFE0F' },
-    { id: 3, label: 'Emotions', icon: '\u{1F60A}' },
-    { id: 4, label: 'Dashboard', icon: '\u{1F4CA}' },
+    { id: 1, label: 'Reminder', icon: '\u{1F514}', description: 'See medicine times, stock, and safety.' },
+    { id: 2, label: 'Allergy', icon: '\u26A0\uFE0F', description: 'Check medicine allergy and safety details.' },
+    { id: 3, label: 'Emotions', icon: '\u{1F60A}', description: 'Do a quick mood check-in.' },
+    { id: 4, label: 'Dashboard', icon: '\u{1F4CA}', description: 'View today health summary.' },
   ];
 
   const reminderMenuItems = [
@@ -504,7 +504,51 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
           )}
         </View>
 
+        <TouchableOpacity
+          style={styles.caregiverDashboardButton}
+          onPress={onOpenDashboard}
+          activeOpacity={0.86}
+          accessibilityRole="button"
+          accessibilityLabel="Open elder summary dashboard"
+          accessibilityHint="Shows medication, mood, alert, stock, and routine summaries"
+        >
+          <View style={styles.caregiverDashboardTextWrap}>
+            <Text style={styles.caregiverDashboardTitle}>Summary Dashboard</Text>
+            <Text style={styles.caregiverDashboardSubtitle}>
+              Review medicine adherence, missed doses, mood, alerts, stock, and routine in one place.
+            </Text>
+          </View>
+          <Text style={styles.caregiverDashboardArrow}>{'>'}</Text>
+        </TouchableOpacity>
+
         <View style={styles.quickActionRow}>
+          <TouchableOpacity
+            style={styles.caregiverDiabetesButton}
+            onPress={onOpenDiabetesPrediction}
+            activeOpacity={0.86}
+            accessibilityRole="button"
+            accessibilityLabel="Open diabetes risk prediction"
+          >
+            <Text style={styles.caregiverDiabetesButtonText}>Diabetes Risk Prediction</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.caregiverStrokeButton}
+            onPress={onOpenStrokePrediction}
+            activeOpacity={0.86}
+            accessibilityRole="button"
+            accessibilityLabel="Open stroke risk prediction"
+          >
+            <Text style={styles.caregiverDiabetesButtonText}>Stroke Risk Prediction</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.caregiverHypertensionButton}
+            onPress={onOpenHypertensionPrediction}
+            activeOpacity={0.86}
+            accessibilityRole="button"
+            accessibilityLabel="Open blood pressure risk prediction"
+          >
+            <Text style={styles.caregiverDiabetesButtonText}>BP Risk Prediction</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
             <Text style={styles.profileButtonText}>View Profile</Text>
           </TouchableOpacity>
@@ -738,7 +782,7 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
               </View>
               <View style={styles.reminderButtonTextWrap}>
                 <Text style={[styles.reminderButtonText, { fontSize: 20 * textScale }]}>{item.title}</Text>
-                <Text style={[styles.reminderButtonSubText, { fontSize: 13 * textScale }]}>{item.subtitle}</Text>
+                <Text style={[styles.reminderButtonSubText, { fontSize: 15 * textScale }]}>{item.subtitle}</Text>
               </View>
               <Text style={styles.reminderButtonArrow}>›</Text>
             </TouchableOpacity>
@@ -856,16 +900,16 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
             onPress={() => handleButtonPress(item)}
             accessibilityRole="button"
             accessibilityLabel={item.label}
-            accessibilityHint="Medicine care option"
+            accessibilityHint={item.description}
           >
             <View style={[styles.homeActionIconWrap, { backgroundColor: '#1f6894' }]}>
               <Text style={styles.homeActionIcon}>{item.icon}</Text>
             </View>
             <View style={styles.homeActionTextWrap}>
               <Text style={styles.homeActionTitle}>{item.label}</Text>
-              <Text style={styles.homeActionSubtitle}>Care option</Text>
+              <Text style={styles.homeActionSubtitle}>{item.description}</Text>
             </View>
-            <Text style={[styles.homeActionHelper, { color: '#1f6894' }]}>Soon</Text>
+            <Text style={[styles.homeActionHelper, { color: '#1f6894' }]}>Open</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -975,6 +1019,85 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '900',
   },
+  caregiverDiabetesButton: {
+    width: '48%',
+    minHeight: 66,
+    backgroundColor: '#0F766E',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  caregiverStrokeButton: {
+    width: '48%',
+    minHeight: 66,
+    backgroundColor: '#7C3AED',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  caregiverHypertensionButton: {
+    width: '48%',
+    minHeight: 66,
+    backgroundColor: '#B91C1C',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  caregiverDiabetesButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 16,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  caregiverDashboardButton: {
+    width: '100%',
+    minHeight: 108,
+    backgroundColor: '#12354D',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  caregiverDashboardTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  caregiverDashboardTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  caregiverDashboardSubtitle: {
+    color: '#DCEBFF',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '700',
+  },
+  caregiverDashboardArrow: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '900',
+  },
   homeHeroCard: {
     minHeight: 150,
     borderRadius: 24,
@@ -998,8 +1121,8 @@ const styles = StyleSheet.create({
   },
   homeDateText: {
     color: '#eaf5ff',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '900',
     marginBottom: 6,
   },
@@ -1012,8 +1135,8 @@ const styles = StyleSheet.create({
   },
   homeHeroSubtitle: {
     color: '#f3f9ff',
-    fontSize: 17,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: '700',
   },
   homeHeroBadge: {
@@ -1034,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   homeHeroBadgeText: {
     color: '#1f6894',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '900',
     marginTop: 4,
   },
@@ -1074,7 +1197,7 @@ const styles = StyleSheet.create({
   },
   homePrimaryEyebrow: {
     color: '#4c6d82',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '900',
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -1087,8 +1210,8 @@ const styles = StyleSheet.create({
   },
   homePrimarySubtitle: {
     color: '#4c6d82',
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 23,
     fontWeight: '700',
     marginTop: 5,
   },
@@ -1119,8 +1242,8 @@ const styles = StyleSheet.create({
   },
   homeSectionSubtitle: {
     color: '#4c6d82',
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 23,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -1128,10 +1251,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   homeActionCard: {
-    minHeight: 102,
+    minHeight: 108,
     borderRadius: 20,
     borderWidth: 2,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 13,
     marginBottom: 13,
     flexDirection: 'row',
@@ -1155,21 +1278,21 @@ const styles = StyleSheet.create({
   },
   homeActionTitle: {
     color: '#12354d',
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '900',
   },
   homeActionSubtitle: {
     color: '#4c6d82',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '700',
     marginTop: 4,
   },
   homeActionHelper: {
-    minWidth: 46,
+    minWidth: 52,
     textAlign: 'right',
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '900',
   },
   localModeBanner: {
@@ -1198,7 +1321,8 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   welcome: {
-    fontSize: 16,
+    fontSize: 18,
+    lineHeight: 25,
     color: '#666',
     marginBottom: 6,
   },
@@ -1210,32 +1334,39 @@ const styles = StyleSheet.create({
   },
   quickActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
   profileButton: {
-    flex: 1,
+    width: '48%',
+    minHeight: 58,
     backgroundColor: '#1f6894',
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginRight: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginRight: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   profileButtonText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '900',
+    fontSize: 16,
   },
   logoutButton: {
-    flex: 1,
+    width: '48%',
+    minHeight: 58,
     backgroundColor: '#dd4d4d',
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginLeft: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginLeft: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   logoutButtonText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '900',
+    fontSize: 16,
   },
   grid: {
     flexDirection: 'row',
@@ -1275,7 +1406,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   caregiverContainer: {
-    paddingBottom: 24,
+    paddingBottom: 30,
     backgroundColor: '#f6f7f9',
   },
   caregiverHeaderRow: {
@@ -1285,9 +1416,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   caregiverNotificationButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1314,12 +1445,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   caregiverNotificationIcon: {
-    fontSize: 20,
+    fontSize: 24,
   },
   caregiverCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    padding: 18,
     marginBottom: 14,
     shadowColor: '#000',
     shadowOpacity: 0.08,
@@ -1352,23 +1483,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   caregiverInfoTitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#2d3c49',
-    fontWeight: '700',
+    fontWeight: '900',
   },
   caregiverInfoBadge: {
     backgroundColor: '#e9f1ff',
     color: '#2161a8',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '900',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   caregiverSectionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#2e3d4f',
-    fontWeight: '700',
+    fontWeight: '900',
     marginBottom: 10,
     textTransform: 'uppercase',
   },
@@ -1394,17 +1525,18 @@ const styles = StyleSheet.create({
   },
   caregiverCriticalLabel: {
     color: '#b0293f',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '900',
   },
   caregiverCriticalTime: {
     color: '#8e5a63',
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '800',
   },
   caregiverCriticalMessage: {
     color: '#4a2d33',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 23,
     marginBottom: 2,
   },
   caregiverRecentItem: {
@@ -1432,23 +1564,25 @@ const styles = StyleSheet.create({
   },
   caregiverRecentTitle: {
     color: '#243542',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '900',
     flexShrink: 1,
     marginRight: 8,
   },
   caregiverRecentTime: {
     color: '#678090',
-    fontSize: 11,
+    fontSize: 13,
   },
   caregiverRecentMessage: {
     color: '#405361',
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 16,
+    lineHeight: 23,
   },
   caregiverEmptyText: {
     color: '#687f90',
-    fontSize: 13,
+    fontSize: 16,
+    lineHeight: 23,
   },
   caregiverTimelineHeader: {
     flexDirection: 'row',
@@ -1460,14 +1594,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     color: '#5f7280',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   caregiverTimelineLink: {
     color: '#2b72b8',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '900',
   },
   caregiverTimelineItem: {
     flexDirection: 'row',
@@ -1517,27 +1651,27 @@ const styles = StyleSheet.create({
   },
   caregiverTimelineTime: {
     color: '#4a5c69',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '900',
   },
   caregiverTimelineText: {
     color: '#324653',
-    fontSize: 14,
-    lineHeight: 17,
+    fontSize: 16,
+    lineHeight: 23,
     marginTop: 2,
   },
   caregiverTimelineExpandButton: {
     marginTop: 4,
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: '#edf4fb',
   },
   caregiverTimelineExpandButtonText: {
     color: '#2b72b8',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '900',
   },
   backgroundBlobTop: {
     position: 'absolute',

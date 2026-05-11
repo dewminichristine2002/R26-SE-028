@@ -6,11 +6,21 @@ const ChatBubble = ({
   content,
   sql,
   rows,
+  sources,
+  safetyNote,
   fallback,
   onSpeak,
   isSpeaking = false,
 }) => {
   const isAssistant = role === 'assistant' || role === 'system';
+  const sourceList = Array.isArray(sources) && sources.length
+    ? sources
+    : (Array.isArray(rows) ? rows : [])
+      .map((row) => ({
+        name: row.name || row.source_name || row.sourceName,
+        url: row.url || row.source_url || row.sourceUrl,
+      }))
+      .filter((source) => source.name || source.url);
 
   return (
     <View style={[styles.row, isAssistant ? styles.rowLeft : styles.rowRight]}>
@@ -30,6 +40,23 @@ const ChatBubble = ({
         <Text style={isAssistant ? styles.textAssistant : styles.textUser}>
           {String(content || '').trim() || '\u2026'}
         </Text>
+
+        {isAssistant && sourceList.length > 0 ? (
+          <View style={styles.sourceBox}>
+            <Text style={styles.sourceTitle}>Trusted sources</Text>
+            {sourceList.slice(0, 4).map((source, index) => (
+              <Text key={`${source.name || source.url}-${index}`} style={styles.sourceText}>
+                {source.name || source.url}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
+        {isAssistant && safetyNote ? (
+          <View style={styles.noteBox}>
+            <Text style={styles.noteText}>{safetyNote}</Text>
+          </View>
+        ) : null}
 
         {isAssistant ? (
           <View style={styles.metaRow}>
@@ -70,20 +97,20 @@ const styles = StyleSheet.create({
   rowLeft: { justifyContent: 'flex-start' },
   rowRight: { justifyContent: 'flex-end' },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
     marginBottom: 4,
   },
-  avatarText: { fontSize: 18 },
+  avatarText: { fontSize: 22 },
   bubble: {
-    maxWidth: '78%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    maxWidth: '84%',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     borderRadius: 22,
   },
   bubbleAssistant: {
@@ -102,14 +129,14 @@ const styles = StyleSheet.create({
   },
   textAssistant: {
     color: '#111827',
-    fontSize: 17,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 28,
   },
   textUser: {
     color: '#FFFFFF',
-    fontSize: 17,
-    lineHeight: 26,
-    fontWeight: '500',
+    fontSize: 18,
+    lineHeight: 28,
+    fontWeight: '700',
   },
   metaRow: {
     flexDirection: 'row',
@@ -120,8 +147,9 @@ const styles = StyleSheet.create({
   metaButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: '#F3F4F6',
     borderRadius: 999,
     marginRight: 8,
@@ -132,11 +160,11 @@ const styles = StyleSheet.create({
   metaButtonPressed: {
     backgroundColor: '#E5E7EB',
   },
-  metaButtonIcon: { fontSize: 14, marginRight: 6 },
+  metaButtonIcon: { fontSize: 17, marginRight: 6 },
   metaButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#1F2937',
-    fontWeight: '700',
+    fontWeight: '900',
   },
   listenButton: {
     backgroundColor: '#DCFCE7',
@@ -151,23 +179,38 @@ const styles = StyleSheet.create({
   },
   sourceBox: {
     marginTop: 12,
-    backgroundColor: '#111827',
+    backgroundColor: '#F0FDF4',
     padding: 12,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   sourceTitle: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginTop: 6,
+    color: '#166534',
+    fontSize: 14,
+    fontWeight: '900',
     marginBottom: 4,
   },
-  sourceCode: {
-    color: '#E5E7EB',
-    fontSize: 12,
-    fontFamily: 'Courier',
-    lineHeight: 18,
+  sourceText: {
+    color: '#14532D',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginTop: 3,
+  },
+  noteBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  noteText: {
+    color: '#1E3A8A',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '800',
   },
 });
 

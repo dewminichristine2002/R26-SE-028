@@ -233,6 +233,87 @@ const TABLES = {
     },
   },
 
+  user_health_profiles: {
+    purpose: 'Structured health values for risk prediction (diabetes and stroke phase 1 inputs). One row per user.',
+    userIdColumn: 'user_id',
+    columns: {
+      user_id: 'integer FK users.id',
+      age: 'integer',
+      gender: 'text',
+      blood_sugar: 'numeric',
+      systolic_bp: 'numeric',
+      diastolic_bp: 'numeric',
+      height_cm: 'numeric',
+      weight_kg: 'numeric',
+      smoking_status: 'text',
+      physical_activity_level: 'text',
+      family_history: 'text',
+      existing_disease_history: 'text[]',
+      created_at: 'timestamptz',
+      updated_at: 'timestamptz',
+    },
+  },
+
+  diabetes_risk_predictions: {
+    purpose: 'Saved diabetes risk prediction results for longitudinal monitoring and explanation history.',
+    userIdColumn: 'user_id',
+    columns: {
+      id: 'integer',
+      user_id: 'integer FK users.id',
+      risk_type: "text currently 'Diabetes'",
+      risk_level: "text 'Low' | 'Medium' | 'High'",
+      confidence: 'integer (0-100)',
+      probability: 'numeric (0-1)',
+      selected_algorithm: 'text',
+      factors: 'jsonb[] style list (stored as jsonb array)',
+      input_snapshot: 'jsonb',
+      summary: 'text',
+      conversation_id: 'integer FK assistant_conversations.id (nullable)',
+      created_at: 'timestamptz',
+    },
+    notes: 'Predictions are for health risk awareness only and are not medical diagnosis.',
+  },
+
+  stroke_risk_predictions: {
+    purpose: 'Saved stroke risk prediction results for longitudinal monitoring and explanation history.',
+    userIdColumn: 'user_id',
+    columns: {
+      id: 'integer',
+      user_id: 'integer FK users.id',
+      risk_type: "text currently 'Stroke'",
+      risk_level: "text 'Low' | 'Medium' | 'High'",
+      confidence: 'integer (0-100)',
+      probability: 'numeric (0-1)',
+      selected_algorithm: 'text',
+      factors: 'jsonb[] style list (stored as jsonb array)',
+      input_snapshot: 'jsonb',
+      summary: 'text',
+      conversation_id: 'integer FK assistant_conversations.id (nullable)',
+      created_at: 'timestamptz',
+    },
+    notes: 'Predictions are for health risk awareness only and are not medical diagnosis.',
+  },
+
+  hypertension_risk_predictions: {
+    purpose: 'Saved hypertension risk prediction results for longitudinal monitoring and explanation history.',
+    userIdColumn: 'user_id',
+    columns: {
+      id: 'integer',
+      user_id: 'integer FK users.id',
+      risk_type: "text currently 'Hypertension'",
+      risk_level: "text 'Low' | 'Medium' | 'High'",
+      confidence: 'integer (0-100)',
+      probability: 'numeric (0-1)',
+      selected_algorithm: 'text',
+      factors: 'jsonb[] style list (stored as jsonb array)',
+      input_snapshot: 'jsonb',
+      summary: 'text',
+      conversation_id: 'integer FK assistant_conversations.id (nullable)',
+      created_at: 'timestamptz',
+    },
+    notes: 'Predictions are for health risk awareness only and are not medical diagnosis.',
+  },
+
   emotional_support_emotion_sessions: {
     purpose: 'Each mood / emotion check-in the patient submitted (text, voice, emoji or multimodal).',
     userIdColumn: 'elder_user_id',
@@ -303,6 +384,22 @@ const TABLES = {
       created_at: 'timestamptz',
     },
   },
+
+  health_advice_chunks: {
+    purpose: 'Trusted RAG knowledge chunks for diabetes, hypertension and stroke advice. Global source catalog, not user-specific.',
+    userIdColumn: null,
+    columns: {
+      id: 'integer',
+      source_name: 'text',
+      source_url: 'text',
+      risk_type: "text 'General' | 'Diabetes' | 'Hypertension' | 'Stroke'",
+      topic: 'text',
+      content_chunk: 'text',
+      created_at: 'timestamptz',
+      updated_at: 'timestamptz',
+    },
+    notes: 'Use only as trusted source metadata. Do not answer heart disease advice from this catalog.',
+  },
 };
 
 const SAFE_RELATIONSHIPS = [
@@ -312,6 +409,7 @@ const SAFE_RELATIONSHIPS = [
   'medication_status_events.medication_id -> user_medications.id',
   'caregiver_alerts.medication_id -> user_medications.id',
   'caregiver_alerts.status_event_id -> medication_status_events.id',
+  'diabetes_risk_predictions.conversation_id -> assistant_conversations.id',
   'emotional_support_interventions.session_id -> emotional_support_emotion_sessions.id',
   'emotional_support_caregiver_alerts.session_id -> emotional_support_emotion_sessions.id',
 ];

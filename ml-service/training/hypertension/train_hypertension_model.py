@@ -1,0 +1,271 @@
+import argparse
+import json
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
+
+RANDOM_STATE = 42
+DEFAULT_DATASET = "data/raw/hypertension_dataset.csv"
+DEFAULT_OUTPUT_DIR = "app/models"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train ElderMeds hypertension risk model.")
+    parser.add_argument("--dataset-path", default=DEFAULT_DATASET)
+    parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--test-size", type=float, default=0.2)
+    return parser.parse_args()
+
+
+def load_dataset(dataset_path: Path) -> pd.DataFrame:
+    if not dataset_path.exists():
+        raise FileNotFoundError(
+            f"Dataset not found at {dataset_path}. Place hypertension_dataset.csv in data/raw."
+        )
+
+    df = pd.read_csv(dataset_path, na_values=["N/A", "Unknown", ""])
+    if "Hypertension" not in df.columns:
+        raise ValueError("Hypertension dataset must contain a 'Hypertension' target column.")
+
+    normalized = df["Hypertension"].astype(str).str.strip().str.lower()
+    df = df[normalized.isin(["high", "low", "1", "0", "yes", "no"])].copy()
+    normalized = df["Hypertension"].astype(str).str.strip().str.lower()
+    df["Hypertension_binary"] = normalized.isin(["high", "1", "yes"]).astype(int)
+    return df
+
+
+def build_feature_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str], list[str]]:
+    numeric_features = [
+        "Age",
+        "BMI",
+        "Cholesterol",
+        "Systolic_BP",
+        "Diastolic_BP",
+        "Alcohol_Intake",
+        "Stress_Level",
+        "Salt_Intake",
+        "Sleep_Duration",
+        "Heart_Rate",
+        "LDL",
+        "HDL",
+        "Triglycerides",
+        "Glucose",
+    ]
+    categorical_features = [
+        "Country",
+        "Smoking_Status",
+        "Physical_Activity_Level",
+        "Family_History",
+        "Diabetes",
+        "Gender",
+        "Education_Level",
+        "Employment_Status",
+    ]
+    required = numeric_features + categorical_features
+    missing = [name for name in required if name not in df.columns]
+    if missing:
+        raise ValueError(f"Hypertension dataset is missing required columns: {', '.join(missing)}")
+
+    X = df[required].copy()
+    y = df["Hypertension_binary"].copy()
+
+    for col in numeric_features:
+        X[col] = pd.to_numeric(X[col], errors="coerce")
+
+    for col in categorical_features:
+        X[col] = X[col].apply(lambda value: str(value).strip() if pd.notna(value) else np.nan)
+
+    return X, y, numeric_features, categorical_features
+
+
+def evaluate_model(model, X_test, y_test) -> dict:
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+
+    return {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "balancedAccuracy": float(balanced_accuracy_score(y_test, y_pred)),
+        "precision": float(precision_score(y_test, y_pred, zero_division=0)),
+        "recall": float(recall_score(y_test, y_pred, zero_division=0)),
+        "f1Score": float(f1_score(y_test, y_pred, zero_division=0)),
+        "rocAuc": float(roc_auc_score(y_test, y_prob)),
+        "confusionMatrix": confusion_matrix(y_test, y_pred).tolist(),
+        "positiveRate": float(np.mean(y_prob)),
+    }
+
+
+def rank_key(result: dict) -> tuple:
+    metrics = result["metrics"]
+    # Avoid selecting a model that simply predicts the majority class.
+    return (
+        metrics["balancedAccuracy"],
+        metrics["rocAuc"],
+        metrics["f1Score"],
+        metrics["recall"],
+        metrics["accuracy"],
+    )
+
+
+def main() -> None:
+    args = parse_args()
+    project_root = Path(__file__).resolve().parents[2]
+    dataset_path = (project_root / args.dataset_path).resolve()
+    output_dir = (project_root / args.output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    df = load_dataset(dataset_path)
+    X, y, numeric_features, categorical_features = build_feature_frame(df)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=args.test_size,
+        random_state=RANDOM_STATE,
+        stratify=y,
+    )
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "numeric",
+                Pipeline(
+                    steps=[
+                        ("imputer", SimpleImputer(strategy="median")),
+                        ("scaler", StandardScaler()),
+                    ]
+                ),
+                numeric_features,
+            ),
+            (
+                "categorical",
+                Pipeline(
+                    steps=[
+                        ("imputer", SimpleImputer(strategy="most_frequent")),
+                        ("onehot", OneHotEncoder(handle_unknown="ignore")),
+                    ]
+                ),
+                categorical_features,
+            ),
+        ],
+        remainder="drop",
+    )
+
+    X_train_t = preprocessor.fit_transform(X_train)
+    X_test_t = preprocessor.transform(X_test)
+
+    positive = int((y_train == 1).sum())
+    negative = int((y_train == 0).sum())
+    scale_pos_weight = float(negative / max(1, positive))
+
+    models = {
+        "Logistic Regression": LogisticRegression(
+            max_iter=2000,
+            class_weight="balanced",
+            random_state=RANDOM_STATE,
+        ),
+        "Decision Tree": DecisionTreeClassifier(
+            random_state=RANDOM_STATE,
+            class_weight="balanced",
+            min_samples_leaf=40,
+        ),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=250,
+            random_state=RANDOM_STATE,
+            class_weight="balanced_subsample",
+            min_samples_leaf=5,
+            n_jobs=-1,
+        ),
+        "XGBoost": XGBClassifier(
+            n_estimators=250,
+            learning_rate=0.05,
+            max_depth=5,
+            subsample=0.9,
+            colsample_bytree=0.9,
+            objective="binary:logistic",
+            eval_metric="logloss",
+            random_state=RANDOM_STATE,
+            scale_pos_weight=scale_pos_weight,
+            n_jobs=4,
+        ),
+    }
+
+    comparison = []
+    best_name = None
+    best_model = None
+    best_result = None
+
+    for name, model in models.items():
+        model.fit(X_train_t, y_train)
+        metrics = evaluate_model(model, X_test_t, y_test)
+        result = {"algorithm": name, "metrics": metrics}
+        comparison.append(result)
+
+        if best_result is None or rank_key(result) > rank_key(best_result):
+            best_name = name
+            best_model = model
+            best_result = result
+
+    model_path = output_dir / "hypertension_model.pkl"
+    preprocessor_path = output_dir / "hypertension_preprocessor.pkl"
+    metadata_path = output_dir / "hypertension_model_metadata.json"
+
+    joblib.dump(best_model, model_path)
+    joblib.dump(preprocessor, preprocessor_path)
+
+    numeric_defaults = {
+        col: float(X_train[col].median()) if pd.notna(X_train[col].median()) else 0.0
+        for col in numeric_features
+    }
+    categorical_defaults = {}
+    for col in categorical_features:
+        mode = X_train[col].dropna().mode()
+        categorical_defaults[col] = str(mode.iloc[0]) if not mode.empty else ""
+
+    metadata = {
+        "selectedAlgorithm": best_name,
+        "accuracy": best_result["metrics"]["accuracy"],
+        "balancedAccuracy": best_result["metrics"]["balancedAccuracy"],
+        "precision": best_result["metrics"]["precision"],
+        "recall": best_result["metrics"]["recall"],
+        "f1Score": best_result["metrics"]["f1Score"],
+        "rocAuc": best_result["metrics"]["rocAuc"],
+        "confusionMatrix": best_result["metrics"]["confusionMatrix"],
+        "featuresUsed": numeric_features + categorical_features,
+        "numericFeatures": numeric_features,
+        "categoricalFeatures": categorical_features,
+        "numericDefaults": numeric_defaults,
+        "categoricalDefaults": categorical_defaults,
+        "datasetPath": str(dataset_path),
+        "classBalance": {
+            "trainPositive": positive,
+            "trainNegative": negative,
+        },
+        "modelComparison": comparison,
+    }
+
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    print(json.dumps(metadata, indent=2))
+
+
+if __name__ == "__main__":
+    main()
