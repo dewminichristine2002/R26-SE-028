@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { intakeMonitoringService } from '../services/intakeMonitoringService';
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
@@ -36,6 +38,27 @@ const parseTakeWith = (value = '') =>
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+
+const formatTabletCount = (count) => {
+  const normalized = Number(count);
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return '0';
+  }
+
+  if (Math.abs(normalized - 0.5) < 0.001) {
+    return '1/2';
+  }
+
+  if (Number.isInteger(normalized)) {
+    return String(normalized);
+  }
+
+  return normalized.toFixed(1).replace(/\.0$/, '');
+};
+
+const getExpectedTabletCount = (medication) => Math.max(0.5, Number(medication?.daily_amount) || 1);
+
+const getCountSourceLabel = (source) => (source === 'trained-model' ? 'Model count' : 'Image count');
 
 const getSlotIcon = (slot) =>
   ({

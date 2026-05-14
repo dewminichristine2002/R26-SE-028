@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import { intakeMonitoringService } from '../services/intakeMonitoringService';
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 import { routineService } from '../services/routineService';
@@ -363,6 +366,61 @@ const formatTabletCount = (count) => {
   return normalized.toFixed(1).replace(/\.0$/, '');
 };
 
+const getVerificationEntries = (entry) => {
+  if (Array.isArray(entry?.entries) && entry.entries.length) {
+    return entry.entries;
+  }
+  return entry ? [entry] : [];
+};
+
+const getExpectedTabletCount = (entry) => {
+  const entries = getVerificationEntries(entry);
+  if (entries.length > 1 || entry?.isGroupIntake) {
+    return entries.reduce((total, item) => total + (Number(item?.dailyAmount) || 1), 0);
+  }
+  return Math.max(0.5, Number(entry?.dailyAmount) || 1);
+};
+
+const getCountComparisonStatus = (count, expectedCount) => {
+  const normalizedCount = Number(count);
+  const normalizedExpected = Number(expectedCount);
+  if (!Number.isFinite(normalizedCount) || normalizedCount <= 0 || !Number.isFinite(normalizedExpected) || normalizedExpected <= 0) {
+    return 'unknown';
+  }
+  if (Math.abs(normalizedCount - normalizedExpected) <= 0.001) {
+    return 'okay';
+  }
+  return normalizedCount > normalizedExpected ? 'overdose' : 'underdose';
+};
+
+const getCountComparisonLabel = (status) => {
+  if (status === 'okay') {
+    return 'Count OK';
+  }
+  if (status === 'overdose') {
+    return 'Overdose count';
+  }
+  if (status === 'underdose') {
+    return 'Underdose count';
+  }
+  return 'Count uncertain';
+};
+
+const getCountComparisonMessage = (status, count, expectedCount) => {
+  const expectedText = formatTabletCount(expectedCount);
+  const countText = formatTabletCount(count);
+  if (status === 'okay') {
+    return `Count is correct: ${countText} tablet${Number(count) === 1 ? '' : 's'}.`;
+  }
+  if (status === 'overdose') {
+    return `Overdose: detected ${countText}, expected ${expectedText}.`;
+  }
+  if (status === 'underdose') {
+    return `Underdose: detected ${countText}, expected ${expectedText}.`;
+  }
+  return `Expected ${expectedText} tablet${Number(expectedCount) === 1 ? '' : 's'}.`;
+};
+
 const getIntakeAmountText = (entry) => {
   const tabletCount = Number(entry?.dailyAmount) || 1;
   const formattedCount = formatTabletCount(tabletCount);
@@ -401,6 +459,20 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   const [showOverdoseModal, setShowOverdoseModal] = useState(false);
   const [overdoseTabletsCount, setOverdoseTabletsCount] = useState(0.5);
   const [overdoseEntry, setOverdoseEntry] = useState(null);
+  const [intakeVerificationEntry, setIntakeVerificationEntry] = useState(null);
+  const [intakeVerificationPhotoUri, setIntakeVerificationPhotoUri] = useState('');
+  const [intakeVerificationPhotoBase64, setIntakeVerificationPhotoBase64] = useState('');
+  const [detectedTabletCount, setDetectedTabletCount] = useState(null);
+  const [tabletCountAnalysisMessage, setTabletCountAnalysisMessage] = useState('');
+  const [isAnalyzingTabletCount, setIsAnalyzingTabletCount] = useState(false);
+  const [verifiedTabletCount, setVerifiedTabletCount] = useState(1);
+  const [verificationHandToMouth, setVerificationHandToMouth] = useState(false);
+  const [verificationSwallowComplete, setVerificationSwallowComplete] = useState(false);
+  const [verificationSpeakMessage, setVerificationSpeakMessage] = useState('');
+  const [isOpeningVerificationCamera, setIsOpeningVerificationCamera] = useState(false);
+  const [isAnalyzingMotionVideo, setIsAnalyzingMotionVideo] = useState(false);
+  const [motionVideoUri, setMotionVideoUri] = useState('');
+  const [motionAnalysisMessage, setMotionAnalysisMessage] = useState('');
   const [showFullDay, setShowFullDay] = useState(true);
   const activeVoiceEntryRef = useRef(null);
   const textScale = reminderTextScale || 1;
@@ -898,6 +970,342 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     }
   };
 
+  const handleSaveDoseGroupTaken = async (entries, options = {}) => {
+    const activeEntries = (entries || []).filter((entry) => entry?.medicationId);
+    if (!activeEntries.length) {
+      Alert.alert('No dose', 'No medicines selected to mark right now.');
+      return;
+    }
+
+    if (isSavingStatus) {
+      return;
+    }
+
+    try {
+      setIsSavingStatus(true);
+      const eventTime = new Date().toISOString();
+
+      await Promise.all(
+        activeEntries.map((entry) =>
+          medicationService.saveMedicationStatusEvent({
+            medicationId: entry.medicationId,
+            status: 'taken',
+            overdoseTablets: null,
+            scheduleSlot: entry.rowKey,
+            doseNumber: entry.doseNumber,
+            timesPerDay: entry.timesPerDay,
+            routineTime: entry.routineTime,
+            reminderTime: entry.dueDate
+              ? entry.dueDate.toISOString()
+              : entry.nextDate
+                ? entry.nextDate.toISOString()
+                : null,
+            eventTime,
+          })
+        )
+      );
+
+      const savedAt = new Date();
+      setLastSavedStatusByEntry((prev) => {
+        const next = { ...prev };
+        activeEntries.forEach((entry) => {
+          next[getEntryStatusKey(entry)] = {
+            status: 'taken',
+            overdoseTablets: null,
+            savedAt,
+          };
+        });
+        return next;
+      });
+
+      if (options?.speakMessage && SpeechModule) {
+        SpeechModule.speak(options.speakMessage, {
+          language: 'en',
+          pitch: 1.0,
+          rate: 0.95,
+        });
+      } else {
+        speakSavedStatus('taken', activeEntries.length, activeEntries);
+      }
+    } catch (error) {
+      Alert.alert('Save failed', error?.response?.data?.error || error?.message || 'Could not save statuses.');
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
+
+  const resetIntakeVerification = () => {
+    setIntakeVerificationEntry(null);
+    setIntakeVerificationPhotoUri('');
+    setIntakeVerificationPhotoBase64('');
+    setDetectedTabletCount(null);
+    setTabletCountAnalysisMessage('');
+    setIsAnalyzingTabletCount(false);
+    setVerifiedTabletCount(1);
+    setVerificationHandToMouth(false);
+    setVerificationSwallowComplete(false);
+    setVerificationSpeakMessage('');
+    setIsOpeningVerificationCamera(false);
+    setIsAnalyzingMotionVideo(false);
+    setMotionVideoUri('');
+    setMotionAnalysisMessage('');
+  };
+
+  const analyzePalmPhoto = async (entry, imageBase64) => {
+    if (!entry || !imageBase64) {
+      return;
+    }
+
+    try {
+      setIsAnalyzingTabletCount(true);
+      setTabletCountAnalysisMessage('Counting tablets from the palm photo...');
+      const expectedCount = getExpectedTabletCount(entry);
+      const analysis = await intakeMonitoringService.analyzePalmPhoto({
+        imageBase64,
+        expectedCount,
+      });
+      const count = Number(analysis?.detectedCount);
+      if (Number.isFinite(count) && count > 0) {
+        setDetectedTabletCount(count);
+        setVerifiedTabletCount(count);
+        const confidenceText = Number.isFinite(Number(analysis?.confidence))
+          ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
+          : '';
+        const sourceText = analysis?.countSource === 'ai-model'
+          ? 'AI model detected'
+          : analysis?.countSource === 'pill-detector'
+          ? 'Pill detector counted'
+          : String(analysis?.countSource || '').startsWith('hybrid')
+          ? 'Hybrid check detected'
+          : 'Image processing detected';
+        const comparisonStatus = analysis?.status || getCountComparisonStatus(count, expectedCount);
+        const modelConfidence = Number(analysis?.modelAnalysis?.confidence) || 0;
+        const modelThreshold = Number(analysis?.modelAnalysis?.confidenceThreshold) || 0.7;
+        const modelText = analysis?.modelAnalysis?.available && analysis?.countSource !== 'ai-model' && modelConfidence >= modelThreshold
+          ? analysis?.modelAnalysis?.agreement === false
+            ? ` AI model estimated ${formatTabletCount(analysis.modelAnalysis.count)}. Please confirm.`
+            : ' AI model confirmed.'
+          : '';
+        setTabletCountAnalysisMessage(
+          `${sourceText} ${formatTabletCount(count)} tablet${count === 1 ? '' : 's'}${confidenceText}. ${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${modelText}`
+        );
+      } else {
+        setDetectedTabletCount(0);
+        setTabletCountAnalysisMessage(analysis?.error || 'Could not clearly count tablets. Retake the palm photo with all tablets separated.');
+      }
+    } catch (error) {
+      setDetectedTabletCount(null);
+      setTabletCountAnalysisMessage(error?.response?.data?.error || error?.message || 'Could not analyze photo. Retake the palm photo with all tablets separated.');
+    } finally {
+      setIsAnalyzingTabletCount(false);
+    }
+  };
+
+  const captureIntakeVerificationPhoto = async (entryOverride = intakeVerificationEntry) => {
+    try {
+      setIsOpeningVerificationCamera(true);
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera Needed', 'Camera permission is required to verify this intake.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.75,
+        base64: true,
+      });
+
+      if (!pickerResult.canceled && pickerResult.assets?.length) {
+        const asset = pickerResult.assets[0];
+        setIntakeVerificationPhotoUri(asset?.uri || '');
+        setIntakeVerificationPhotoBase64(asset?.base64 || '');
+        setDetectedTabletCount(null);
+        setTabletCountAnalysisMessage('');
+        await analyzePalmPhoto(entryOverride, asset?.base64 || '');
+      }
+    } catch (error) {
+      Alert.alert('Camera Error', error?.message || 'Could not open camera.');
+    } finally {
+      setIsOpeningVerificationCamera(false);
+    }
+  };
+
+  const openIntakeVerification = (entry, options = {}) => {
+    if (!entry?.medicationId) {
+      Alert.alert('No dose', 'No medicine selected to verify right now.');
+      return;
+    }
+
+    const expectedCount = getExpectedTabletCount(entry);
+    setIntakeVerificationEntry(entry);
+    setIntakeVerificationPhotoUri('');
+    setVerifiedTabletCount(expectedCount);
+    setVerificationHandToMouth(false);
+    setVerificationSwallowComplete(false);
+    setVerificationSpeakMessage(options?.speakMessage || '');
+    setDetectedTabletCount(null);
+    setTabletCountAnalysisMessage('');
+    setIntakeVerificationPhotoBase64('');
+    setMotionVideoUri('');
+    setMotionAnalysisMessage('');
+    void captureIntakeVerificationPhoto(entry);
+  };
+
+  const getFileExtensionFromUri = (uri = '') => {
+    const cleanUri = String(uri || '').split('?')[0];
+    const match = cleanUri.match(/\.([a-zA-Z0-9]+)$/);
+    return match?.[1]?.toLowerCase() || 'mp4';
+  };
+
+  const recordAndAnalyzeIntakeMotion = async () => {
+    try {
+      setIsAnalyzingMotionVideo(true);
+      setVerificationHandToMouth(false);
+      setMotionAnalysisMessage('Opening camera for intake motion...');
+
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera Needed', 'Camera permission is required to verify intake motion.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        cameraType: ImagePicker.CameraType?.front || 'front',
+        videoMaxDuration: 8,
+        quality: 0.7,
+      });
+
+      if (pickerResult.canceled || !pickerResult.assets?.length) {
+        setVerificationHandToMouth(false);
+        setMotionAnalysisMessage('');
+        return;
+      }
+
+      const asset = pickerResult.assets[0];
+      const uri = asset?.uri || '';
+      if (!uri) {
+        setVerificationHandToMouth(false);
+        setMotionAnalysisMessage('Could not read motion video. Please try again.');
+        return;
+      }
+
+      setMotionVideoUri(uri);
+      setMotionAnalysisMessage('Analyzing hand-to-mouth motion...');
+      const videoBase64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const analysis = await intakeMonitoringService.analyzeMotionVideo({
+        videoBase64,
+        extension: getFileExtensionFromUri(uri),
+        swallowConfirmed: verificationSwallowComplete,
+      });
+
+      const motionAvailable = analysis?.motionAvailable ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected);
+      setVerificationHandToMouth(!!motionAvailable);
+
+      const confidenceText = Number.isFinite(Number(analysis?.confidence))
+        ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
+        : '';
+      if (motionAvailable) {
+        setMotionAnalysisMessage(`Camera detected hand-to-mouth intake motion${confidenceText}.`);
+      } else {
+        const frameHint = analysis?.extractionMode === 'opencv-motion-fallback'
+          ? ` Motion frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
+          : '';
+        setMotionAnalysisMessage(
+          analysis?.message ||
+            analysis?.error ||
+            `Motion not clear${confidenceText}.${frameHint} Record again with face, hand, and mouth visible.`
+        );
+      }
+    } catch (error) {
+      setVerificationHandToMouth(false);
+      setMotionAnalysisMessage(
+        error?.response?.data?.error ||
+          error?.message ||
+          'Could not analyze intake motion. Record again with face and hand visible.'
+      );
+    } finally {
+      setIsAnalyzingMotionVideo(false);
+    }
+  };
+
+  const openOneTimeIntakeVerification = () => {
+    const entries = visibleNextDoseGroup.filter((entry) => !isEntryInteractionLocked(entry));
+    if (!entries.length) {
+      Alert.alert('No dose', 'No unmarked medicines are ready for one-time verification.');
+      return;
+    }
+
+    const expectedCount = entries.reduce((total, entry) => total + (Number(entry?.dailyAmount) || 1), 0);
+    const groupEntry = {
+      isGroupIntake: true,
+      entries,
+      medicineName: 'Current intake',
+      dosageMg: '',
+      dailyAmount: expectedCount,
+      color: '',
+      shape: '',
+      rowLabel: entries[0]?.rowLabel,
+      rowKey: entries[0]?.rowKey,
+      dueDate: entries[0]?.dueDate,
+      nextDate: entries[0]?.nextDate,
+      routineTime: entries[0]?.routineTime,
+    };
+
+    setIntakeVerificationEntry(groupEntry);
+    setIntakeVerificationPhotoUri('');
+    setVerifiedTabletCount(expectedCount);
+    setVerificationHandToMouth(false);
+    setVerificationSwallowComplete(false);
+    setVerificationSpeakMessage(`I got all medicines for ${entries.length} medicines.`);
+    setDetectedTabletCount(null);
+    setTabletCountAnalysisMessage('');
+    setIntakeVerificationPhotoBase64('');
+    setMotionVideoUri('');
+    setMotionAnalysisMessage('');
+    void captureIntakeVerificationPhoto(groupEntry);
+  };
+
+  const completeIntakeVerification = async () => {
+    const entry = intakeVerificationEntry;
+    if (!entry) {
+      resetIntakeVerification();
+      return;
+    }
+
+    const expectedCount = getExpectedTabletCount(entry);
+    if (!intakeVerificationPhotoUri) {
+      Alert.alert('Palm Photo Needed', 'Please take a photo showing the tablets in your palm first.');
+      return;
+    }
+
+    if (Math.abs(Number(verifiedTabletCount) - expectedCount) > 0.001) {
+      Alert.alert(
+        'Incorrect Count',
+        `This intake needs ${formatTabletCount(expectedCount)} tablet${expectedCount === 1 ? '' : 's'}, but the verified count is ${formatTabletCount(verifiedTabletCount)}.`
+      );
+      return;
+    }
+
+    if (!verificationHandToMouth) {
+      Alert.alert('Camera Motion Needed', 'Please record the intake motion first. Mark Taken unlocks only after hand-to-mouth motion is detected in the video.');
+      return;
+    }
+
+    const speakMessage = verificationSpeakMessage;
+    const verificationEntries = getVerificationEntries(entry);
+    resetIntakeVerification();
+    if (entry?.isGroupIntake || verificationEntries.length > 1) {
+      await handleSaveDoseGroupTaken(verificationEntries, { speakMessage });
+      return;
+    }
+
+    await handleSaveDoseStatus(entry, 'taken', { speakMessage });
+  };
+
   const applyVoiceStatusCommandForEntry = async (entry, transcript) => {
     const parsed = parseVoiceStatusCommand(transcript, entry);
 
@@ -1204,6 +1612,180 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     });
   };
 
+  if (intakeVerificationEntry) {
+    const expectedCount = getExpectedTabletCount(intakeVerificationEntry);
+    const countMatches = Math.abs(Number(verifiedTabletCount) - expectedCount) <= 0.001;
+    const countStatus = getCountComparisonStatus(verifiedTabletCount, expectedCount);
+    const verificationEntries = getVerificationEntries(intakeVerificationEntry);
+    const isGroupVerification = intakeVerificationEntry?.isGroupIntake || verificationEntries.length > 1;
+    const motionDetected = !!verificationHandToMouth && !isAnalyzingMotionVideo;
+    const canMarkTaken = !!intakeVerificationPhotoUri && countMatches && motionDetected;
+
+    return (
+      <View style={styles.page}>
+        <View style={styles.staticHeaderWrap}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={resetIntakeVerification}>
+              <Text style={styles.backIcon}>‹</Text>
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Intake Check</Text>
+            <View style={styles.headerRightSpacer} />
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.verificationContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.verificationHeroCard}>
+            <Text style={[styles.verificationHeroTitle, { fontSize: 24 * textScale, lineHeight: 30 * textScale }]}>
+              {isGroupVerification ? 'Verify one-time intake' : 'Verify before marking taken'}
+            </Text>
+            <Text style={[styles.verificationHeroText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
+              Show all tablets in your palm. The trained AI model checks whether the amount is OK, overdose, or underdose.
+            </Text>
+          </View>
+
+          <View style={styles.verificationMedicineCard}>
+            {!isGroupVerification && (
+              <View style={styles.verificationAppearanceWrap}>
+                {renderAppearanceIcon(intakeVerificationEntry.shape, intakeVerificationEntry.color, true)}
+              </View>
+            )}
+            <View style={styles.verificationMedicineTextWrap}>
+              <Text style={[styles.verificationMedicineName, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>
+                {isGroupVerification ? 'All medicines for this time' : intakeVerificationEntry.medicineName}
+              </Text>
+              {isGroupVerification ? (
+                <Text style={[styles.verificationMedicineMeta, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
+                  {verificationEntries.length} medicine{verificationEntries.length === 1 ? '' : 's'} - Need {formatTabletCount(expectedCount)} tablet{expectedCount === 1 ? '' : 's'} total
+                </Text>
+              ) : (
+                <Text style={[styles.verificationMedicineMeta, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
+                  {intakeVerificationEntry.dosageMg}mg - Need {formatTabletCount(expectedCount)} tablet{expectedCount === 1 ? '' : 's'}
+                </Text>
+              )}
+              {isGroupVerification && (
+                <View style={styles.verificationMedicineList}>
+                  {verificationEntries.map((entry) => (
+                    <Text key={entry.stableId || getEntryStatusKey(entry)} style={[styles.verificationMedicineListText, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+                      {entry.medicineName}: {formatTabletCount(Number(entry?.dailyAmount) || 1)} tablet{Number(entry?.dailyAmount) === 1 ? '' : 's'}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.verificationStepCard}>
+            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>1. Palm photo</Text>
+            {!!intakeVerificationPhotoUri ? (
+              <Image source={{ uri: intakeVerificationPhotoUri }} style={styles.verificationPhoto} resizeMode="cover" />
+            ) : (
+              <View style={styles.verificationPhotoPlaceholder}>
+                <Text style={styles.verificationPhotoPlaceholderText}>No photo captured</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.verificationCameraButton}
+              onPress={captureIntakeVerificationPhoto}
+              disabled={isOpeningVerificationCamera}
+            >
+              {isOpeningVerificationCamera ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.verificationCameraButtonText}>
+                  {intakeVerificationPhotoUri ? 'Retake Photo' : 'Open Camera'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.verificationStepCard}>
+            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>2. AI tablet count</Text>
+            <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
+              The system counts tablet-like objects from the palm photo and compares the count with this intake.
+            </Text>
+            <View style={styles.verificationAnalysisBox}>
+              {isAnalyzingTabletCount ? (
+                <View style={styles.verificationAnalysisRow}>
+                  <ActivityIndicator color="#2f5d50" size="small" />
+                  <Text style={styles.verificationAnalysisText}>Analyzing palm photo...</Text>
+                </View>
+              ) : (
+                <Text style={styles.verificationAnalysisText}>
+                  {tabletCountAnalysisMessage || 'Take a palm photo to estimate the tablet count.'}
+                </Text>
+              )}
+              {detectedTabletCount != null && (
+                <Text style={styles.verificationAnalysisMeta}>
+                  AI count: {formatTabletCount(detectedTabletCount)} - {getCountComparisonLabel(getCountComparisonStatus(detectedTabletCount, expectedCount))}
+                </Text>
+              )}
+            </View>
+            <View style={styles.verificationCountRow}>
+              <View style={[styles.verificationCountValue, countMatches ? styles.verificationCountValueGood : styles.verificationCountValueBad]}>
+                <Text style={[styles.verificationCountValueText, { fontSize: 22 * textScale }]}>
+                  {formatTabletCount(verifiedTabletCount)}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.verificationReadOnlyCountText}>Retake the photo to refresh this count.</Text>
+            <Text style={[styles.verificationCountStatus, countMatches ? styles.verificationCountStatusGood : styles.verificationCountStatusBad]}>
+              {getCountComparisonMessage(countStatus, verifiedTabletCount, expectedCount)}
+            </Text>
+          </View>
+
+          <View style={styles.verificationStepCard}>
+            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Camera intake motion</Text>
+            <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
+              Record a short video with your face, hand, and mouth visible. The camera check detects hand-to-mouth motion.
+            </Text>
+            <TouchableOpacity
+              style={[styles.verificationCameraButton, isAnalyzingMotionVideo && styles.verificationCompleteButtonDisabled]}
+              onPress={recordAndAnalyzeIntakeMotion}
+              disabled={isAnalyzingMotionVideo}
+            >
+              {isAnalyzingMotionVideo ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.verificationCameraButtonText}>
+                  {motionVideoUri ? 'Record Again' : 'Record Motion'}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <View style={[styles.verificationCheckRow, verificationHandToMouth && styles.verificationCheckRowActive]}>
+              <Text style={styles.verificationCheckIcon}>{verificationHandToMouth ? '✓' : '○'}</Text>
+              <Text style={[styles.verificationCheckText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
+                Camera detected hand-to-mouth motion
+              </Text>
+            </View>
+            {!verificationHandToMouth && !isAnalyzingMotionVideo && (
+              <Text style={styles.verificationReadOnlyCountText}>Mark Taken unlocks after this camera motion check passes.</Text>
+            )}
+            {!!motionAnalysisMessage && (
+              <Text style={[styles.verificationAnalysisMeta, !verificationHandToMouth && styles.verificationCountStatusBad]}>
+                {motionAnalysisMessage}
+              </Text>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.verificationCompleteButton, !canMarkTaken && styles.verificationCompleteButtonDisabled]}
+            onPress={() => {
+              void completeIntakeVerification();
+            }}
+          >
+            <Text style={[styles.verificationCompleteButtonText, !canMarkTaken && styles.verificationCompleteButtonTextDisabled]}>
+              Mark Taken
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.verificationCancelButton} onPress={resetIntakeVerification}>
+            <Text style={styles.verificationCancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.page}>
       <View style={styles.staticHeaderWrap}>
@@ -1305,6 +1887,15 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               >
                 <Text style={styles.nextDoseGlobalActionIcon}>■</Text>
                 <Text style={[styles.nextDoseGlobalActionLabel, { fontSize: 13 * textScale, lineHeight: 17 * textScale }]}>Stop</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.nextDoseGlobalActionButton, isSavingStatus && styles.entryActionButtonDisabled]}
+                onPress={openOneTimeIntakeVerification}
+                disabled={isSavingStatus}
+                accessibilityLabel="Mark all medicines for this time"
+              >
+                <Text style={styles.nextDoseGlobalActionIcon}>1x</Text>
+                <Text style={[styles.nextDoseGlobalActionLabel, { fontSize: 13 * textScale, lineHeight: 17 * textScale }]}>One Time</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1552,6 +2143,254 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     backgroundColor: '#f7efe4',
+  },
+  verificationContainer: {
+    flexGrow: 1,
+    backgroundColor: '#f7efe4',
+    paddingHorizontal: 14,
+    paddingTop: 0,
+    paddingBottom: 28,
+  },
+  verificationHeroCard: {
+    borderRadius: 22,
+    backgroundColor: '#2f5d50',
+    borderWidth: 2,
+    borderColor: '#f4cf75',
+    padding: 16,
+    marginBottom: 14,
+  },
+  verificationHeroTitle: {
+    color: '#ffffff',
+    fontWeight: '900',
+  },
+  verificationHeroText: {
+    color: '#fff8d6',
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  verificationMedicineCard: {
+    borderRadius: 20,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  verificationAppearanceWrap: {
+    marginRight: 12,
+  },
+  verificationMedicineTextWrap: {
+    flex: 1,
+  },
+  verificationMedicineName: {
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  verificationMedicineMeta: {
+    color: '#74665b',
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  verificationMedicineList: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#f8f2e9',
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  verificationMedicineListText: {
+    color: '#5d5045',
+    fontWeight: '800',
+  },
+  verificationStepCard: {
+    borderRadius: 20,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 14,
+    marginBottom: 14,
+  },
+  verificationStepTitle: {
+    color: '#2d241d',
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  verificationStepText: {
+    color: '#74665b',
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  verificationAnalysisBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  verificationAnalysisRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  verificationAnalysisText: {
+    color: '#5d5045',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  verificationAnalysisMeta: {
+    color: '#1e6f5c',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '900',
+    marginTop: 5,
+  },
+  verificationPhoto: {
+    width: '100%',
+    height: 240,
+    borderRadius: 16,
+    backgroundColor: '#eee7dc',
+    marginBottom: 12,
+  },
+  verificationPhotoPlaceholder: {
+    height: 170,
+    borderRadius: 16,
+    backgroundColor: '#f2e8dc',
+    borderWidth: 1,
+    borderColor: '#eadcca',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  verificationPhotoPlaceholderText: {
+    color: '#74665b',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  verificationCameraButton: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: '#2f5d50',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verificationCameraButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  verificationCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  verificationCountValue: {
+    minWidth: 92,
+    height: 58,
+    borderRadius: 18,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  verificationCountValueGood: {
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
+  },
+  verificationCountValueBad: {
+    backgroundColor: '#fff0f2',
+    borderColor: '#edbdc4',
+  },
+  verificationCountValueText: {
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  verificationReadOnlyCountText: {
+    marginTop: 8,
+    color: '#74665b',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  verificationCountStatus: {
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '900',
+    marginTop: 10,
+  },
+  verificationCountStatusGood: {
+    color: '#1e6f5c',
+  },
+  verificationCountStatusBad: {
+    color: '#9b3d47',
+  },
+  verificationCheckRow: {
+    minHeight: 58,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  verificationCheckRowActive: {
+    borderColor: '#a8dbc8',
+    backgroundColor: '#e9f7f1',
+  },
+  verificationCheckIcon: {
+    width: 32,
+    color: '#1e6f5c',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  verificationCheckText: {
+    flex: 1,
+    color: '#2d241d',
+    fontWeight: '900',
+  },
+  verificationCompleteButton: {
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: '#1e6f5c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  verificationCompleteButtonDisabled: {
+    backgroundColor: '#c8d1cb',
+  },
+  verificationCompleteButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  verificationCompleteButtonTextDisabled: {
+    color: '#6f7b75',
+  },
+  verificationCancelButton: {
+    minHeight: 50,
+    borderRadius: 16,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verificationCancelButtonText: {
+    color: '#74665b',
+    fontSize: 16,
+    fontWeight: '900',
   },
   container: {
     flexGrow: 1,

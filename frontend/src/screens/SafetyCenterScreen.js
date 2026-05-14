@@ -26,8 +26,8 @@ const getIssueDisplay = (item) => {
     return {
       icon: '✓',
       level: 'OK',
-      headline: 'Taken',
-      detail: 'Medicine taken.',
+      headline: 'Correct Dose',
+      detail: 'Medicine intake was completed.',
       accent: styles.issueIconGood,
       levelStyle: styles.levelGood,
       cardStyle: styles.issueCardGood,
@@ -43,7 +43,7 @@ const getIssueDisplay = (item) => {
     return {
       icon: '!',
       level: 'CHECK',
-      headline: 'Overdose',
+      headline: 'Incorrect Dose',
       detail: `Extra medicine recorded: ${overdoseText}.`,
       accent: styles.issueIconCaution,
       levelStyle: styles.levelCaution,
@@ -54,7 +54,7 @@ const getIssueDisplay = (item) => {
   return {
     icon: '!',
     level: 'HELP',
-    headline: 'Not Taken',
+    headline: 'Missed Dose',
     detail: 'Medicine was not taken.',
     accent: styles.issueIconCritical,
     levelStyle: styles.levelCritical,
@@ -173,17 +173,17 @@ const SafetyCenterScreen = ({ onBack, reminderTextScale = 1 }) => {
         <View style={[styles.summaryCard, styles.summaryCardGood]}>
           <Text style={styles.summaryIcon}>✓</Text>
           <Text style={[styles.summaryNumber, { fontSize: 30 * textScale }]}>{takenCount}</Text>
-          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Taken</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Correct</Text>
         </View>
         <View style={[styles.summaryCard, styles.summaryCardMissed]}>
           <Text style={styles.summaryIcon}>!</Text>
           <Text style={[styles.summaryNumber, { fontSize: 30 * textScale }]}>{missedCount}</Text>
-          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Not Taken</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Missed</Text>
         </View>
         <View style={[styles.summaryCard, styles.summaryCardDanger]}>
           <Text style={styles.summaryIcon}>⚠</Text>
           <Text style={[styles.summaryNumber, { fontSize: 30 * textScale }]}>{overdoseCount}</Text>
-          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Overdose</Text>
+          <Text style={[styles.summaryLabel, { fontSize: 13 * textScale }]}>Incorrect</Text>
         </View>
       </View>
 

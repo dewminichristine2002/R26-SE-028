@@ -1,1 +1,10 @@
 node_modules/
+backend/.venv-mediapipe/
+backend/ml/.ultralytics/
+backend/ml/runs/
+backend/ml/data/public/
+backend/ml/data/intake-count/images/
+backend/ml/models/*.pt
+Ultralytics/
+yolo11n.pt
+runs/
