@@ -1,54 +1,114 @@
 {
-  "dataset": "medicine_safety_training_dataset.csv + medicine_safety_dataset.csv",
+  "model_type": "XGBClassifier",
+  "model_role": "production",
+  "dataset": "FAERS",
   "dataset_sources": [
-    "medicine_safety_training_dataset.csv",
-    "medicine_safety_dataset.csv"
+    "FAERS"
   ],
-  "rows": 4150,
-  "target": "risk_level",
-  "risk_level_classes": [
-    "Safe",
-    "Warning",
-    "Dangerous"
-  ],
+  "training_data": {
+    "primary": "FAERS (faers_adrs.csv)",
+    "augmentation": "SMOTE oversampling for minority severe ADR class"
+  },
+  "rows": 11868,
+  "target": "adr_event",
   "n_jobs": 1,
-  "numeric_features": [
-    "side_effect_count",
-    "severe_side_effect_count",
-    "side_effect_match_count",
-    "interaction_count",
-    "age",
-    "reaction_count",
-    "age_risk_flag",
-    "current_medication_count",
-    "chronic_disease_count",
-    "known_allergy_count",
-    "same_class_allergy"
+  "feature_columns": [
+    "patient_age",
+    "num_current_meds",
+    "ddi_pair_count",
+    "sider_adr_count",
+    "has_renal_disease",
+    "has_hepatic_disease",
+    "has_diabetes",
+    "has_cardiovascular",
+    "has_epilepsy",
+    "allergy_class_overlap",
+    "drug_hepatic_metabolism",
+    "drug_renal_excretion",
+    "nti_drug_flag",
+    "allergy_severity_max",
+    "ddi_severity_max",
+    "patient_sex",
+    "atc_class_encoded"
+  ],
+  "continuous_features": [
+    "patient_age",
+    "num_current_meds",
+    "ddi_pair_count",
+    "sider_adr_count"
+  ],
+  "binary_features": [
+    "has_renal_disease",
+    "has_hepatic_disease",
+    "has_diabetes",
+    "has_cardiovascular",
+    "has_epilepsy",
+    "allergy_class_overlap",
+    "drug_hepatic_metabolism",
+    "drug_renal_excretion",
+    "nti_drug_flag"
+  ],
+  "ordinal_features": [
+    "allergy_severity_max",
+    "ddi_severity_max"
   ],
   "categorical_features": [
-    "gender",
-    "input_method",
-    "max_interaction_severity",
-    "has_medicine_allergy",
-    "has_reaction_log",
-    "has_severe_reaction_log",
-    "q_past_reaction",
-    "q_antibiotic_painkiller_reaction",
-    "drug_class"
+    "patient_sex",
+    "atc_class_encoded"
   ],
-  "text_feature_name": "combined_text",
   "tuning": {
-    "method": "RandomizedSearchCV",
+    "method": "GridSearchCV",
     "cv_folds": 5,
-    "n_iter": 30,
-    "refit_metric": "f1_macro",
+    "scoring": "f1_weighted",
+    "smote": true,
+    "param_grid": {
+      "classifier__n_estimators": [
+        100,
+        200
+      ],
+      "classifier__max_depth": [
+        4,
+        6,
+        8
+      ],
+      "classifier__learning_rate": [
+        0.05,
+        0.1
+      ],
+      "classifier__subsample": [
+        0.8,
+        0.9
+      ]
+    },
     "best_params": {
-      "preprocessor__txt__tfidf__max_features": 300,
-      "classifier__n_estimators": 400,
-      "classifier__min_samples_split": 4,
-      "classifier__min_samples_leaf": 1,
-      "classifier__max_features": 0.25,
-      "classifier__max_depth": 16
+      "learning_rate": 0.05,
+      "max_depth": 8,
+      "n_estimators": 200,
+      "subsample": 0.8
     }
+  },
+  "output": {
+    "adr_risk_probability_range": [
+      0,
+      1
+    ],
+    "shap_feature_importance": true,
+    "global_mdi_importance_path": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\models\\global_feature_importance.json",
+    "youdens_j_optimal_threshold": 0.48474839329719543,
+    "production_alias": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\models\\xgboost_production.joblib"
+  },
+  "threshold_tuning": {
+    "method": "youdens_j",
+    "description": "Optimal binary threshold from Youden's J on 5-fold out-of-fold training probabilities",
+    "youdens_j": {
+      "optimal_threshold": 0.48474839329719543,
+      "youdens_j": 0.8834241737647426,
+      "tpr": 0.9588875453446191,
+      "fpr": 0.07546337157987644
+    }
+  },
+  "comparative_study": {
+    "selected_over": "random_forest",
+    "rationale": "XGBoost achieved highest binary F1 and AUC-ROC on FAERS hold-out (Section 11.1)"
   }
 }

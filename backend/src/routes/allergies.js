@@ -13,6 +13,7 @@ const {
   fetchHistory,
   fetchReactions,
   createReaction,
+  createClinicalOverride,
   analyzeMedicine,
 } = require('../controllers/allergyController');
 
@@ -36,5 +37,6 @@ router.put('/cards/:id', saveCard);
 router.get('/history', fetchHistory);
 router.get('/reactions', fetchReactions);
 router.post('/reactions', createReaction);
+router.post('/clinical-overrides', createClinicalOverride);
 
 module.exports = router;

@@ -1,0 +1,427 @@
+{
+  "section": "13.1_weight_calibration_experiment",
+  "objective": "Phase_7_hybrid_risk_score",
+  "formula": "hybridScore = round(alpha * ruleScore + beta * mlDangerScore)",
+  "production_weights": {
+    "alpha_rule_engine": 0.6,
+    "beta_ml_engine": 0.4,
+    "rationale": {
+      "rule_engine": "Higher weight because clinical rules encode validated, evidence-based contraindications and remain the primary source of explainability and clinical accountability.",
+      "ml_engine": "Supplementary probabilistic signal for complex, non-linear interactions between patient features and drug properties not fully captured by explicit rules."
+    }
+  },
+  "validation": {
+    "method": "5-fold stratified CV on 80% train split (out-of-fold ML scores) + 20% held-out test",
+    "optimization_metric": "joint F1-weighted across Safe/Warning/Dangerous",
+    "thresholds": {
+      "warning": 25,
+      "dangerous": 60
+    },
+    "cv_weight_selection": {
+      "folds": [
+        {
+          "fold": 1,
+          "rows": 658,
+          "best_alpha": 0.9,
+          "best_beta": 0.1,
+          "best_f1_weighted": 0.9924033452228065
+        },
+        {
+          "fold": 2,
+          "rows": 658,
+          "best_alpha": 0.9,
+          "best_beta": 0.1,
+          "best_f1_weighted": 0.9969615344303533
+        },
+        {
+          "fold": 3,
+          "rows": 658,
+          "best_alpha": 0.8,
+          "best_beta": 0.2,
+          "best_f1_weighted": 0.9954429491745453
+        },
+        {
+          "fold": 4,
+          "rows": 658,
+          "best_alpha": 0.9,
+          "best_beta": 0.1,
+          "best_f1_weighted": 0.9908900390343774
+        },
+        {
+          "fold": 5,
+          "rows": 657,
+          "best_alpha": 0.8,
+          "best_beta": 0.2,
+          "best_f1_weighted": 0.9878376543761931
+        }
+      ],
+      "weight_grid_cv": [
+        {
+          "alpha": 0.9,
+          "beta": 0.1,
+          "cv_f1_weighted_mean": 0.9927071044476552,
+          "cv_f1_weighted_std": 0.003246245869573234
+        },
+        {
+          "alpha": 0.8,
+          "beta": 0.2,
+          "cv_f1_weighted_mean": 0.99149258801227,
+          "cv_f1_weighted_std": 0.0032731620224560934
+        },
+        {
+          "alpha": 0.7,
+          "beta": 0.3,
+          "cv_f1_weighted_mean": 0.9887586170688571,
+          "cv_f1_weighted_std": 0.0024714636813643713
+        },
+        {
+          "alpha": 0.6,
+          "beta": 0.4,
+          "cv_f1_weighted_mean": 0.9866274932211547,
+          "cv_f1_weighted_std": 0.003104460797719049
+        },
+        {
+          "alpha": 0.5,
+          "beta": 0.5,
+          "cv_f1_weighted_mean": 0.9857177474024164,
+          "cv_f1_weighted_std": 0.0031335903629772137
+        },
+        {
+          "alpha": 1.0,
+          "beta": 0.0,
+          "cv_f1_weighted_mean": 0.8583669986699028,
+          "cv_f1_weighted_std": 0.011440901159698374
+        },
+        {
+          "alpha": 0.4,
+          "beta": 0.6,
+          "cv_f1_weighted_mean": 0.5438683457620301,
+          "cv_f1_weighted_std": 0.0038671215698830837
+        },
+        {
+          "alpha": 0.3,
+          "beta": 0.7,
+          "cv_f1_weighted_mean": 0.538958063520828,
+          "cv_f1_weighted_std": 0.003546544071698942
+        },
+        {
+          "alpha": 0.2,
+          "beta": 0.8,
+          "cv_f1_weighted_mean": 0.5382145118699022,
+          "cv_f1_weighted_std": 0.00317499656041197
+        },
+        {
+          "alpha": 0.1,
+          "beta": 0.9,
+          "cv_f1_weighted_mean": 0.5380776253504582,
+          "cv_f1_weighted_std": 0.0030246410806299665
+        },
+        {
+          "alpha": 0.0,
+          "beta": 1.0,
+          "cv_f1_weighted_mean": 0.5378062823356413,
+          "cv_f1_weighted_std": 0.0030947993524667833
+        }
+      ],
+      "selected_by_cv_mean_f1_weighted": {
+        "alpha": 0.9,
+        "beta": 0.1,
+        "cv_f1_weighted_mean": 0.9927071044476552,
+        "cv_f1_weighted_std": 0.003246245869573234
+      }
+    },
+    "production_weights_rank_in_cv_grid": 4
+  },
+  "datasets": [
+    "medicine_safety_training_dataset.csv",
+    "medicine_safety_dataset.csv"
+  ],
+  "rows_total": 4112,
+  "rows_train": 3289,
+  "rows_test": 823,
+  "ablation_configurations": [
+    {
+      "configuration": "rule_only",
+      "alpha": 1.0,
+      "beta": 0.0,
+      "label": "Rule-only"
+    },
+    {
+      "configuration": "ml_only",
+      "alpha": 0.0,
+      "beta": 1.0,
+      "label": "ML-only"
+    },
+    {
+      "configuration": "hybrid_proposed",
+      "alpha": 0.6,
+      "beta": 0.4,
+      "label": "Proposed hybrid"
+    },
+    {
+      "configuration": "hybrid_equal",
+      "alpha": 0.5,
+      "beta": 0.5,
+      "label": "Equal weight"
+    }
+  ],
+  "heldout_test_configurations": [
+    {
+      "configuration": "rule_only",
+      "alpha": 1.0,
+      "beta": 0.0,
+      "f1_weighted": 0.869664412534919,
+      "f1_macro": 0.8758882911602578,
+      "dangerous_recall": 1.0,
+      "dangerous_precision": 0.7319587628865979,
+      "per_class": {
+        "Safe": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 248.0
+        },
+        "Warning": {
+          "precision": 1.0,
+          "recall": 0.6426116838487973,
+          "f1-score": 0.7824267782426778,
+          "support": 291.0
+        },
+        "Dangerous": {
+          "precision": 0.7319587628865979,
+          "recall": 1.0,
+          "f1-score": 0.8452380952380952,
+          "support": 284.0
+        },
+        "accuracy": 0.8736330498177399,
+        "macro avg": {
+          "precision": 0.9106529209621993,
+          "recall": 0.8808705612829324,
+          "f1-score": 0.8758882911602578,
+          "support": 823.0
+        },
+        "weighted avg": {
+          "precision": 0.9075046034748405,
+          "recall": 0.8736330498177399,
+          "f1-score": 0.869664412534919,
+          "support": 823.0
+        }
+      }
+    },
+    {
+      "configuration": "ml_only",
+      "alpha": 0.0,
+      "beta": 1.0,
+      "f1_weighted": 0.5333335517256906,
+      "f1_macro": 0.5416626413087843,
+      "dangerous_recall": 0.9964788732394366,
+      "dangerous_precision": 1.0,
+      "per_class": {
+        "Safe": {
+          "precision": 0.4581005586592179,
+          "recall": 0.9919354838709677,
+          "f1-score": 0.6267515923566879,
+          "support": 248.0
+        },
+        "Warning": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 291.0
+        },
+        "Dangerous": {
+          "precision": 1.0,
+          "recall": 0.9964788732394366,
+          "f1-score": 0.9982363315696648,
+          "support": 284.0
+        },
+        "accuracy": 0.6427703523693803,
+        "macro avg": {
+          "precision": 0.48603351955307267,
+          "recall": 0.6628047857034681,
+          "f1-score": 0.5416626413087843,
+          "support": 823.0
+        },
+        "weighted avg": {
+          "precision": 0.4831214320139563,
+          "recall": 0.6427703523693803,
+          "f1-score": 0.5333335517256906,
+          "support": 823.0
+        }
+      }
+    },
+    {
+      "configuration": "hybrid_proposed",
+      "alpha": 0.6,
+      "beta": 0.4,
+      "f1_weighted": 0.9927136172781416,
+      "f1_macro": 0.9926252229373783,
+      "dangerous_recall": 0.9964788732394366,
+      "dangerous_precision": 1.0,
+      "per_class": {
+        "Safe": {
+          "precision": 0.9802371541501976,
+          "recall": 1.0,
+          "f1-score": 0.9900199600798403,
+          "support": 248.0
+        },
+        "Warning": {
+          "precision": 0.9965156794425087,
+          "recall": 0.9828178694158075,
+          "f1-score": 0.9896193771626297,
+          "support": 291.0
+        },
+        "Dangerous": {
+          "precision": 1.0,
+          "recall": 0.9964788732394366,
+          "f1-score": 0.9982363315696648,
+          "support": 284.0
+        },
+        "accuracy": 0.9927095990279465,
+        "macro avg": {
+          "precision": 0.9922509445309021,
+          "recall": 0.9930989142184147,
+          "f1-score": 0.9926252229373783,
+          "support": 823.0
+        },
+        "weighted avg": {
+          "precision": 0.9928127301907885,
+          "recall": 0.9927095990279465,
+          "f1-score": 0.9927136172781416,
+          "support": 823.0
+        }
+      }
+    },
+    {
+      "configuration": "hybrid_equal",
+      "alpha": 0.5,
+      "beta": 0.5,
+      "f1_weighted": 0.9915001767315456,
+      "f1_macro": 0.991384141521125,
+      "dangerous_recall": 0.9964788732394366,
+      "dangerous_precision": 1.0,
+      "per_class": {
+        "Safe": {
+          "precision": 0.9763779527559056,
+          "recall": 1.0,
+          "f1-score": 0.9880478087649402,
+          "support": 248.0
+        },
+        "Warning": {
+          "precision": 0.9965034965034965,
+          "recall": 0.979381443298969,
+          "f1-score": 0.9878682842287695,
+          "support": 291.0
+        },
+        "Dangerous": {
+          "precision": 1.0,
+          "recall": 0.9964788732394366,
+          "f1-score": 0.9982363315696648,
+          "support": 284.0
+        },
+        "accuracy": 0.991494532199271,
+        "macro avg": {
+          "precision": 0.9909604830864674,
+          "recall": 0.9919534388461352,
+          "f1-score": 0.991384141521125,
+          "support": 823.0
+        },
+        "weighted avg": {
+          "precision": 0.9916455039683865,
+          "recall": 0.991494532199271,
+          "f1-score": 0.9915001767315456,
+          "support": 823.0
+        }
+      }
+    }
+  ],
+  "heldout_comparison_table": [
+    {
+      "configuration": "rule_only",
+      "alpha": 1.0,
+      "beta": 0.0,
+      "f1_weighted": 0.869664412534919,
+      "f1_macro": 0.8758882911602578,
+      "dangerous_recall": 1.0,
+      "dangerous_precision": 0.7319587628865979,
+      "per_class_f1": {
+        "Safe": 1.0,
+        "Warning": 0.7824267782426778,
+        "Dangerous": 0.8452380952380952
+      },
+      "per_class_support": {
+        "Safe": 248,
+        "Warning": 291,
+        "Dangerous": 284
+      }
+    },
+    {
+      "configuration": "ml_only",
+      "alpha": 0.0,
+      "beta": 1.0,
+      "f1_weighted": 0.5333335517256906,
+      "f1_macro": 0.5416626413087843,
+      "dangerous_recall": 0.9964788732394366,
+      "dangerous_precision": 1.0,
+      "per_class_f1": {
+        "Safe": 0.6267515923566879,
+        "Warning": 0.0,
+        "Dangerous": 0.9982363315696648
+      },
+      "per_class_support": {
+        "Safe": 248,
+        "Warning": 291,
+        "Dangerous": 284
+      }
+    },
+    {
+      "configuration": "hybrid_proposed",
+      "alpha": 0.6,
+      "beta": 0.4,
+      "f1_weighted": 0.9927136172781416,
+      "f1_macro": 0.9926252229373783,
+      "dangerous_recall": 0.9964788732394366,
+      "dangerous_precision": 1.0,
+      "per_class_f1": {
+        "Safe": 0.9900199600798403,
+        "Warning": 0.9896193771626297,
+        "Dangerous": 0.9982363315696648
+      },
+      "per_class_support": {
+        "Safe": 248,
+        "Warning": 291,
+        "Dangerous": 284
+      }
+    },
+    {
+      "configuration": "hybrid_equal",
+      "alpha": 0.5,
+      "beta": 0.5,
+      "f1_weighted": 0.9915001767315456,
+      "f1_macro": 0.991384141521125,
+      "dangerous_recall": 0.9964788732394366,
+      "dangerous_precision": 1.0,
+      "per_class_f1": {
+        "Safe": 0.9880478087649402,
+        "Warning": 0.9878682842287695,
+        "Dangerous": 0.9982363315696648
+      },
+      "per_class_support": {
+        "Safe": 248,
+        "Warning": 291,
+        "Dangerous": 284
+      }
+    }
+  ],
+  "heldout_best_configuration_by_f1_weighted": "hybrid_proposed",
+  "selected_production_weights_justified": {
+    "cv_best_alpha": 0.9,
+    "cv_best_beta": 0.1,
+    "proposed_alpha": 0.6,
+    "proposed_beta": 0.4,
+    "proposed_matches_cv_best": false,
+    "heldout_f1_weighted_proposed": 0.9927136172781416,
+    "heldout_f1_weighted_cv_best": 0.9963563135058892
+  },
+  "note": "rule_score from dataset risk_score column; mlDangerScore from out-of-fold or held-out ADR probability * 100."
+}

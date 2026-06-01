@@ -19,22 +19,26 @@ router.get('/search', (req, res) => {
   });
 });
 
-router.get('/knowledge', (req, res) => {
-  const medicineName = String(req.query.medicineName || '').trim();
-  const currentMedicationsText = String(req.query.currentMedicationsText || '').trim();
-  const symptomMatch = String(req.query.symptomMatch || '').trim();
+router.get('/knowledge', async (req, res, next) => {
+  try {
+    const medicineName = String(req.query.medicineName || '').trim();
+    const currentMedicationsText = String(req.query.currentMedicationsText || '').trim();
+    const symptomMatch = String(req.query.symptomMatch || '').trim();
 
-  if (!medicineName) {
-    return res.status(400).json({ error: 'medicineName query parameter is required' });
+    if (!medicineName) {
+      return res.status(400).json({ error: 'medicineName query parameter is required' });
+    }
+
+    return res.json({
+      knowledge: await enrichMedication({
+        medicineName,
+        currentMedicationsText,
+        symptomMatch,
+      }),
+    });
+  } catch (error) {
+    return next(error);
   }
-
-  return res.json({
-    knowledge: enrichMedication({
-      medicineName,
-      currentMedicationsText,
-      symptomMatch,
-    }),
-  });
 });
 
 module.exports = router;

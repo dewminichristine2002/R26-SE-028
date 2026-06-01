@@ -31,26 +31,15 @@ import {
   getExpoSpeech,
   getExpoSpeechRecognitionModule,
 } from '../utils/optionalExpoModules';
-
-const palette = {
-  header: '#0f5c3e',
-  primary: '#0d9d6d',
-  primaryMuted: '#e0f9f1',
-  primaryLight: '#f0fdf9',
-  bg: '#f8fafb',
-  surface: '#ffffff',
-  text: '#0a1428',
-  textSecondary: '#4a5568',
-  textTertiary: '#718096',
-  border: '#e5e8ed',
-  borderStrong: '#cbd5e1',
-  safe: '#0f766e',
-  safeBg: '#ecfdf5',
-  warn: '#d97706',
-  warnBg: '#fef9e7',
-  danger: '#dc2626',
-  dangerBg: '#fef2f2',
-};
+import {
+  profileComplete,
+  validateClinicalOverride,
+  validateMedicineCheckForm,
+  validateOnboardingStep,
+  validateProfileForm,
+  validateReactionForm,
+} from '../utils/formValidation';
+import { elder, palette } from '../theme/elderTheme';
 
 const headerPadTop = Platform.select({
   ios: 52,
@@ -84,7 +73,10 @@ const emptyProfile = {
   suspectedMedicineNamesText: '',
   avoidedMedicinesText: '',
   antibioticPainkillerReaction: '',
+  feedbackConsentForTraining: false,
 };
+
+const REACTION_OUTCOMES = ['none', 'mild', 'moderate', 'severe', 'anaphylactic'];
 
 const emptyInput = {
   inputMethod: 'manual',
@@ -145,12 +137,6 @@ const normalizeAnswers = (answers = []) => {
   });
   return state;
 };
-
-const profileComplete = (profile) =>
-  Boolean(profile.age?.trim()) &&
-  Boolean(profile.gender?.trim()) &&
-  profile.hasMedicineAllergy !== null &&
-  (profile.hasMedicineAllergy === false || Boolean(profile.knownAllergiesText?.trim()));
 
 const questionnaireComplete = (answers) => QUESTIONS.every((item) => Boolean(answers[item.key]));
 
@@ -243,8 +229,10 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   const [voiceError, setVoiceError] = useState('');
   const [voiceDiagnostic, setVoiceDiagnostic] = useState('');
   const [scanFlashOn, setScanFlashOn] = useState(false);
-  const [followUp, setFollowUp] = useState({ symptoms: '', severity: 'mild', notes: '' });
-  const [standaloneReaction, setStandaloneReaction] = useState({ symptoms: '', severity: 'mild', notes: '' });
+  const [followUp, setFollowUp] = useState({ symptoms: '', severity: 'none', notes: '', pharmacistConfirmed: false });
+  const [standaloneReaction, setStandaloneReaction] = useState({ symptoms: '', severity: 'mild', notes: '', pharmacistConfirmed: false });
+  const [clinicalOverride, setClinicalOverride] = useState({ accepted: false, justification: '', pharmacistConfirmed: false });
+  const [showResultDetails, setShowResultDetails] = useState(false);
   const dangerAlertShown = useRef(false);
   const searchTimer = useRef(null);
   const routeBootstrapped = useRef(false);
@@ -259,6 +247,10 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
       setUserFirstName(name.split(/\s+/)[0] || '');
     });
   }, []);
+
+  useEffect(() => {
+    if (route === 'result') setShowResultDetails(false);
+  }, [route, latestResult?.card?.medicineName, latestResult?.card?.riskScore]);
 
   useEffect(() => {
     return () => {
@@ -310,6 +302,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           suspectedMedicineNamesText: p.suspectedMedicineNamesText || '',
           avoidedMedicinesText: p.avoidedMedicinesText || '',
           antibioticPainkillerReaction: p.antibioticPainkillerReaction || '',
+          feedbackConsentForTraining: Boolean(p.feedbackConsentForTraining),
         });
         setPregnancyNote(parsed.pregnancy);
         setAnswers(normalizeAnswers(q));
@@ -408,8 +401,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   };
 
   const saveProfile = async () => {
-    if (!profileComplete(profile)) {
-      Alert.alert('Missing details', 'Please fill age, gender, medicine allergy, and known allergies if you said yes.');
+    const validation = validateProfileForm(profile);
+    if (!validation.valid) {
+      Alert.alert('Validation', validation.message);
       return;
     }
     const chronicFull = mergeChronicWithPregnancy(profile.chronicDiseasesText, pregnancyNote, profile.gender);
@@ -463,8 +457,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   };
 
   const completeOnboarding = async () => {
-    if (!profileComplete(profile)) {
-      Alert.alert('Missing details', 'Please complete all required fields.');
+    const validation = validateProfileForm(profile);
+    if (!validation.valid) {
+      Alert.alert('Validation', validation.message);
       return;
     }
     const chronicFull = mergeChronicWithPregnancy(profile.chronicDiseasesText, pregnancyNote, profile.gender);
@@ -518,8 +513,13 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   };
 
   const checkMedicine = async () => {
-    if (!medicineInput.medicineName.trim()) {
-      Alert.alert('Missing medicine', 'Please enter a medicine name first.');
+    const validation = validateMedicineCheckForm({
+      medicineName: medicineInput.medicineName,
+      recentReaction: minimalCheck.recentReaction,
+      recentReactionDetail: minimalCheck.recentReactionDetail,
+    });
+    if (!validation.valid) {
+      Alert.alert('Validation', validation.message);
       return;
     }
     const hasOtherMeds =
@@ -543,6 +543,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
       setSelectedCard(result.card);
       setMedicineInput(emptyInput);
       setMinimalCheck(emptyMinimal);
+      setClinicalOverride({ accepted: false, justification: '', pharmacistConfirmed: false });
       dangerAlertShown.current = false;
       setRoute('result');
     } catch (e) {
@@ -552,21 +553,27 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   };
 
   const submitStandaloneReaction = async () => {
-    if (!standaloneReaction.symptoms.trim()) {
-      Alert.alert('Symptoms needed', 'Please describe the reaction.');
+    const validation = validateReactionForm({
+      symptoms: standaloneReaction.symptoms,
+      severity: standaloneReaction.severity,
+    });
+    if (!validation.valid) {
+      Alert.alert('Validation', validation.message);
       return;
     }
     try {
       setSaving(true);
       await allergyService.saveReaction({
         medicineCheckId: null,
-        symptoms: standaloneReaction.symptoms,
+        symptoms: standaloneReaction.severity === 'none' ? 'No reaction reported' : standaloneReaction.symptoms,
         severity: standaloneReaction.severity,
         notes: standaloneReaction.notes || '',
+        pharmacistConfirmed: standaloneReaction.pharmacistConfirmed,
+        pharmacistRole: standaloneReaction.pharmacistConfirmed ? 'pharmacist' : '',
       });
       setReactions(await allergyService.getReactions().catch(() => []));
       Alert.alert('Saved', 'Reaction logged. It will be kept with your allergy history.');
-      setStandaloneReaction({ symptoms: '', severity: 'mild', notes: '' });
+      setStandaloneReaction({ symptoms: '', severity: 'mild', notes: '', pharmacistConfirmed: false });
       setRoute('home');
     } catch (e) {
       Alert.alert('Save failed', errorText(e, 'Could not save reaction.'));
@@ -576,23 +583,55 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   };
 
   const submitFollowUp = async () => {
-    if (!followUp.symptoms.trim()) {
-      Alert.alert('Symptoms needed', 'Please describe how you felt.');
+    const validation = validateReactionForm({
+      symptoms: followUp.symptoms,
+      severity: followUp.severity,
+    });
+    if (!validation.valid) {
+      Alert.alert('Validation', validation.message);
       return;
     }
     try {
       setSaving(true);
       await allergyService.saveReaction({
         medicineCheckId: null,
-        symptoms: followUp.symptoms,
+        allergyCardId: latestResult?.card?.id || null,
+        symptoms: followUp.severity === 'none' ? 'No reaction reported' : followUp.symptoms,
         severity: followUp.severity,
         notes: [followUp.notes, latestResult?.card?.id ? `Related check card id: ${latestResult.card.id}` : ''].filter(Boolean).join('\n'),
+        pharmacistConfirmed: followUp.pharmacistConfirmed,
+        pharmacistRole: followUp.pharmacistConfirmed ? 'pharmacist' : '',
       });
       Alert.alert('Thank you', 'Your follow-up was saved. Future checks can use this information.');
-      setFollowUp({ symptoms: '', severity: 'mild', notes: '' });
+      setFollowUp({ symptoms: '', severity: 'none', notes: '', pharmacistConfirmed: false });
       setRoute('home');
     } catch (e) {
       Alert.alert('Save failed', errorText(e, 'Could not save follow-up.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const documentClinicalOverride = async () => {
+    const overrideValidation = validateClinicalOverride(clinicalOverride.justification);
+    if (!overrideValidation.valid) {
+      Alert.alert('Validation', overrideValidation.message);
+      return;
+    }
+    try {
+      setSaving(true);
+      await allergyService.saveClinicalOverride({
+        allergyCardId: latestResult?.card?.id || null,
+        medicineName: latestResult?.card?.medicineName || '',
+        riskLevel: latestResult?.card?.riskLevel || 'Dangerous',
+        justification: clinicalOverride.justification.trim(),
+        pharmacistConfirmed: clinicalOverride.pharmacistConfirmed,
+        pharmacistRole: clinicalOverride.pharmacistConfirmed ? 'pharmacist' : 'clinician',
+      });
+      setClinicalOverride((prev) => ({ ...prev, accepted: true }));
+      Alert.alert('Override documented', 'Clinical override recorded for this check. Proceed only as directed by your clinician.');
+    } catch (e) {
+      Alert.alert('Save failed', errorText(e, 'Could not save clinical override record.'));
     } finally {
       setSaving(false);
     }
@@ -987,7 +1026,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           banner: s.bannerDanger,
           pill: s.pillDanger,
           pillText: s.pillDangerText,
-          sub: 'Do not take without speaking to your doctor',
+          sub: 'Do not take this medicine until you speak with your doctor.',
           barFill: palette.danger,
         }
       : risk === 'Safe'
@@ -997,7 +1036,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             banner: s.bannerSafe,
             pill: s.pillSafe,
             pillText: s.pillSafeText,
-            sub: 'Lower concern on this check — still follow your prescriber',
+            sub: 'This check looks OK for you. Still follow your doctor’s advice.',
             barFill: palette.safe,
           }
         : {
@@ -1006,7 +1045,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             banner: s.bannerWarn,
             pill: s.pillWarn,
             pillText: s.pillWarnText,
-            sub: 'Extra caution — confirm with pharmacist or doctor',
+            sub: 'Please check with your pharmacist or doctor before taking this.',
             barFill: palette.warn,
         };
 
@@ -1022,6 +1061,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
   const resultBody = (card, analysis = null) => {
     if (!card) return null;
+    const report = analysis?.riskReport || analysis?.dataUsed?.riskReport || null;
     const t = tone(String(card.riskLevel || 'Warning'));
     const ml = analysis?.mlPrediction || analysis?.medicationKnowledge?.mlPrediction;
     const dataUsed = analysis?.dataUsed || {};
@@ -1030,7 +1070,22 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     const finalScore = card.riskScore;
     const sev = interactionSeverityUserLabel(card.maxInteractionSeverity || analysis?.medicationKnowledge?.interactions?.[0]?.severity);
     const mk = analysis?.medicationKnowledge || {};
-    const interactions = displayInteractions(mk.interactions);
+    const interactions = displayInteractions(report?.drugInteractions?.length ? report.drugInteractions : mk.interactions);
+    const triggeredRules = report?.triggeredRules?.length
+      ? report.triggeredRules
+      : (card.riskFactors || analysis?.riskFactors || []).map((factor) => ({
+          ...factor,
+          recommendation: factor.recommendation || 'Discuss this finding with a pharmacist or doctor.',
+        }));
+    const allergyConflicts = report?.allergyConflicts || null;
+    const alternatives = report?.alternativeSuggestions || [];
+    const shapItems = (report?.shap?.contributions || ml?.shap?.contributions || []).slice(0, 8);
+    const shapMax = shapItems.reduce((max, item) => Math.max(max, Math.abs(Number(item.shap || 0))), 0.0001);
+    const clinicalAction = report?.classification?.clinicalAction || t.sub;
+    const requiresOverride = report?.safetyControls?.requiresClinicalOverride && !clinicalOverride.accepted;
+    const guidelines = report?.clinicalRecommendations?.general?.length
+      ? report.clinicalRecommendations.general
+      : analysis?.guidelines || card.guidelines || [];
 
     return (
       <>
@@ -1038,35 +1093,104 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         <Text style={s.med}>{card.medicineName || 'Medicine'}</Text>
         <View style={[s.banner, t.banner]}>
           <View style={[s.riskPill, t.pill]}>
-            <Text style={[s.riskPillText, t.pillText]}>{card.riskLevel || 'Warning'}</Text>
+            <Text style={[s.riskPillText, t.pillText]}>
+              {card.riskLevel || 'Warning'}
+            </Text>
           </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.bannerTitle}>Safety level</Text>
-            <Text style={[s.bannerSub, t.text]}>{t.sub}</Text>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={s.bannerTitle}>What this means for you</Text>
+            <Text style={[s.bannerSub, t.text]}>{clinicalAction}</Text>
           </View>
         </View>
 
+        {requiresOverride ? (
+          <View style={s.blockBanner}>
+            <Text style={s.blockTitle}>This medicine is blocked for now</Text>
+            <Text style={s.blockText}>
+              Your doctor or carer must approve this before you take it. Write the reason below.
+            </Text>
+            <TextInput
+              style={[s.input, s.area, { marginTop: 10 }]}
+              value={clinicalOverride.justification}
+              onChangeText={(value) => setClinicalOverride((prev) => ({ ...prev, justification: value, accepted: false }))}
+              placeholder="e.g. Doctor approved this with monitoring"
+              placeholderTextColor={palette.placeholder}
+              multiline
+            />
+            <TouchableOpacity
+              style={[s.bigPrimary, { marginTop: 12 }]}
+              onPress={documentClinicalOverride}
+              disabled={saving}
+            >
+              <Text style={s.bigPrimaryText}>Save doctor’s approval</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.row, { marginTop: 10, alignItems: 'center' }]}
+              onPress={() => setClinicalOverride((prev) => ({ ...prev, pharmacistConfirmed: !prev.pharmacistConfirmed }))}
+            >
+              <Text style={s.chipText}>{clinicalOverride.pharmacistConfirmed ? '☑' : '☐'} Pharmacist confirmed</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {card.riskLevel === 'Dangerous' ? (
           <View style={s.emergencyBanner}>
-            <Text style={s.emergencyTitle}>Emergency</Text>
+            <Text style={s.emergencyTitle}>If you feel unwell</Text>
             <Text style={s.emergencyText}>
-              Contact your doctor or go to urgent care if you already took this medicine and feel unwell. If breathing is hard or swelling is
-              severe, call emergency services.
+              Call your doctor or go to urgent care if you already took this medicine and feel worse. If breathing is hard or swelling is
+              severe, call emergency services straight away.
             </Text>
           </View>
         ) : null}
 
+        <View style={s.elderScoreSimple}>
+          <Text style={s.elderScoreTitle}>Safety score: {finalScore ?? '--'} out of 100</Text>
+          <Text style={s.elderScoreHint}>0–19 Safe · 20–54 Warning · 55+ Dangerous</Text>
+          <View style={[s.scoreRow, { marginTop: 14, marginBottom: 0 }]}>
+            <View style={[s.track, s.trackLarge]}>
+              <View style={[s.fill, s.fillLarge, { width: `${Math.max(8, Number(card.riskScore || 0))}%`, backgroundColor: t.barFill }]} />
+            </View>
+            <Text style={s.scoreValueLarge}>{card.riskScore ?? '--'}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={s.detailsToggle}
+          onPress={() => setShowResultDetails((open) => !open)}
+          accessibilityRole="button"
+          accessibilityLabel={showResultDetails ? 'Hide technical details' : 'Show technical details'}
+        >
+          <Text style={s.detailsToggleText}>
+            {showResultDetails ? '▲ Hide technical details' : '▼ Show technical details (for doctors or carers)'}
+          </Text>
+        </TouchableOpacity>
+
+        {showResultDetails ? (
+          <>
         <View style={s.scoreBlock}>
-          <Text style={s.scoreBlockTitle}>Risk scores (how we decided)</Text>
+          <Text style={s.scoreBlockTitle}>How we calculated this</Text>
           <Text style={s.scoreLine}>Final score: {finalScore ?? '--'} / 100</Text>
-          <Text style={s.scoreHint}>Levels: 0–24 Safe · 25–59 Warning · 60–100 Dangerous</Text>
+          <Text style={s.scoreHint}>Levels: 0–19 Safe · 20–54 Warning · 55–100 Dangerous</Text>
           {ruleScore != null ? <Text style={s.scoreLine}>Rule-based clinical score: {ruleScore} / 100</Text> : null}
           {mlScore != null ? (
             <Text style={s.scoreLine}>ML score — P(Dangerous) × 100: {mlScore} / 100</Text>
           ) : null}
+          {dataUsed.hybridBreakdown?.youdensJThreshold?.optimal_threshold != null ? (
+            <Text style={s.scoreHint}>
+              ML class threshold (Youden's J): P(ADR) ≥ {Number(dataUsed.hybridBreakdown.youdensJThreshold.optimal_threshold).toFixed(3)}
+            </Text>
+          ) : null}
           <Text style={s.scoreHint}>
-            Final blend uses clinical rules and ML P(Dangerous) (about 55% rules, 45% ML), with safety guardrails.
+            Final blend: 60% clinical rules + 40% ML P(Dangerous) (RTAD-MSM hybrid formula), with safety guardrails.
           </Text>
+          {dataUsed.hybridBreakdown ? (
+            <Text style={s.scoreHint}>
+              Formula: {dataUsed.hybridBreakdown.formula || '0.6×rule + 0.4×ML'} → blended {dataUsed.hybridBreakdown.blendedScore ?? finalScore}/100
+            </Text>
+          ) : null}
+          {report?.scoreBreakdown?.formula ? (
+            <Text style={s.scoreHint}>{report.scoreBreakdown.formula}</Text>
+          ) : null}
           {Number(dataUsed.historyPriorCheckCount) > 0 ? (
             <Text style={s.scoreHint}>
               Your saved history for this drug: {dataUsed.historyPriorCheckCount} prior check(s) — latest was{' '}
@@ -1087,37 +1211,108 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         </View>
 
         <View style={s.scoreRow}>
-          <Text style={s.scoreLabel}>Final bar</Text>
+          <Text style={s.scoreLabel}>Score bar</Text>
           <View style={s.track}>
             <View style={[s.fill, { width: `${Math.max(8, Number(card.riskScore || 0))}%`, backgroundColor: t.barFill }]} />
           </View>
           <Text style={s.scoreValue}>{card.riskScore ?? '--'}/100</Text>
         </View>
 
+        {triggeredRules.length ? (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Health factors we checked</Text>
+            {triggeredRules.map((rule, index) => (
+              <View key={`${rule.factorType || 'rule'}-${index}`} style={s.ruleRow}>
+                <Text style={s.ruleLabel}>{rule.factorLabel}</Text>
+                <Text style={s.helpSmall}>
+                  Score contribution: {rule.score ?? 0} · Severity: {rule.severity || 'n/a'}
+                </Text>
+                {rule.recommendation ? <Text style={s.ruleRecommendation}>{rule.recommendation}</Text> : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {shapItems.length ? (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>ML feature importance (SHAP)</Text>
+            <Text style={s.helpSmall}>
+              Top drivers of ADR risk probability{report?.shap?.method ? ` (${report.shap.method})` : ''}.
+            </Text>
+            {shapItems.map((item, index) => {
+              const widthPct = Math.max(6, Math.round((Math.abs(Number(item.shap || 0)) / shapMax) * 100));
+              const label = item.clinicalExplanation || item.feature;
+              return (
+                <View key={`shap-${item.feature}-${index}`} style={{ marginTop: 10 }}>
+                  <Text style={s.shapFeature}>{label}</Text>
+                  {!item.clinicalExplanation ? (
+                    <Text style={s.helpSmall}>Feature: {item.feature}</Text>
+                  ) : null}
+                  <View style={s.shapTrack}>
+                    <View
+                      style={[
+                        s.shapFill,
+                        {
+                          width: `${widthPct}%`,
+                          backgroundColor: Number(item.shap || 0) >= 0 ? palette.danger : palette.primary,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={s.helpSmall}>
+                    Impact: {Number(item.shap || 0).toFixed(4)}
+                    {item.waterfallCumulative != null ? ` · cumulative: ${Number(item.waterfallCumulative).toFixed(4)}` : ''}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+          </>
+        ) : null}
+
+        {allergyConflicts &&
+        (allergyConflicts.directAllergyMatch ||
+          allergyConflicts.classAllergyMatch ||
+          allergyConflicts.nsaidAspirinCrossReactivity ||
+          allergyConflicts.summary) ? (
+          <View style={[s.card, s.danger]}>
+            <Text style={[s.cardTitle, s.dangerText]}>Allergy warning</Text>
+            {allergyConflicts.summary ? <Text style={s.cardText}>{allergyConflicts.summary}</Text> : null}
+            {allergyConflicts.profileAllergiesText ? (
+              <Text style={s.helpSmall}>Profile allergies: {allergyConflicts.profileAllergiesText}</Text>
+            ) : null}
+            <Text style={s.helpSmall}>
+              Drug class: {allergyConflicts.drugClass || 'unknown'}
+              {allergyConflicts.atcCode ? ` · ATC: ${allergyConflicts.atcCode}` : ''}
+              {allergyConflicts.atcClassLabel ? ` · ${allergyConflicts.atcClassLabel}` : ''}
+            </Text>
+          </View>
+        ) : null}
+
         {Number(card.interactionCount) > 0 ? (
           <View style={s.interactionCard}>
-            <Text style={s.interactionTitle}>Interaction alert</Text>
+            <Text style={s.interactionTitle}>May not mix well with your other medicines</Text>
             <Text style={s.interactionLevel}>
-              Highest level with your current medicines: {sev}
-              {card.maxInteractionSeverity ? ` (clinical: ${card.maxInteractionSeverity})` : ''}
+              Highest concern level: {sev}
             </Text>
-            <Text style={s.helpSmall}>Major means seek advice before taking; moderate means pharmacist review; minor means usually watch and monitor.</Text>
+            <Text style={s.helpSmall}>Ask your pharmacist before taking this with your other tablets.</Text>
           </View>
         ) : null}
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Why this result?</Text>
+          <Text style={s.cardTitle}>Why you got this result</Text>
           <Text style={s.cardText}>{cleanExplanationText(card.explanation)}</Text>
         </View>
 
         <View style={[s.card, t.box]}>
-          <Text style={[s.cardTitle, t.text]}>Recommendation</Text>
+          <Text style={[s.cardTitle, t.text]}>What to do next</Text>
           <Text style={[s.cardText, t.text]}>{card.recommendation || 'No recommendation available.'}</Text>
         </View>
 
         {mk.ingredientName ? (
           <View style={s.card}>
-            <Text style={s.cardTitle}>Drug information summary</Text>
+            <Text style={s.cardTitle}>About this medicine</Text>
             <Text style={s.cardText}>
               {[
                 mk.ingredientName ? `Active ingredient: ${mk.ingredientName}` : null,
@@ -1130,22 +1325,42 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           </View>
         ) : null}
 
-        {ml?.available ? (
+        {showResultDetails && ml?.available ? (
           <View style={s.card}>
-            <Text style={s.cardTitle}>Machine learning check</Text>
+            <Text style={s.cardTitle}>Computer model check</Text>
             <Text style={s.cardText}>Support score: {ml.mlRiskScore ?? '--'} / 100 ({ml.mlRiskLevel || 'n/a'})</Text>
-            <Text style={s.helpSmall}>Random-forest style model — supports, but does not replace, clinical checks.</Text>
+            <Text style={s.helpSmall}>This supports the main check — it does not replace your doctor.</Text>
           </View>
         ) : null}
 
         {interactions.length ? (
           <View style={s.card}>
-            <Text style={s.cardTitle}>Interaction details</Text>
+            <Text style={s.cardTitle}>Other medicine interactions</Text>
             {interactions.map((item, index) => (
               <View key={`${item.interactingDrug || index}`} style={{ marginBottom: 10 }}>
                 <Text style={s.bullet}>{`\u2022 ${item.interactingDrug || item.interactingNormalizedDrug || 'Another medicine'} (${interactionSeverityUserLabel(item.severity)})`}</Text>
                 {item.description ? <Text style={s.helpSmall}>{item.description}</Text> : null}
+                <Text style={s.helpSmall}>Source: {item.evidenceSource || 'DDInter'}</Text>
               </View>
+            ))}
+          </View>
+        ) : null}
+
+        {alternatives.length ? (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Alternative suggestions</Text>
+            {alternatives.map((item, index) => (
+              <Text key={`alt-${index}`} style={s.bullet}>{`\u2022 ${item}`}</Text>
+            ))}
+            <Text style={s.helpSmall}>Suggestions are informational only — prescriber must confirm suitability.</Text>
+          </View>
+        ) : null}
+
+        {guidelines.length ? (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Tips from clinical guidelines</Text>
+            {guidelines.map((item, index) => (
+              <Text key={`guide-${index}`} style={s.bullet}>{`\u2022 ${item}`}</Text>
             ))}
           </View>
         ) : null}
@@ -1208,7 +1423,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           </Text>
         </View>
         {readText ? (
-          <TouchableOpacity style={s.speakTop} onPress={() => speakAloud(readText)} accessibilityLabel="Read screen aloud">
+          <TouchableOpacity style={s.speakTop} onPress={() => speakAloud(readText)} accessibilityLabel="Read screen aloud" accessibilityHint="Reads the main content on this screen">
             <Text style={s.speakTopText}>🔊</Text>
           </TouchableOpacity>
         ) : (
@@ -1224,8 +1439,8 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         {header(route === 'loading' ? 'Checking safety' : 'Medicine safety', 'Checking your medicine. Please wait.')}
         <View style={s.center}>
           <ActivityIndicator size="large" color={palette.primary} />
-          <Text style={s.loadTitle}>Checking medicine safety…</Text>
-          <Text style={s.loadText}>Rules, your profile, interactions, and the learning model are combined.</Text>
+          <Text style={s.loadTitle}>Checking your medicine…</Text>
+          <Text style={s.loadText}>We are checking your allergies, health profile, and medicine information. This may take a moment.</Text>
         </View>
       </View>
     );
@@ -1236,9 +1451,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     const allergyHistoryChip = questionnaireComplete(answers);
     const readHome = `Medicine safety. ${
       isOnboarded
-        ? 'Your allergy profile is saved and reused every time you check a medicine — only quick updates when needed.'
-        : 'Finish one-time setup so we can personalize every medicine check.'
-    } Tap check a medicine to continue.`;
+        ? 'Your health profile is saved. Tap check a medicine to start.'
+        : 'Finish one-time setup so we can check medicines for you.'
+    }`;
     return (
       <View style={s.screen}>
         {header('Medicine safety', readHome)}
@@ -1251,7 +1466,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.heroTitle}>Hello{userFirstName ? `, ${userFirstName}` : ''}</Text>
-                <Text style={s.heroSub}>Check a new medicine against your allergies, conditions, and current tablets — with clear results you can share with a doctor or pharmacist.</Text>
+                <Text style={s.heroSub}>Check if a medicine is safe for you — using your allergies, health conditions, and current tablets.</Text>
               </View>
             </View>
             <View style={s.statusRow}>
@@ -1273,7 +1488,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
           <View style={s.disclaimerCard}>
             <Text style={s.disclaimerText}>
-              This tool supports your decisions only — it is not a diagnosis. Always follow advice from your clinician or pharmacist.
+              This app helps you decide — it does not replace your doctor or pharmacist. Always follow their advice.
             </Text>
           </View>
 
@@ -1290,7 +1505,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               </View>
               <View style={s.ctaTextCol}>
                 <Text style={s.bigPrimaryText}>Check a medicine</Text>
-                <Text style={s.bigPrimarySub}>{isOnboarded ? 'Type, scan photo, or voice — quick check only' : 'We’ll finish setup if needed'}</Text>
+                <Text style={s.bigPrimarySub}>{isOnboarded ? 'Type, take a photo, or speak the name' : 'Quick setup first, then check'}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -1299,7 +1514,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             <Text style={s.secondaryBigText}>🔊 Read this screen aloud</Text>
           </TouchableOpacity>
 
-          <Text style={s.sectionTitle}>Shortcuts</Text>
+          <Text style={s.sectionTitle}>Quick links</Text>
           <View style={s.shortcutRow}>
             <TouchableOpacity style={s.shortcutHalf} onPress={() => setRoute('profile-view')} activeOpacity={0.88}>
               <Text style={s.shortcutIcon}>👤</Text>
@@ -1338,9 +1553,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     const hubRead = 'Choose how to enter the medicine. Type the name, upload or photograph a prescription for OCR, or speak the medicine name.';
     return (
       <View style={s.screen}>
-        {header('How do you want to enter the medicine?', hubRead)}
+        {header('Enter medicine', hubRead)}
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.lead}>Choose how to enter the medicine. You can correct everything before the safety check runs.</Text>
+          <Text style={s.lead}>Pick one way to tell us the medicine name. You can fix anything before we check.</Text>
           <TouchableOpacity style={s.hubRow} onPress={() => setRoute('check-input')} activeOpacity={0.88}>
             <View style={[s.hubIcon, s.hubIconTeal]}>
               <Text style={s.hubEmoji}>⌨️</Text>
@@ -1608,7 +1823,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                 value={scanConfirmMedicineDraft}
                 onChangeText={setScanConfirmMedicineDraft}
                 placeholder="e.g. Amoxicillin 500 mg"
-                placeholderTextColor={palette.textTertiary}
+                placeholderTextColor={palette.placeholder}
                 autoCorrect={false}
                 autoCapitalize="words"
               />
@@ -1947,7 +2162,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               value={voiceDraft}
               onChangeText={setVoiceDraft}
               placeholder="Medicine name"
-              placeholderTextColor={palette.textTertiary}
+              placeholderTextColor={palette.placeholder}
               autoCorrect={false}
               autoCapitalize="words"
             />
@@ -2158,6 +2373,20 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               placeholder="Caregiver phone number"
               keyboardType="phone-pad"
             />
+            <View style={s.disclaimerCard}>
+              <Text style={s.sectionTitle}>Feedback for model improvement</Text>
+              <Text style={s.helpSmall}>
+                Optional: allow anonymized reaction outcomes and clinician overrides to improve safety predictions. You can log reactions either way.
+              </Text>
+              <TouchableOpacity
+                style={[s.row, { marginTop: 8, alignItems: 'center' }]}
+                onPress={() => setProfile((p) => ({ ...p, feedbackConsentForTraining: !p.feedbackConsentForTraining }))}
+              >
+                <Text style={s.chipText}>
+                  {profile.feedbackConsentForTraining ? '☑' : '☐'} I consent to anonymized use of my feedback for continuous learning
+                </Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={s.bigPrimary} onPress={saveProfile} disabled={saving}>
               <Text style={s.bigPrimaryText}>{saving ? 'Saving…' : 'Save and continue'}</Text>
             </TouchableOpacity>
@@ -2169,23 +2398,16 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
   if (route === 'onboarding') {
     const advance = () => {
+      const validation = validateOnboardingStep(onboardingStep, profile);
+      if (!validation.valid) {
+        Alert.alert('Validation', validation.message);
+        return;
+      }
       if (onboardingStep === 0) {
-        if (!profile.age?.trim() || !profile.gender) {
-          Alert.alert('Missing', 'Please enter age and gender.');
-          return;
-        }
         setOnboardingStep(1);
         return;
       }
       if (onboardingStep === 1) {
-        if (profile.hasMedicineAllergy !== true && profile.hasMedicineAllergy !== false) {
-          Alert.alert('Missing', 'Please answer Yes or No for medicine allergies.');
-          return;
-        }
-        if (profile.hasMedicineAllergy === true && !profile.knownAllergiesText?.trim()) {
-          Alert.alert('Missing', 'Please list known drug allergies or type “unsure”.');
-          return;
-        }
         setOnboardingStep(2);
         return;
       }
@@ -2383,7 +2605,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               value={medicineInput.medicineName}
               onChangeText={onMedicineNameChange}
               placeholder="Start typing… e.g. Panadol"
-              placeholderTextColor={palette.textTertiary}
+              placeholderTextColor={palette.placeholder}
               autoCorrect={false}
             />
             {searchBusy ? <Text style={s.helpSmall}>Searching library…</Text> : null}
@@ -2634,9 +2856,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             placeholder="What symptoms did you have?"
             multiline
           />
-          <Text style={s.fieldLabel}>Severity</Text>
-          <View style={s.row}>
-            {['mild', 'moderate', 'severe'].map((level) => (
+            <Text style={s.fieldLabel}>Severity</Text>
+          <View style={[s.row, { flexWrap: 'wrap' }]}>
+            {REACTION_OUTCOMES.map((level) => (
               <TouchableOpacity
                 key={level}
                 style={[s.chip, standaloneReaction.severity === level && s.chipOn]}
@@ -2646,6 +2868,12 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               </TouchableOpacity>
             ))}
           </View>
+          <TouchableOpacity
+            style={[s.row, { marginTop: 8, alignItems: 'center' }]}
+            onPress={() => setStandaloneReaction((r) => ({ ...r, pharmacistConfirmed: !r.pharmacistConfirmed }))}
+          >
+            <Text style={s.chipText}>{standaloneReaction.pharmacistConfirmed ? '☑' : '☐'} Pharmacist confirmed this outcome</Text>
+          </TouchableOpacity>
           <TextInput
             style={[s.input, s.area]}
             value={standaloneReaction.notes}
@@ -2662,27 +2890,39 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'result') {
+    const report = latestResult?.analysis?.riskReport || latestResult?.analysis?.dataUsed?.riskReport || null;
+    const blocked =
+      (report?.safetyControls?.requiresClinicalOverride && !clinicalOverride.accepted) ||
+      (latestResult?.card?.riskLevel === 'Dangerous' && !clinicalOverride.accepted);
     return (
       <View style={s.screen}>
-        {header('Safety result', 'Here is your medicine safety result.')}
+        {header('Your result', 'Here is your medicine safety result. Tap the speaker to hear it read aloud.')}
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
           {latestResult?.card ? resultBody(latestResult.card, latestResult.analysis) : null}
           <View style={s.disclaimerCard}>
             <Text style={s.disclaimerText}>Results depend on the information you entered and our knowledge base — not a substitute for professional care.</Text>
           </View>
-          <Text style={s.sectionTitle}>After you take a medicine</Text>
-          <TouchableOpacity style={s.tile} onPress={() => setRoute('follow-up')}>
-            <Text style={s.tileTitle}>Follow-up: how did you feel?</Text>
-            <Text style={s.tileSub}>Update your allergy profile after you use the medicine.</Text>
+          {!blocked ? (
+            <>
+              <Text style={s.sectionTitle}>After you take a medicine</Text>
+              <TouchableOpacity style={s.tile} onPress={() => setRoute('follow-up')}>
+                <Text style={s.tileTitle}>Follow-up: how did you feel?</Text>
+                <Text style={s.tileSub}>Update your allergy profile after you use the medicine.</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={s.blockBanner}>
+              <Text style={s.blockText}>Follow-up actions remain blocked until a clinical override is documented above.</Text>
+            </View>
+          )}
+          <TouchableOpacity style={s.bigPrimary} onPress={() => setRoute('medicine-hub')}>
+            <Text style={s.bigPrimaryText}>Check another medicine</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.bigPrimary} onPress={() => setRoute('history')}>
-            <Text style={s.bigPrimaryText}>View history</Text>
+          <TouchableOpacity style={s.secondaryBig} onPress={() => setRoute('history')}>
+            <Text style={s.secondaryBigText}>View past checks</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.secondaryBig} onPress={() => setRoute('home')}>
-            <Text style={s.secondaryBigText}>Medicine safety home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.secondaryBig} onPress={() => setRoute('medicine-hub')}>
-            <Text style={s.secondaryBigText}>Check another medicine</Text>
+          <TouchableOpacity style={[s.secondaryBig, { marginTop: 10 }]} onPress={() => setRoute('home')}>
+            <Text style={s.secondaryBigText}>Back to home</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -2701,14 +2941,20 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
             placeholder="What did you feel?"
             multiline
           />
-          <Text style={s.fieldLabel}>Severity</Text>
-          <View style={s.row}>
-            {['mild', 'moderate', 'severe'].map((level) => (
+          <Text style={s.fieldLabel}>Outcome</Text>
+          <View style={[s.row, { flexWrap: 'wrap' }]}>
+            {REACTION_OUTCOMES.map((level) => (
               <TouchableOpacity key={level} style={[s.chip, followUp.severity === level && s.chipOn]} onPress={() => setFollowUp((f) => ({ ...f, severity: level }))}>
                 <Text style={[s.chipText, followUp.severity === level && s.chipTextOn]}>{level}</Text>
               </TouchableOpacity>
             ))}
           </View>
+          <TouchableOpacity
+            style={[s.row, { marginTop: 8, alignItems: 'center' }]}
+            onPress={() => setFollowUp((f) => ({ ...f, pharmacistConfirmed: !f.pharmacistConfirmed }))}
+          >
+            <Text style={s.chipText}>{followUp.pharmacistConfirmed ? '☑' : '☐'} Pharmacist confirmed this outcome</Text>
+          </TouchableOpacity>
           <TextInput style={[s.input, s.area]} value={followUp.notes} onChangeText={(v) => setFollowUp((f) => ({ ...f, notes: v }))} placeholder="Notes" multiline />
           <TouchableOpacity style={s.bigPrimary} onPress={submitFollowUp} disabled={saving}>
             <Text style={s.bigPrimaryText}>{saving ? 'Saving…' : 'Save follow-up'}</Text>
@@ -3281,31 +3527,31 @@ const s = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.12)',
   },
   back: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
   },
-  backText: { color: '#fff', fontSize: 28, fontWeight: '300', marginTop: -2 },
-  topTitleWrap: { flex: 1, paddingRight: 6 },
-  topTitle: { color: '#fff', fontSize: 18, fontWeight: '700', letterSpacing: 0.2 },
+  backText: { color: '#fff', fontSize: 32, fontWeight: '300', marginTop: -2 },
+  topTitleWrap: { flex: 1, paddingRight: 8 },
+  topTitle: { color: '#fff', fontSize: 20, fontWeight: '700', lineHeight: 26 },
   speakTop: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  speakTopText: { fontSize: 20 },
-  speakTopPlaceholder: { width: 44 },
-  content: { padding: 20, paddingBottom: 40 },
+  speakTopText: { fontSize: 24 },
+  speakTopPlaceholder: { width: 52 },
+  content: { padding: 24, paddingBottom: 48 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
-  loadTitle: { marginTop: 16, fontSize: 20, fontWeight: '700', color: palette.text, textAlign: 'center' },
-  loadText: { marginTop: 10, fontSize: 16, color: palette.textSecondary, textAlign: 'center', lineHeight: 24, maxWidth: 300 },
+  loadTitle: { marginTop: 20, fontSize: 22, fontWeight: '700', color: palette.text, textAlign: 'center' },
+  loadText: { marginTop: 12, fontSize: elder.body, color: palette.textSecondary, textAlign: 'center', lineHeight: elder.bodyLine, maxWidth: 320 },
   scanHero: {
     backgroundColor: palette.primaryLight,
     borderRadius: 24,
@@ -3826,7 +4072,7 @@ const s = StyleSheet.create({
   moduleHeroTop: { flexDirection: 'row', alignItems: 'center' },
   statusRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16 },
   statusChip: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
-  statusChipText: { fontSize: 13, fontWeight: '700' },
+  statusChipText: { fontSize: 15, fontWeight: '700' },
   statusReady: { backgroundColor: palette.primaryMuted },
   statusReadyText: { color: palette.primary },
   statusPending: { backgroundColor: palette.warnBg },
@@ -3841,23 +4087,25 @@ const s = StyleSheet.create({
     marginRight: 14,
   },
   circleText: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  heroTitle: { fontSize: 24, fontWeight: '700', color: palette.text },
-  heroSub: { marginTop: 8, fontSize: 16, color: palette.textSecondary, lineHeight: 24 },
+  heroTitle: { fontSize: 26, fontWeight: '700', color: palette.text },
+  heroSub: { marginTop: 10, fontSize: elder.body, color: palette.textSecondary, lineHeight: elder.bodyLine },
   disclaimerCard: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderLeftWidth: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 18,
+    borderLeftWidth: 5,
     borderLeftColor: palette.primary,
   },
-  disclaimerText: { fontSize: 13, color: palette.textSecondary, lineHeight: 20, fontWeight: '500' },
+  disclaimerText: { fontSize: 16, color: palette.text, lineHeight: 24, fontWeight: '500' },
   bigPrimary: {
     backgroundColor: palette.primary,
     borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginTop: 4,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginTop: 6,
+    minHeight: elder.minTouch,
+    justifyContent: 'center',
     ...cardShadow,
   },
   ctaInner: { flexDirection: 'row', alignItems: 'center' },
@@ -3872,34 +4120,37 @@ const s = StyleSheet.create({
   },
   ctaIcon: { fontSize: 26 },
   ctaTextCol: { flex: 1 },
-  bigPrimaryText: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
-  bigPrimarySub: { color: 'rgba(255,255,255,0.95)', fontSize: 15, marginTop: 4, fontWeight: '500' },
+  bigPrimaryText: { color: '#fff', fontSize: elder.button, fontWeight: '800' },
+  bigPrimarySub: { color: 'rgba(255,255,255,0.95)', fontSize: 16, marginTop: 6, fontWeight: '500', lineHeight: 22 },
   primaryActionCard: { borderWidth: 0 },
   secondaryBig: {
     backgroundColor: palette.surface,
     borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: palette.border,
-    paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: palette.borderStrong,
+    paddingVertical: 18,
     alignItems: 'center',
     marginTop: 14,
+    minHeight: elder.minTouch,
+    justifyContent: 'center',
     ...cardShadow,
   },
-  secondaryBigText: { color: palette.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  sectionTitle: { fontSize: 12, fontWeight: '800', color: palette.primary, textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 22, marginBottom: 14 },
+  secondaryBigText: { color: palette.text, fontSize: elder.button, fontWeight: '700' },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: palette.text, marginTop: 24, marginBottom: 14 },
   shortcutRow: { flexDirection: 'row', justifyContent: 'space-between' },
   shortcutHalf: {
     width: '48%',
     backgroundColor: palette.surface,
     borderRadius: 18,
-    padding: 16,
-    borderWidth: 1.5,
+    padding: 18,
+    borderWidth: 2,
     borderColor: palette.border,
+    minHeight: 120,
     ...cardShadow,
   },
-  shortcutIcon: { fontSize: 28, marginBottom: 10 },
-  shortcutTitle: { fontSize: 16, fontWeight: '800', color: palette.text, letterSpacing: -0.2 },
-  shortcutSub: { fontSize: 13, color: palette.textSecondary, marginTop: 4, lineHeight: 18, fontWeight: '500' },
+  shortcutIcon: { fontSize: 32, marginBottom: 12 },
+  shortcutTitle: { fontSize: 17, fontWeight: '800', color: palette.text },
+  shortcutSub: { fontSize: 15, color: palette.textSecondary, marginTop: 6, lineHeight: 22, fontWeight: '500' },
   tile: {
     backgroundColor: palette.surface,
     borderRadius: 18,
@@ -3916,22 +4167,23 @@ const s = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1.5,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 2,
     borderColor: palette.border,
+    minHeight: 80,
     ...cardShadow,
   },
-  hubIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  hubIcon: { width: 60, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   hubIconTeal: { backgroundColor: '#d0fdf3' },
   hubIconBlue: { backgroundColor: '#dbeafe' },
   hubIconViolet: { backgroundColor: '#ede9fe' },
   hubEmoji: { fontSize: 26 },
   hubRowBody: { flex: 1 },
-  hubRowTitle: { fontSize: 16, fontWeight: '800', color: palette.text, letterSpacing: -0.2 },
-  hubRowSub: { fontSize: 14, color: palette.textSecondary, marginTop: 4, fontWeight: '500' },
-  hubChevron: { fontSize: 22, color: palette.textTertiary, fontWeight: '300' },
-  lead: { fontSize: 15, color: palette.textSecondary, lineHeight: 23, marginBottom: 16, fontWeight: '500' },
+  hubRowTitle: { fontSize: 18, fontWeight: '800', color: palette.text },
+  hubRowSub: { fontSize: 16, color: palette.textSecondary, marginTop: 6, fontWeight: '500', lineHeight: 22 },
+  hubChevron: { fontSize: 26, color: palette.textSecondary, fontWeight: '300' },
+  lead: { fontSize: elder.body, color: palette.textSecondary, lineHeight: elder.bodyLine, marginBottom: 18, fontWeight: '500' },
   profileTop: { alignItems: 'center', paddingBottom: 12 },
   bigCircle: {
     width: 80,
@@ -4031,15 +4283,15 @@ const s = StyleSheet.create({
   card: {
     backgroundColor: palette.surface,
     borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: palette.border,
-    padding: 16,
-    marginBottom: 14,
+    padding: 18,
+    marginBottom: 16,
     ...cardShadow,
   },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: palette.primary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.1 },
-  cardText: { fontSize: 15, lineHeight: 23, color: palette.text, fontWeight: '500' },
-  helpSmall: { fontSize: 13, color: palette.textSecondary, lineHeight: 20, marginTop: 8, fontWeight: '500' },
+  cardTitle: { fontSize: elder.label, fontWeight: '700', color: palette.primary, marginBottom: 10 },
+  cardText: { fontSize: elder.body, lineHeight: elder.bodyLine, color: palette.text, fontWeight: '500' },
+  helpSmall: { fontSize: 15, color: palette.textSecondary, lineHeight: 22, marginTop: 8, fontWeight: '500' },
   voiceMicButton: {
     backgroundColor: palette.primary,
     borderRadius: 18,
@@ -4214,55 +4466,55 @@ const s = StyleSheet.create({
     lineHeight: 22,
     color: palette.textSecondary,
   },
-  fieldLabel: { fontSize: 14, fontWeight: '600', color: palette.text, marginBottom: 8, marginTop: 4 },
+  fieldLabel: { fontSize: elder.label, fontWeight: '700', color: palette.text, marginBottom: 10, marginTop: 6 },
   input: {
     backgroundColor: palette.surface,
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: palette.border,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
+    borderWidth: 2,
+    borderColor: palette.borderStrong,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: elder.input,
     color: palette.text,
-    marginBottom: 14,
-    minHeight: 52,
+    marginBottom: 16,
+    minHeight: 58,
   },
   area: { minHeight: 120, textAlignVertical: 'top', paddingVertical: 12 },
   areaLarge: { minHeight: 180, textAlignVertical: 'top', paddingVertical: 12 },
   row: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
   chip: {
     borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: palette.border,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 2,
+    borderColor: palette.borderStrong,
     backgroundColor: palette.surface,
-    marginRight: 8,
-    marginBottom: 10,
-    minHeight: 46,
+    marginRight: 10,
+    marginBottom: 12,
+    minHeight: 50,
     justifyContent: 'center',
   },
   chipOn: { backgroundColor: palette.primary, borderColor: palette.primary },
-  chipText: { fontSize: 15, fontWeight: '700', color: palette.text, letterSpacing: -0.2 },
+  chipText: { fontSize: 17, fontWeight: '700', color: palette.text },
   chipTextOn: { color: '#fff' },
   dots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 18 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.borderStrong, marginHorizontal: 5 },
   dotOn: { width: 24, borderRadius: 4, backgroundColor: palette.primary },
-  title: { fontSize: 20, lineHeight: 28, fontWeight: '800', color: palette.text, letterSpacing: -0.4 },
+  title: { fontSize: 22, lineHeight: 30, fontWeight: '800', color: palette.text },
   option: {
     backgroundColor: palette.surface,
     borderRadius: 16,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: palette.border,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    minHeight: 54,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    marginBottom: 14,
+    minHeight: 58,
     justifyContent: 'center',
     ...cardShadow,
   },
   optionOn: { backgroundColor: palette.primaryMuted, borderColor: palette.primary, borderWidth: 2 },
-  optionText: { fontSize: 16, fontWeight: '700', color: palette.text, letterSpacing: -0.3 },
+  optionText: { fontSize: 18, fontWeight: '700', color: palette.text },
   optionTextOn: { color: palette.primary },
   suggestPanel: {
     backgroundColor: palette.surface,
@@ -4314,31 +4566,58 @@ const s = StyleSheet.create({
   },
   secondaryText: { color: palette.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
-  resultMedLabel: { fontSize: 11, fontWeight: '800', color: palette.primary, textTransform: 'uppercase', letterSpacing: 1.2 },
-  med: { fontSize: 24, fontWeight: '800', color: palette.text, marginTop: 6, marginBottom: 16, letterSpacing: -0.4 },
-  banner: { borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 16, ...cardShadow },
-  bannerWarn: { backgroundColor: palette.warnBg, borderWidth: 1.5, borderColor: '#fcd34d' },
-  bannerSafe: { backgroundColor: palette.safeBg, borderWidth: 1.5, borderColor: '#6ee7b7' },
-  bannerDanger: { backgroundColor: palette.dangerBg, borderWidth: 1.5, borderColor: '#fca5a5' },
-  riskPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+  resultMedLabel: { fontSize: 15, fontWeight: '700', color: palette.primary, marginBottom: 4 },
+  med: { fontSize: 28, fontWeight: '800', color: palette.text, marginTop: 4, marginBottom: 18 },
+  banner: { borderRadius: 18, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 18, ...cardShadow },
+  bannerWarn: { backgroundColor: palette.warnBg, borderWidth: 2, borderColor: '#fcd34d' },
+  bannerSafe: { backgroundColor: palette.safeBg, borderWidth: 2, borderColor: '#6ee7b7' },
+  bannerDanger: { backgroundColor: palette.dangerBg, borderWidth: 2, borderColor: '#fca5a5' },
+  riskPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
+  riskPillText: { fontSize: 16, fontWeight: '800' },
   pillSafe: { backgroundColor: '#d1fae5' },
-  pillSafeText: { color: '#065f46', fontSize: 12, fontWeight: '800', letterSpacing: -0.1 },
+  pillSafeText: { color: '#065f46', fontSize: 16, fontWeight: '800' },
   pillWarn: { backgroundColor: '#fef08a' },
-  pillWarnText: { color: '#92400e', fontSize: 12, fontWeight: '800', letterSpacing: -0.1 },
+  pillWarnText: { color: '#92400e', fontSize: 16, fontWeight: '800' },
   pillDanger: { backgroundColor: '#fee2e2' },
-  pillDangerText: { color: '#991b1b', fontSize: 12, fontWeight: '800', letterSpacing: -0.1 },
-  bannerTitle: { fontSize: 16, fontWeight: '800', color: palette.text, letterSpacing: -0.3 },
-  bannerSub: { fontSize: 14, marginTop: 4, lineHeight: 20, color: palette.textSecondary, fontWeight: '500' },
+  pillDangerText: { color: '#991b1b', fontSize: 16, fontWeight: '800' },
+  bannerTitle: { fontSize: 18, fontWeight: '800', color: palette.text },
+  bannerSub: { fontSize: 17, marginTop: 6, lineHeight: 26, color: palette.text, fontWeight: '600' },
+  elderScoreSimple: {
+    backgroundColor: palette.surface,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: palette.border,
+    padding: 20,
+    marginBottom: 14,
+    ...cardShadow,
+  },
+  elderScoreTitle: { fontSize: 20, fontWeight: '800', color: palette.text },
+  elderScoreHint: { fontSize: 16, color: palette.textSecondary, marginTop: 8, lineHeight: 24 },
+  detailsToggle: {
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: palette.borderStrong,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 18,
+    minHeight: elder.minTouch,
+    justifyContent: 'center',
+  },
+  detailsToggleText: { fontSize: 16, fontWeight: '700', color: palette.text, textAlign: 'center', lineHeight: 24 },
+  trackLarge: { height: 16, borderRadius: 8 },
+  fillLarge: { borderRadius: 8 },
+  scoreValueLarge: { marginLeft: 14, fontSize: 22, fontWeight: '800', color: palette.text, minWidth: 36, textAlign: 'right' },
   emergencyBanner: {
     backgroundColor: palette.dangerBg,
     borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 2,
     borderColor: '#fecaca',
   },
-  emergencyTitle: { fontSize: 17, fontWeight: '700', color: palette.danger },
-  emergencyText: { marginTop: 8, fontSize: 15, color: palette.text, lineHeight: 24 },
+  emergencyTitle: { fontSize: 20, fontWeight: '800', color: palette.danger },
+  emergencyText: { marginTop: 10, fontSize: elder.body, color: palette.text, lineHeight: elder.bodyLine },
   caregiverNote: { marginTop: 10, fontSize: 14, color: palette.textSecondary, lineHeight: 22 },
   scoreBlock: {
     backgroundColor: palette.surface,
@@ -4365,30 +4644,58 @@ const s = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
   },
-  interactionTitle: { fontSize: 16, fontWeight: '700', color: palette.warn },
-  interactionLevel: { marginTop: 8, fontSize: 16, fontWeight: '600', color: palette.text },
+  interactionTitle: { fontSize: 18, fontWeight: '700', color: palette.warn },
+  interactionLevel: { marginTop: 10, fontSize: elder.body, fontWeight: '600', color: palette.text, lineHeight: elder.bodyLine },
+  blockBanner: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#fecaca',
+    padding: 18,
+    marginBottom: 14,
+  },
+  blockTitle: { fontSize: 18, fontWeight: '800', color: palette.danger },
+  blockText: { marginTop: 10, fontSize: elder.body, color: palette.text, lineHeight: elder.bodyLine },
+  ruleRow: {
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
+  ruleLabel: { fontSize: 17, fontWeight: '600', color: palette.text },
+  ruleRecommendation: { marginTop: 8, fontSize: 16, color: palette.textSecondary, lineHeight: 24 },
+  shapFeature: { fontSize: 13, fontWeight: '600', color: palette.textSecondary },
+  shapTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: palette.border,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  shapFill: { height: '100%', borderRadius: 4 },
   warn: { backgroundColor: palette.warnBg },
   warnText: { color: palette.warn },
   safe: { backgroundColor: palette.safeBg },
   safeText: { color: palette.safe },
   danger: { backgroundColor: palette.dangerBg },
   dangerText: { color: palette.danger },
-  bullet: { fontSize: 15, lineHeight: 24, fontWeight: '500', marginTop: 4, color: palette.text },
+  bullet: { fontSize: elder.body, lineHeight: elder.bodyLine, fontWeight: '500', marginTop: 6, color: palette.text },
   historyCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
+    padding: 18,
+    marginBottom: 12,
+    borderWidth: 2,
     borderColor: palette.border,
+    minHeight: 72,
     ...cardShadow,
   },
   historyCardMain: { flex: 1, paddingRight: 8 },
-  historyMed: { fontSize: 17, fontWeight: '700', color: palette.text },
-  historyDate: { fontSize: 14, color: palette.textSecondary, marginTop: 4 },
-  historyChevron: { fontSize: 22, color: palette.textTertiary, marginLeft: 4 },
+  historyMed: { fontSize: 19, fontWeight: '700', color: palette.text },
+  historyDate: { fontSize: 16, color: palette.textSecondary, marginTop: 6 },
+  historyChevron: { fontSize: 26, color: palette.textSecondary, marginLeft: 4 },
   emptyState: {
     backgroundColor: palette.surface,
     borderRadius: 16,
@@ -4398,10 +4705,10 @@ const s = StyleSheet.create({
     borderColor: palette.border,
     ...cardShadow,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: palette.text },
-  emptySub: { fontSize: 15, color: palette.textSecondary, textAlign: 'center', marginTop: 10, lineHeight: 22 },
-  emptyBtn: { marginTop: 20, backgroundColor: palette.primary, paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12 },
-  emptyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: palette.text },
+  emptySub: { fontSize: elder.body, color: palette.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: elder.bodyLine },
+  emptyBtn: { marginTop: 22, backgroundColor: palette.primary, paddingVertical: 16, paddingHorizontal: 28, borderRadius: 14, minHeight: elder.minTouch, justifyContent: 'center' },
+  emptyBtnText: { color: '#fff', fontSize: elder.button, fontWeight: '700' },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, marginTop: 0, alignSelf: 'center' },
   badgeText: { fontSize: 12, fontWeight: '800' },
 });

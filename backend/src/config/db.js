@@ -50,17 +50,23 @@ const getConnectionStringHost = (connectionString) => {
 
 const resolvedConnectionHost = getConnectionStringHost(resolvedDatabaseUrl);
 const sslHost = resolvedDatabaseUrl ? (resolvedConnectionHost || resolvedHost) : resolvedHost;
+const isSupabasePooler = /\.pooler\.supabase\.com$/i.test(resolvedDatabaseUrl ? sslHost : resolvedHost);
+
+const poolOptions = {
+  connectionTimeoutMillis: resolvedConnectionTimeout,
+  query_timeout: Number(process.env.DB_QUERY_TIMEOUT_MS || 8000),
+  statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS || 8000),
+  keepAlive: true,
+  max: Number(process.env.DB_POOL_MAX || (isSupabasePooler ? 5 : 10)),
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || (isSupabasePooler ? 30000 : 10000)),
+  ...(resolvedFamily ? { family: resolvedFamily } : {}),
+};
 
 const dbConfig = resolvedDatabaseUrl
   ? {
       connectionString: resolvedDatabaseUrl,
-      connectionTimeoutMillis: resolvedConnectionTimeout,
-      query_timeout: Number(process.env.DB_QUERY_TIMEOUT_MS || 8000),
-      statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS || 8000),
+      ...poolOptions,
       ssl: getSslConfig(sslHost),
-      keepAlive: true,
-      max: Number(process.env.DB_POOL_MAX || 10),
-      ...(resolvedFamily ? { family: resolvedFamily } : {}),
     }
   : {
       host: resolvedHost,
@@ -68,13 +74,8 @@ const dbConfig = resolvedDatabaseUrl
       database: process.env.DB_NAME || 'postgres',
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD,
-      connectionTimeoutMillis: resolvedConnectionTimeout,
-      query_timeout: Number(process.env.DB_QUERY_TIMEOUT_MS || 8000),
-      statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS || 8000),
+      ...poolOptions,
       ssl: getSslConfig(resolvedHost),
-      keepAlive: true,
-      max: Number(process.env.DB_POOL_MAX || 10),
-      ...(resolvedFamily ? { family: resolvedFamily } : {}),
     };
 
 const parseConnectionStringIdentity = (connectionString) => {
@@ -121,6 +122,18 @@ const getDatabaseTroubleshootingHints = (errorMessage = '') => {
     hints.push('The TCP socket opens, but PostgreSQL never completes the startup handshake from this machine.');
   }
 
+  if (normalizedError.includes('tenant/user') && normalizedError.includes('not found')) {
+    hints.push(
+      'Supabase returned "tenant/user not found". The project is usually paused, deleted, or the DB_USER project ref is wrong. Open the Supabase dashboard, restore the project if paused, then copy a fresh connection string from Settings → Database → Connect.'
+    );
+  }
+
+  if (normalizedError.includes('enotfound') && /db\.[^.]+\.supabase\.co/i.test(host)) {
+    hints.push(
+      'The direct database hostname did not resolve. Confirm the project still exists and the project reference in DB_HOST/DATABASE_URL matches the Supabase dashboard.'
+    );
+  }
+
   if (isSupabasePooler && String(port) === '6543') {
     hints.push(
       'This backend is using the Supabase transaction pooler on port 6543. For a long-running backend server, Supabase session mode on the same host at port 5432 is usually the better fit.'
@@ -158,7 +171,21 @@ const dbState = {
 };
 
 pool.on('error', (error) => {
-  console.error('[DB] Unexpected pool error:', error.message);
+  const message = String(error?.message || error);
+  const normalized = message.toLowerCase();
+  const isIdleDisconnect =
+    normalized.includes('administrator command') ||
+    normalized.includes('connection terminated') ||
+    normalized.includes('ECONNRESET'.toLowerCase());
+
+  if (isIdleDisconnect) {
+    console.warn('[DB] Idle pool connection closed by server; pool will reconnect on next query.');
+    return;
+  }
+
+  console.error('[DB] Unexpected pool error:', message);
+  dbState.connected = false;
+  dbState.lastError = message;
 });
 
 const initializeDatabase = async () => {

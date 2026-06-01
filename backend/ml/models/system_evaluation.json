@@ -1,0 +1,109 @@
+{
+  "section": "11.2_validation_protocol",
+  "datasets": [
+    "medicine_safety_training_dataset.csv",
+    "medicine_safety_dataset.csv"
+  ],
+  "rows": 4112,
+  "target": "adr_event",
+  "classes": [
+    "no_adr",
+    "severe_adr"
+  ],
+  "validation_protocol": {
+    "train_test_split": "80/20 stratified on adr_event",
+    "cross_validation": "5-fold StratifiedKFold on training set (see train_baseline / compare_models)",
+    "threshold_tuning": "Youden's J on out-of-fold training probabilities (baseline_metrics.json)",
+    "calibration_evaluation": "Brier score + reliability diagram bins on 20% hold-out"
+  },
+  "holdout_accuracy": 0.9975698663426489,
+  "holdout_f1_weighted": 0.9975678035595926,
+  "holdout_roc_auc": 0.9982593901321816,
+  "holdout_mcc": 0.9946199793336848,
+  "holdout_brier_score": 0.0024286438037072334,
+  "youdens_j": {
+    "optimal_threshold": 0.5799402985074626,
+    "youdens_j": 0.9929328621908127,
+    "tpr": 0.9929328621908127,
+    "fpr": 0.0
+  },
+  "reliability_diagram": [
+    {
+      "mean_predicted_probability": 0.0,
+      "observed_positive_fraction": 0.0
+    },
+    {
+      "mean_predicted_probability": 2.6160889470242106e-05,
+      "observed_positive_fraction": 0.0034129692832764505
+    },
+    {
+      "mean_predicted_probability": 0.0004180405192896666,
+      "observed_positive_fraction": 0.0
+    },
+    {
+      "mean_predicted_probability": 0.49102246903180463,
+      "observed_positive_fraction": 0.4945054945054945
+    },
+    {
+      "mean_predicted_probability": 0.9999420124530979,
+      "observed_positive_fraction": 1.0
+    },
+    {
+      "mean_predicted_probability": 1.0,
+      "observed_positive_fraction": 1.0
+    }
+  ],
+  "calibration_bins": [
+    {
+      "mean_predicted_probability": 0.0,
+      "observed_positive_fraction": 0.0
+    },
+    {
+      "mean_predicted_probability": 2.6160889470242106e-05,
+      "observed_positive_fraction": 0.0034129692832764505
+    },
+    {
+      "mean_predicted_probability": 0.0004180405192896666,
+      "observed_positive_fraction": 0.0
+    },
+    {
+      "mean_predicted_probability": 0.49102246903180463,
+      "observed_positive_fraction": 0.4945054945054945
+    },
+    {
+      "mean_predicted_probability": 0.9999420124530979,
+      "observed_positive_fraction": 1.0
+    },
+    {
+      "mean_predicted_probability": 1.0,
+      "observed_positive_fraction": 1.0
+    }
+  ],
+  "per_class": {
+    "no_adr": {
+      "precision": 0.996309963099631,
+      "recall": 1.0,
+      "f1-score": 0.9981515711645101,
+      "support": 540.0
+    },
+    "severe_adr": {
+      "precision": 1.0,
+      "recall": 0.9929328621908127,
+      "f1-score": 0.9964539007092199,
+      "support": 283.0
+    },
+    "accuracy": 0.9975698663426489,
+    "macro avg": {
+      "precision": 0.9981549815498155,
+      "recall": 0.9964664310954063,
+      "f1-score": 0.997302735936865,
+      "support": 823.0
+    },
+    "weighted avg": {
+      "precision": 0.9975788336255172,
+      "recall": 0.9975698663426489,
+      "f1-score": 0.9975678035595926,
+      "support": 823.0
+    }
+  }
+}

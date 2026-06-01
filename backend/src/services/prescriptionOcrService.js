@@ -1,5 +1,6 @@
 const { createWorker } = require('tesseract.js');
 const { Jimp, JimpMime } = require('jimp');
+const { correctOcrText } = require('../utils/ocrPostCorrection');
 
 let workerPromise = null;
 let queue = Promise.resolve();
@@ -280,8 +281,12 @@ async function recognizePrescriptionImage(imageBuffer) {
     const {
       data: { text, confidence },
     } = await worker.recognize(processedBuffer);
-    const rawText = String(text || '').replace(/\r\n/g, '\n').trim();
+    const ocrCorrected = correctOcrText(String(text || ''));
+    const rawText = ocrCorrected.text;
     const finalWarnings = [...(quality?.warnings || [])];
+    if (ocrCorrected.corrections.length > 0) {
+      finalWarnings.push('Automatic OCR corrections were applied. Review the text before confirming.');
+    }
     if (typeof confidence === 'number' && confidence < 55) {
       finalWarnings.push('OCR confidence is low. Review the detected text carefully before confirming medicine names.');
     }
@@ -290,6 +295,7 @@ async function recognizePrescriptionImage(imageBuffer) {
       confidence: typeof confidence === 'number' ? confidence : 0,
       preprocessing: {
         applied,
+        ocrCorrections: ocrCorrected.corrections,
       },
       quality: {
         ...(quality || {}),

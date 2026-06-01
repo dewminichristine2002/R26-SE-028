@@ -14,7 +14,7 @@ reaction_summary AS (
     user_id,
     medicine_check_id,
     COUNT(*) AS reaction_count,
-    MAX(CASE WHEN LOWER(COALESCE(severity, '')) = 'severe' THEN 1 ELSE 0 END) AS has_severe_reaction_log
+    MAX(CASE WHEN LOWER(COALESCE(severity, '')) IN ('severe', 'anaphylactic') THEN 1 ELSE 0 END) AS has_severe_reaction_log
   FROM reaction_logs
   GROUP BY user_id, medicine_check_id
 )

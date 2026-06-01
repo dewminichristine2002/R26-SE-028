@@ -116,6 +116,7 @@ export const allergyService = {
           suspectedMedicineNamesText: '',
           avoidedMedicinesText: '',
           antibioticPainkillerReaction: '',
+          feedbackConsentForTraining: false,
         });
       }
       throw error;
@@ -231,10 +232,32 @@ export const allergyService = {
           symptoms: payload.symptoms,
           severity: payload.severity || '',
           notes: payload.notes || '',
+          pharmacistConfirmed: Boolean(payload.pharmacistConfirmed),
           createdAt: new Date().toISOString(),
         };
         const list = await readLocal('allergy_reactions', []);
         await writeLocal('allergy_reactions', [entry, ...list]);
+        return entry;
+      }
+      throw error;
+    }
+  },
+
+  async saveClinicalOverride(payload) {
+    try {
+      const data = await request('post', '/allergies/clinical-overrides', payload);
+      return data.override;
+    } catch (error) {
+      if (shouldUseLocalFallback(error)) {
+        const entry = {
+          id: Date.now(),
+          recordType: 'clinical_override',
+          justification: payload.justification || '',
+          pharmacistConfirmed: Boolean(payload.pharmacistConfirmed),
+          createdAt: new Date().toISOString(),
+        };
+        const list = await readLocal('allergy_clinical_overrides', []);
+        await writeLocal('allergy_clinical_overrides', [entry, ...list]);
         return entry;
       }
       throw error;

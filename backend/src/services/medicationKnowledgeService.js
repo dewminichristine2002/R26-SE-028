@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { RXNORM_DRUGS, DDINTER_INTERACTIONS } = require('../data/medicationKnowledge');
+const { resolveDrugClass } = require('./drugClassLookupService');
+const { canonicalizeDrugName } = require('./drugNormalizationService');
 
 const generatedKnowledgePath = path.resolve(__dirname, '..', 'data', 'generated', 'medicationKnowledge.generated.json');
 
@@ -443,28 +445,83 @@ const findDrugEntry = (input) => {
   return matchMedicationName(input);
 };
 
-const resolveMedication = (input) => {
+const buildUnresolvedMedication = (input) => {
+  const fallbackName = String(input || '').trim();
+  return {
+    rxnormCui: '',
+    displayName: fallbackName,
+    normalizedName: normalizeText(fallbackName),
+    ingredientName: fallbackName,
+    therapeuticClass: '',
+    aliases: [],
+    sideEffects: [],
+    severeSideEffects: [],
+    matched: false,
+    knowledgeSources: [],
+    matchType: 'none',
+    matchedAlias: '',
+    matchDistance: null,
+  };
+};
+
+const resolveMedicationSync = (input) => {
   const match = findDrugEntry(input);
   if (!match) {
-    const fallbackName = String(input || '').trim();
-    return {
-      rxnormCui: '',
-      displayName: fallbackName,
-      normalizedName: normalizeText(fallbackName),
-      ingredientName: fallbackName,
-      therapeuticClass: '',
-      aliases: [],
-      sideEffects: [],
-      severeSideEffects: [],
-      matched: false,
-      knowledgeSources: [],
-      matchType: 'none',
-      matchedAlias: '',
-      matchDistance: null,
-    };
+    return buildUnresolvedMedication(input);
   }
 
   return match;
+};
+
+const resolveMedication = async (input, options = {}) => {
+  const rawInput = String(input || '').trim();
+  if (!rawInput) {
+    return buildUnresolvedMedication(input);
+  }
+
+  if (options.useRxNorm === false) {
+    return resolveMedicationSync(input);
+  }
+
+  const canonical = await canonicalizeDrugName(rawInput);
+  const genericMatch = canonical.ingredientName ? findDrugEntry(canonical.ingredientName) : null;
+  const localMatch = findDrugEntry(rawInput);
+  const match = genericMatch || localMatch;
+
+  if (!match) {
+    if (canonical.ingredientName && canonical.source !== 'empty') {
+      return {
+        rxnormCui: canonical.ingredientRxcui || canonical.rxcui || '',
+        displayName: canonical.ingredientName,
+        normalizedName: normalizeLookupText(canonical.ingredientName),
+        ingredientName: canonical.ingredientName,
+        therapeuticClass: 'RxNorm IN',
+        aliases: [],
+        sideEffects: [],
+        severeSideEffects: [],
+        matched: true,
+        knowledgeSources: ['RxNorm'],
+        matchType: 'rxnorm',
+        matchedAlias: canonical.ingredientName,
+        matchDistance: 0,
+        canonicalIngredient: canonical.ingredientName,
+        normalizationSource: canonical.source,
+        originalInput: rawInput,
+      };
+    }
+    return buildUnresolvedMedication(input);
+  }
+
+  const resolved = genericMatch ? { ...genericMatch } : { ...match };
+
+  return {
+    ...resolved,
+    rxnormCui: (genericMatch && canonical.ingredientRxcui) || canonical.rxcui || resolved.rxnormCui,
+    canonicalIngredient: canonical.ingredientName || normalizeLookupText(resolved.ingredientName),
+    normalizationSource: canonical.source,
+    originalInput: rawInput,
+    knowledgeSources: Array.from(new Set([...(resolved.knowledgeSources || []), ...(genericMatch ? ['RxNorm'] : [])])),
+  };
 };
 
 const compareSeverity = (left, right) => {
@@ -475,7 +532,7 @@ const compareSeverity = (left, right) => {
 const findInteractions = (drugName, currentMedicationText) => {
   const normalizedDrug = normalizeText(drugName);
   const currentMeds = tokenizeMedicineText(currentMedicationText)
-    .map((item) => resolveMedication(item))
+    .map((item) => resolveMedicationSync(item))
     .filter((item) => item.normalizedName);
 
   const interactions = [];
@@ -521,12 +578,26 @@ const findSymptomSideEffectMatches = (symptomText, sideEffects) => {
   return sideEffects.filter((effect) => normalizedSymptoms.includes(normalizeText(effect)));
 };
 
-const enrichMedication = ({ medicineName, currentMedicationsText, symptomMatch }) => {
-  const drug = resolveMedication(medicineName);
+const enrichMedication = async ({ medicineName, currentMedicationsText, symptomMatch }) => {
+  const drug = await resolveMedication(medicineName);
   const interactionSummary = findInteractions(drug.normalizedName, currentMedicationsText);
   const sideEffectMatches = findSymptomSideEffectMatches(
     symptomMatch,
     [...drug.sideEffects, ...drug.severeSideEffects]
+  );
+  const atcRecord = resolveDrugClass(
+    drug.normalizedName,
+    drug.ingredientName,
+    drug.displayName,
+    medicineName
+  );
+
+  const knowledgeSources = Array.from(
+    new Set([
+      ...drug.knowledgeSources,
+      ...(interactionSummary.interactions.length ? ['DDInter'] : []),
+      ...(atcRecord?.atc_code ? ['WHO ATC'] : []),
+    ])
   );
 
   return {
@@ -534,8 +605,20 @@ const enrichMedication = ({ medicineName, currentMedicationsText, symptomMatch }
     rxnormMatchedName: drug.displayName,
     normalizedDrugName: drug.normalizedName,
     ingredientName: drug.ingredientName,
+    canonicalIngredient: drug.canonicalIngredient || drug.ingredientName,
+    normalizationSource: drug.normalizationSource || null,
+    originalMedicineInput: drug.originalInput || medicineName,
     therapeuticClass: drug.therapeuticClass,
     matched: drug.matched !== false,
+    whoAtc: atcRecord
+      ? {
+          atcCode: atcRecord.atc_code || '',
+          atcGroupCode: atcRecord.atc_group_code || '',
+          atcGroupName: atcRecord.atc_group_name || '',
+          atcClassLabel: atcRecord.atc_class_label || '',
+          drugClass: atcRecord.drug_class || 'unknown',
+        }
+      : null,
     commonSideEffects: drug.sideEffects,
     severeSideEffects: drug.severeSideEffects,
     sideEffectCount: drug.sideEffects.length,
@@ -545,12 +628,7 @@ const enrichMedication = ({ medicineName, currentMedicationsText, symptomMatch }
     interactionCount: interactionSummary.interactionCount,
     maxInteractionSeverity: interactionSummary.maxInteractionSeverity,
     interactions: interactionSummary.interactions,
-    knowledgeSources: Array.from(
-      new Set([
-        ...drug.knowledgeSources,
-        ...(interactionSummary.interactions.length ? ['DDInter'] : []),
-      ])
-    ),
+    knowledgeSources,
   };
 };
 
@@ -649,6 +727,7 @@ const matchMedicinesFromText = (rawText) => {
 
 module.exports = {
   resolveMedication,
+  resolveMedicationSync,
   enrichMedication,
   searchMedications,
   matchMedicinesFromText,

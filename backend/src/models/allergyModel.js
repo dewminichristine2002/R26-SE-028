@@ -1,4 +1,9 @@
 const { pool } = require('../config/db');
+const { FEEDBACK_RECORD_TYPES } = require('../config/feedbackConstants');
+const {
+  decodeFeedbackNotes,
+  serializeFeedbackNotes,
+} = require('../services/feedbackAnonymizationService');
 
 let allergyProfileColumnsEnsured = false;
 let analysisColumnsEnsured = false;
@@ -255,6 +260,9 @@ const ensureAllergyProfileColumns = async () => {
   await pool.query(
     `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS caregiver_phone TEXT NOT NULL DEFAULT ''`
   );
+  await pool.query(
+    `ALTER TABLE user_allergy_profiles ADD COLUMN IF NOT EXISTS feedback_consent_for_training BOOLEAN NOT NULL DEFAULT FALSE`
+  );
   allergyProfileColumnsEnsured = true;
 };
 
@@ -363,6 +371,7 @@ const mapProfileRow = (row) => ({
   suspectedMedicineNamesText: row.suspected_medicine_names_text || '',
   avoidedMedicinesText: row.avoided_medicines_text || '',
   antibioticPainkillerReaction: row.antibiotic_painkiller_reaction || '',
+  feedbackConsentForTraining: Boolean(row.feedback_consent_for_training),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -502,9 +511,10 @@ const upsertProfile = async (userId, payload) => {
           suspected_medicine_names_text,
           avoided_medicines_text,
           antibiotic_painkiller_reaction,
+          feedback_consent_for_training,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
         ON CONFLICT (user_id)
         DO UPDATE SET
           age = EXCLUDED.age,
@@ -522,6 +532,7 @@ const upsertProfile = async (userId, payload) => {
           suspected_medicine_names_text = EXCLUDED.suspected_medicine_names_text,
           avoided_medicines_text = EXCLUDED.avoided_medicines_text,
           antibiotic_painkiller_reaction = EXCLUDED.antibiotic_painkiller_reaction,
+          feedback_consent_for_training = EXCLUDED.feedback_consent_for_training,
           updated_at = NOW()
         RETURNING *
       `,
@@ -542,6 +553,7 @@ const upsertProfile = async (userId, payload) => {
         payload.suspectedMedicineNamesText,
         payload.avoidedMedicinesText,
         payload.antibioticPainkillerReaction,
+        payload.feedbackConsentForTraining === true,
       ]
     );
 
@@ -953,6 +965,24 @@ const listHistoryMatchesForMedicine = async (userId, { normalizedDrugName, rxnor
   return result.rows.map(mapHistoryRow);
 };
 
+const mapReactionRow = (row) => {
+  const meta = decodeFeedbackNotes(row.notes);
+  return {
+    id: row.id,
+    userId: row.user_id,
+    medicineCheckId: row.medicine_check_id,
+    symptoms: row.symptoms,
+    severity: row.severity,
+    notes: meta.notes || (meta.v === 0 ? row.notes : ''),
+    recordType: meta.recordType || FEEDBACK_RECORD_TYPES.REACTION,
+    pharmacistConfirmed: Boolean(meta.pharmacistConfirmed),
+    pharmacistRole: meta.pharmacistRole || '',
+    allergyCardId: meta.allergyCardId ?? null,
+    justification: meta.justification || '',
+    createdAt: row.created_at,
+  };
+};
+
 const listReactionLogs = async (userId) => {
   const result = await pool.query(
     `
@@ -965,18 +995,20 @@ const listReactionLogs = async (userId) => {
     [userId]
   );
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    userId: row.user_id,
-    medicineCheckId: row.medicine_check_id,
-    symptoms: row.symptoms,
-    severity: row.severity,
-    notes: row.notes,
-    createdAt: row.created_at,
-  }));
+  return result.rows.map(mapReactionRow);
 };
 
 const createReactionLog = async (userId, payload) => {
+  const notesPayload = serializeFeedbackNotes(payload.notes, {
+    recordType: payload.recordType || FEEDBACK_RECORD_TYPES.REACTION,
+    pharmacistConfirmed: payload.pharmacistConfirmed,
+    pharmacistRole: payload.pharmacistRole,
+    medicineCheckId: payload.medicineCheckId,
+    allergyCardId: payload.allergyCardId,
+    consentForTraining: payload.consentForTraining !== false,
+    justification: payload.justification,
+  });
+
   const result = await pool.query(
     `
       INSERT INTO reaction_logs (
@@ -989,20 +1021,54 @@ const createReactionLog = async (userId, payload) => {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id, user_id, medicine_check_id, symptoms, severity, notes, created_at
     `,
-    [userId, payload.medicineCheckId, payload.symptoms, payload.severity, payload.notes]
+    [userId, payload.medicineCheckId, payload.symptoms, payload.severity, notesPayload]
   );
 
-  const row = result.rows[0];
+  return mapReactionRow(result.rows[0]);
+};
+
+const listConsentedFeedbackForExport = async () => {
+  await ensureAllergyProfileColumns();
+
+  const reactions = await pool.query(
+    `
+      SELECT rl.id, rl.user_id, rl.medicine_check_id, rl.symptoms, rl.severity, rl.notes, rl.created_at
+      FROM reaction_logs rl
+      INNER JOIN user_allergy_profiles uap ON uap.user_id = rl.user_id
+      WHERE uap.feedback_consent_for_training = TRUE
+      ORDER BY rl.created_at DESC
+    `
+  );
+
+  const checks = await pool.query(
+    `
+      SELECT mch.*
+      FROM medicine_check_history mch
+      INNER JOIN user_allergy_profiles uap ON uap.user_id = mch.user_id
+      WHERE uap.feedback_consent_for_training = TRUE
+      ORDER BY mch.created_at DESC
+    `
+  );
+
   return {
-    id: row.id,
-    userId: row.user_id,
-    medicineCheckId: row.medicine_check_id,
-    symptoms: row.symptoms,
-    severity: row.severity,
-    notes: row.notes,
-    createdAt: row.created_at,
+    reactions: reactions.rows,
+    checks: checks.rows,
   };
 };
+
+const createClinicalOverrideLog = async (userId, payload) =>
+  createReactionLog(userId, {
+    medicineCheckId: payload.medicineCheckId,
+    allergyCardId: payload.allergyCardId,
+    symptoms: payload.symptoms || 'Clinical override documented',
+    severity: payload.riskLevel || 'override',
+    notes: payload.notes || '',
+    recordType: FEEDBACK_RECORD_TYPES.CLINICAL_OVERRIDE,
+    pharmacistConfirmed: payload.pharmacistConfirmed,
+    pharmacistRole: payload.pharmacistRole,
+    consentForTraining: payload.consentForTraining !== false,
+    justification: payload.justification,
+  });
 
 module.exports = {
   getProfile,
@@ -1017,4 +1083,6 @@ module.exports = {
   listHistoryMatchesForMedicine,
   listReactionLogs,
   createReactionLog,
+  createClinicalOverrideLog,
+  listConsentedFeedbackForExport,
 };

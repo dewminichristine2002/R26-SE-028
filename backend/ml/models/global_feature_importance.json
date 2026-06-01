@@ -1,0 +1,86 @@
+{
+  "method": "xgboost_gain_importance",
+  "description": "XGBoost global feature importance (gain-based MDI fallback)",
+  "features": [
+    {
+      "feature": "allergy_severity_max",
+      "mdi_importance": 0.5960509181022644
+    },
+    {
+      "feature": "sider_adr_count",
+      "mdi_importance": 0.05167112499475479
+    },
+    {
+      "feature": "atc_class_encoded_J",
+      "mdi_importance": 0.0386086069047451
+    },
+    {
+      "feature": "atc_class_encoded_C",
+      "mdi_importance": 0.03128723427653313
+    },
+    {
+      "feature": "atc_class_encoded_T",
+      "mdi_importance": 0.026975149288773537
+    },
+    {
+      "feature": "atc_class_encoded_M",
+      "mdi_importance": 0.026735415682196617
+    },
+    {
+      "feature": "drug_hepatic_metabolism",
+      "mdi_importance": 0.021584084257483482
+    },
+    {
+      "feature": "atc_class_encoded_D",
+      "mdi_importance": 0.01912243664264679
+    },
+    {
+      "feature": "atc_class_encoded_L",
+      "mdi_importance": 0.01501933578401804
+    },
+    {
+      "feature": "patient_sex_unknown",
+      "mdi_importance": 0.013768267817795277
+    },
+    {
+      "feature": "atc_class_encoded_A",
+      "mdi_importance": 0.011627898551523685
+    },
+    {
+      "feature": "atc_class_encoded_O",
+      "mdi_importance": 0.01046545896679163
+    },
+    {
+      "feature": "patient_sex_female",
+      "mdi_importance": 0.00932022649794817
+    },
+    {
+      "feature": "ddi_severity_max",
+      "mdi_importance": 0.009176285937428474
+    },
+    {
+      "feature": "atc_class_encoded_R",
+      "mdi_importance": 0.00903993844985962
+    },
+    {
+      "feature": "num_current_meds",
+      "mdi_importance": 0.008795597590506077
+    },
+    {
+      "feature": "atc_class_encoded_H",
+      "mdi_importance": 0.008606364019215107
+    },
+    {
+      "feature": "atc_class_encoded_P",
+      "mdi_importance": 0.0079681146889925
+    },
+    {
+      "feature": "nti_drug_flag",
+      "mdi_importance": 0.007781430147588253
+    },
+    {
+      "feature": "atc_class_encoded_U",
+      "mdi_importance": 0.007466430775821209
+    }
+  ]
+}
