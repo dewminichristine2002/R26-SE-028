@@ -121,25 +121,6 @@ Recommended real dataset collection:
 - Label each image with the visible tablet count.
 - Do not store patient identity in the dataset.
 
-## Starter Synthetic Dataset
-
-For demonstration and pipeline testing, generate synthetic palm/tablet images:
-
-```powershell
-cd backend\ml
-python scripts\generate_synthetic_count_dataset.py --output-dir data\intake-count --images-per-count 80 --max-count 5
-```
-
-This creates:
-
-```text
-backend/ml/data/intake-count/manifest.csv
-backend/ml/data/intake-count/images/train/...
-backend/ml/data/intake-count/images/val/...
-```
-
-Synthetic data is useful for viva demonstration, but real palm photos are needed for stronger research results.
-
 ## Model
 
 The training script uses:
@@ -161,7 +142,7 @@ classification: count_0, count_1, count_2, count_3, count_4, count_5
 ```powershell
 cd backend\ml
 python scripts\train_tablet_count_model.py `
-  --manifest data\intake-count\manifest.csv `
+  --manifest data\public\pills-detection-count-manifest-dose.csv `
   --output models\tablet_count_classifier.pt `
   --epochs 10 `
   --batch-size 32 `
@@ -220,7 +201,7 @@ For medication safety, exact accuracy is the important metric. Off-by-one is onl
 cd backend\ml
 python scripts\predict_tablet_count.py `
   --model models\tablet_count_classifier.pt `
-  --image data\intake-count\images\val\count_2\sample.jpg `
+  --image data\public\pills-detection-dataset\images\val\sample.jpg `
   --cpu
 ```
 
@@ -252,7 +233,6 @@ The analyzer also checks the project model folder automatically and uses the fir
 backend/ml/models/tablet_count_classifier.pt
 backend/ml/models/tablet_count_classifier_public.pt
 backend/ml/models/tablet_count_classifier_public_smoke.pt
-backend/ml/models/tablet_count_classifier_smoke.pt
 ```
 
 Set `INTAKE_COUNT_MODEL_PATH` when you want to force a specific trained model.
@@ -267,28 +247,7 @@ If the trained model confidence is below that value, the backend falls back to i
 
 ## Local Smoke Run
 
-A small synthetic starter dataset has been generated:
-
-```text
-backend/ml/data/intake-count/manifest.csv
-```
-
-A one-epoch smoke model was trained and saved at:
-
-```text
-backend/ml/models/tablet_count_classifier_smoke.pt
-```
-
-Smoke training result:
-
-```text
-validation accuracy: 25.00%
-off-by-one accuracy: 50.00%
-```
-
-This smoke model proves the training pipeline runs. It is not production quality because it uses only a tiny synthetic dataset.
-
-A public-dataset smoke model was also trained from the pill detection dataset:
+A public-dataset smoke model was trained from the pill detection dataset:
 
 ```text
 backend/ml/models/tablet_count_classifier_public_smoke.pt

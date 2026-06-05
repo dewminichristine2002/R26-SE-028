@@ -237,7 +237,7 @@ def _resolve_model_path() -> str:
     for name in (
         "tablet_count_classifier.pt",
         "tablet_count_classifier_public.pt",
-        "tablet_count_classifier_smoke.pt",
+        "tablet_count_classifier_public_smoke.pt",
     ):
         candidate = model_dir / name
         if candidate.exists():

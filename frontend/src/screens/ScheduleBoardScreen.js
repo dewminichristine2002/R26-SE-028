@@ -1071,23 +1071,24 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         const confidenceText = Number.isFinite(Number(analysis?.confidence))
           ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
           : '';
-        const sourceText = analysis?.countSource === 'ai-model'
-          ? 'AI model detected'
-          : analysis?.countSource === 'pill-detector'
-          ? 'Pill detector counted'
-          : String(analysis?.countSource || '').startsWith('hybrid')
-          ? 'Hybrid check detected'
-          : 'Image processing detected';
         const comparisonStatus = analysis?.status || getCountComparisonStatus(count, expectedCount);
         const modelConfidence = Number(analysis?.modelAnalysis?.confidence) || 0;
         const modelThreshold = Number(analysis?.modelAnalysis?.confidenceThreshold) || 0.7;
+        const isAiCountSource = analysis?.countSource === 'ai-model'
+          || analysis?.countSource === 'pill-detector'
+          || String(analysis?.countSource || '').startsWith('hybrid');
         const modelText = analysis?.modelAnalysis?.available && analysis?.countSource !== 'ai-model' && modelConfidence >= modelThreshold
           ? analysis?.modelAnalysis?.agreement === false
             ? ` AI model estimated ${formatTabletCount(analysis.modelAnalysis.count)}. Please confirm.`
             : ' AI model confirmed.'
+          : isAiCountSource
+          ? ' AI model confirmed.'
+          : '';
+        const sourceText = analysis?.countSource === 'image-processing'
+          ? ' Image processing fallback used.'
           : '';
         setTabletCountAnalysisMessage(
-          `${sourceText} ${formatTabletCount(count)} tablet${count === 1 ? '' : 's'}${confidenceText}. ${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${modelText}`
+          `${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${modelText}${confidenceText}.${sourceText}`
         );
       } else {
         setDetectedTabletCount(0);

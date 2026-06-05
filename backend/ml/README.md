@@ -128,29 +128,18 @@ python scripts\train_tablet_count_model.py `
   --cpu
 ```
 
-## Generate Starter Dataset
-
-This creates a small synthetic dataset for demonstrating the training pipeline:
-
-```powershell
-cd backend\ml
-python scripts\generate_synthetic_count_dataset.py --output-dir data\intake-count --images-per-count 80 --max-count 5
-```
-
-For real research results, replace or extend the synthetic data with consent-based palm photos from test users.
-
 ## Train
 
 ```powershell
 cd backend\ml
-python scripts\train_tablet_count_model.py --manifest data\intake-count\manifest.csv --output models\tablet_count_classifier.pt --epochs 10 --pretrained --cpu
+python scripts\train_tablet_count_model.py --manifest data\public\pills-detection-count-manifest-dose.csv --output models\tablet_count_classifier.pt --epochs 10 --pretrained --cpu
 ```
 
 ## Predict
 
 ```powershell
 cd backend\ml
-python scripts\predict_tablet_count.py --model models\tablet_count_classifier.pt --image data\intake-count\images\val\count_2\sample.jpg --cpu
+python scripts\predict_tablet_count.py --model models\tablet_count_classifier.pt --image data\public\pills-detection-dataset\images\val\sample.jpg --cpu
 ```
 
 ## Use A Trained Model In The Backend
