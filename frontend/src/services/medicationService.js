@@ -60,6 +60,12 @@ export const medicationService = {
     return response.data?.medications || [];
   },
 
+  async identifyTabletByPhoto(imageBase64) {
+    const headers = await getAuthHeaders();
+    const response = await axios.post(`${API_BASE_URL}/medications/identify-photo`, { imageBase64 }, { headers });
+    return response.data;
+  },
+
   async getMedicationById(id) {
     const headers = await getAuthHeaders();
     const response = await axios.get(`${API_BASE_URL}/medications/${id}`, { headers });

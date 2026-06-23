@@ -5,6 +5,7 @@ backend/ml/runs/
 backend/ml/data/public/
 backend/ml/data/intake-count/images/
 backend/ml/models/*.pt
+backend/ml/models/*.npz
 Ultralytics/
 yolo11n.pt
 runs/

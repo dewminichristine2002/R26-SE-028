@@ -3,13 +3,14 @@ import { API_BASE_URL } from './apiConfig';
 import { getAuthHeaders } from './authService';
 
 export const intakeMonitoringService = {
-  async analyzePalmPhoto({ imageBase64, expectedCount }) {
+  async analyzePalmPhoto({ imageBase64, expectedCount, expectedMedicines = [] }) {
     const headers = await getAuthHeaders();
     const response = await axios.post(
       `${API_BASE_URL}/intake-monitoring/analyze-palm`,
       {
         imageBase64,
         expectedCount,
+        expectedMedicines,
       },
       { headers }
     );

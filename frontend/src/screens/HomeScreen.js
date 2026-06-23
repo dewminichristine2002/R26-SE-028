@@ -9,6 +9,7 @@ import MedicineStockScreen from './MedicineStockScreen';
 import ScheduleBoardScreen from './ScheduleBoardScreen';
 import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
+import TabletIdentifierScreen from './TabletIdentifierScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
 const elderMedsLogo = require('../../assets/logo.png');
@@ -140,6 +141,15 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
       borderColor: '#a7dce4',
     },
     {
+      title: 'Tablet Identifier',
+      subtitle: 'Take photo to find name',
+      helper: 'Photo',
+      icon: 'ID',
+      accentColor: '#2b6f9d',
+      backgroundColor: '#eef8ff',
+      borderColor: '#c9e5f5',
+    },
+    {
       title: 'Safety Center',
       subtitle: 'See safety alerts',
       helper: 'Safe',
@@ -183,6 +193,11 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
     if (menuItem === 'Medicine Stock') {
       setActiveReminderView('medicine-stock');
+      return;
+    }
+
+    if (menuItem === 'Tablet Identifier') {
+      setActiveReminderView('tablet-identifier');
       return;
     }
 
@@ -798,6 +813,10 @@ const HomeScreen = ({ user, onOpenProfile, onLogout, launchIntent }) => {
 
     if (activeReminderView === 'medicine-stock') {
       return <MedicineStockScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+    }
+
+    if (activeReminderView === 'tablet-identifier') {
+      return <TabletIdentifierScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
     }
 
     if (activeReminderView === 'schedule-board') {
