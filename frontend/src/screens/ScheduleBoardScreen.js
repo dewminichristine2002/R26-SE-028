@@ -373,12 +373,26 @@ const getVerificationEntries = (entry) => {
   return entry ? [entry] : [];
 };
 
+const getScheduledTabletCount = (entry) => {
+  const scheduledCount = Number(entry?.scheduledTabletCount);
+  if (Number.isFinite(scheduledCount) && scheduledCount > 0) {
+    return scheduledCount;
+  }
+
+  const doseCount = Number(entry?.dailyAmount);
+  if (Number.isFinite(doseCount) && doseCount > 0) {
+    return doseCount;
+  }
+
+  return 1;
+};
+
 const getExpectedTabletCount = (entry) => {
   const entries = getVerificationEntries(entry);
   if (entries.length > 1 || entry?.isGroupIntake) {
-    return entries.reduce((total, item) => total + (Number(item?.dailyAmount) || 1), 0);
+    return entries.reduce((total, item) => total + getScheduledTabletCount(item), 0);
   }
-  return Math.max(0.5, Number(entry?.dailyAmount) || 1);
+  return Math.max(0.5, getScheduledTabletCount(entry));
 };
 
 const getCountComparisonStatus = (count, expectedCount) => {
@@ -409,20 +423,22 @@ const getCountComparisonLabel = (status) => {
 const getCountComparisonMessage = (status, count, expectedCount) => {
   const expectedText = formatTabletCount(expectedCount);
   const countText = formatTabletCount(count);
+  const expectedUnit = Number(expectedCount) === 1 ? 'tablet' : 'tablets';
+  const countUnit = Number(count) === 1 ? 'tablet' : 'tablets';
   if (status === 'okay') {
-    return `Count is correct: ${countText} tablet${Number(count) === 1 ? '' : 's'}.`;
+    return `Count is correct: ${countText} ${countUnit}.`;
   }
   if (status === 'overdose') {
-    return `Overdose: detected ${countText}, expected ${expectedText}.`;
+    return `Possible overdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   if (status === 'underdose') {
-    return `Underdose: detected ${countText}, expected ${expectedText}.`;
+    return `Possible underdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
-  return `Expected ${expectedText} tablet${Number(expectedCount) === 1 ? '' : 's'}.`;
+  return `This dose needs ${expectedText} ${expectedUnit}.`;
 };
 
 const getIntakeAmountText = (entry) => {
-  const tabletCount = Number(entry?.dailyAmount) || 1;
+  const tabletCount = getScheduledTabletCount(entry);
   const formattedCount = formatTabletCount(tabletCount);
   const unit = tabletCount === 1 ? 'tablet' : 'tablets';
   return `💊 Take ${formattedCount} ${unit} for this intake`;
@@ -463,6 +479,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   const [intakeVerificationPhotoUri, setIntakeVerificationPhotoUri] = useState('');
   const [intakeVerificationPhotoBase64, setIntakeVerificationPhotoBase64] = useState('');
   const [detectedTabletCount, setDetectedTabletCount] = useState(null);
+  const [tabletCountConfidence, setTabletCountConfidence] = useState(null);
   const [tabletCountAnalysisMessage, setTabletCountAnalysisMessage] = useState('');
   const [isAnalyzingTabletCount, setIsAnalyzingTabletCount] = useState(false);
   const [verifiedTabletCount, setVerifiedTabletCount] = useState(1);
@@ -577,6 +594,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           medicineName: medicine.medicine_name,
           dosageMg: medicine.dosage_mg,
           dailyAmount: medicine.daily_amount,
+          scheduledTabletCount: Math.max(0.5, Number(medicine.daily_amount) || 1),
           timing: medicine.intake_timing,
           color: medicine.selected_color || medicine.medicine_color || '',
           shape: medicine.selected_shape || medicine.medicine_shape || '',
@@ -723,7 +741,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
 
   const nextDoseIntakeSummary = useMemo(() => {
     const medicineCount = visibleNextDoseGroup.length;
-    const tabletCount = visibleNextDoseGroup.reduce((total, entry) => total + (Number(entry?.dailyAmount) || 1), 0);
+    const tabletCount = visibleNextDoseGroup.reduce((total, entry) => total + getScheduledTabletCount(entry), 0);
 
     return {
       medicineCount,
@@ -760,7 +778,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       return;
     }
 
-    const doseCount = Number(entry?.dailyAmount) || 1;
+    const doseCount = getScheduledTabletCount(entry);
     const doseText = doseCount === 1 ? '1 tablet' : `${doseCount} tablets`;
     const colorText = entry?.color ? `Color ${entry.color}.` : 'Color not specified.';
     const shapeText = entry?.shape ? `Shape ${entry.shape}.` : 'Shape not specified.';
@@ -791,7 +809,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     }
 
     const summary = visibleNextDoseGroup.map((entry) => {
-      const doseCount = Number(entry?.dailyAmount) || 1;
+      const doseCount = getScheduledTabletCount(entry);
       const doseText = doseCount === 1 ? '1 tablet' : `${doseCount} tablets`;
       return `${entry.medicineName}, ${entry.dosageMg} milligrams, ${doseText}, color ${entry.color || 'not specified'}, shape ${entry.shape || 'not specified'}.`;
     }).join(' ');
@@ -1039,6 +1057,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     setIntakeVerificationPhotoUri('');
     setIntakeVerificationPhotoBase64('');
     setDetectedTabletCount(null);
+    setTabletCountConfidence(null);
     setTabletCountAnalysisMessage('');
     setIsAnalyzingTabletCount(false);
     setVerifiedTabletCount(1);
@@ -1067,9 +1086,10 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       const count = Number(analysis?.detectedCount);
       if (Number.isFinite(count) && count > 0) {
         setDetectedTabletCount(count);
+        setTabletCountConfidence(Number.isFinite(Number(analysis?.confidence)) ? Number(analysis.confidence) : null);
         setVerifiedTabletCount(count);
         const confidenceText = Number.isFinite(Number(analysis?.confidence))
-          ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
+          ? ` Confidence: ${Math.round(Number(analysis.confidence) * 100)}%.`
           : '';
         const comparisonStatus = analysis?.status || getCountComparisonStatus(count, expectedCount);
         const modelConfidence = Number(analysis?.modelAnalysis?.confidence) || 0;
@@ -1088,14 +1108,16 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           ? ' Image processing fallback used.'
           : '';
         setTabletCountAnalysisMessage(
-          `${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${modelText}${confidenceText}.${sourceText}`
+          `${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${confidenceText}${modelText}${sourceText}`
         );
       } else {
         setDetectedTabletCount(0);
+        setTabletCountConfidence(null);
         setTabletCountAnalysisMessage(analysis?.error || 'Could not clearly count tablets. Retake the palm photo with all tablets separated.');
       }
     } catch (error) {
       setDetectedTabletCount(null);
+      setTabletCountConfidence(null);
       setTabletCountAnalysisMessage(error?.response?.data?.error || error?.message || 'Could not analyze photo. Retake the palm photo with all tablets separated.');
     } finally {
       setIsAnalyzingTabletCount(false);
@@ -1122,7 +1144,11 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setIntakeVerificationPhotoUri(asset?.uri || '');
         setIntakeVerificationPhotoBase64(asset?.base64 || '');
         setDetectedTabletCount(null);
+        setTabletCountConfidence(null);
         setTabletCountAnalysisMessage('');
+        setVerificationHandToMouth(false);
+        setMotionVideoUri('');
+        setMotionAnalysisMessage('');
         await analyzePalmPhoto(entryOverride, asset?.base64 || '');
       }
     } catch (error) {
@@ -1146,6 +1172,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     setVerificationSwallowComplete(false);
     setVerificationSpeakMessage(options?.speakMessage || '');
     setDetectedTabletCount(null);
+    setTabletCountConfidence(null);
     setTabletCountAnalysisMessage('');
     setIntakeVerificationPhotoBase64('');
     setMotionVideoUri('');
@@ -1160,6 +1187,14 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   };
 
   const recordAndAnalyzeIntakeMotion = async () => {
+    const expectedCount = getExpectedTabletCount(intakeVerificationEntry);
+    const countMatches = Math.abs(Number(verifiedTabletCount) - expectedCount) <= 0.001;
+
+    if (!intakeVerificationPhotoUri || detectedTabletCount == null || isAnalyzingTabletCount || !countMatches) {
+      Alert.alert('Correct Tablet Count Needed', 'Please complete the AI tablet count first. Record Motion unlocks only when the detected count matches this scheduled dose.');
+      return;
+    }
+
     try {
       setIsAnalyzingMotionVideo(true);
       setVerificationHandToMouth(false);
@@ -1174,8 +1209,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       const pickerResult = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         cameraType: ImagePicker.CameraType?.front || 'front',
-        videoMaxDuration: 8,
-        quality: 0.7,
+        videoMaxDuration: 10,
+        quality: 0.8,
       });
 
       if (pickerResult.canceled || !pickerResult.assets?.length) {
@@ -1203,30 +1238,35 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         swallowConfirmed: verificationSwallowComplete,
       });
 
-      const motionAvailable = analysis?.motionAvailable ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected);
+      const motionAvailable = analysis?.motionAvailable ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected && !!analysis?.swallowDetected);
       setVerificationHandToMouth(!!motionAvailable);
 
       const confidenceText = Number.isFinite(Number(analysis?.confidence))
         ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
         : '';
       if (motionAvailable) {
-        setMotionAnalysisMessage(`Camera detected hand-to-mouth intake motion${confidenceText}.`);
+        setMotionAnalysisMessage(`Camera detected hand-to-mouth and swallowing motion${confidenceText}.`);
       } else {
-        const frameHint = analysis?.extractionMode === 'opencv-motion-fallback'
-          ? ` Motion frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
+        const frameHint = Number.isFinite(Number(analysis?.handFrameCount)) || Number.isFinite(Number(analysis?.faceFrameCount))
+          ? ` Hand frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
           : '';
         setMotionAnalysisMessage(
           analysis?.message ||
             analysis?.error ||
-            `Motion not clear${confidenceText}.${frameHint} Record again with face, hand, and mouth visible.`
+            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, swallow, then stop recording.`
         );
       }
     } catch (error) {
       setVerificationHandToMouth(false);
+      const responseData = error?.response?.data || {};
+      const frameHint = Number.isFinite(Number(responseData?.handFrameCount)) || Number.isFinite(Number(responseData?.faceFrameCount))
+        ? ` Hand frames: ${responseData?.handFrameCount || 0}. Face frames: ${responseData?.faceFrameCount || 0}.`
+        : '';
       setMotionAnalysisMessage(
-        error?.response?.data?.error ||
+        responseData?.message ||
+          (responseData?.error ? `${responseData.error}${frameHint}` : '') ||
           error?.message ||
-          'Could not analyze intake motion. Record again with face and hand visible.'
+          'Could not analyze intake motion. Record again from chest level, move the hand to the mouth, swallow, then stop recording.'
       );
     } finally {
       setIsAnalyzingMotionVideo(false);
@@ -1240,13 +1280,14 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       return;
     }
 
-    const expectedCount = entries.reduce((total, entry) => total + (Number(entry?.dailyAmount) || 1), 0);
+    const expectedCount = entries.reduce((total, entry) => total + getScheduledTabletCount(entry), 0);
     const groupEntry = {
       isGroupIntake: true,
       entries,
       medicineName: 'Current intake',
       dosageMg: '',
       dailyAmount: expectedCount,
+      scheduledTabletCount: expectedCount,
       color: '',
       shape: '',
       rowLabel: entries[0]?.rowLabel,
@@ -1263,6 +1304,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     setVerificationSwallowComplete(false);
     setVerificationSpeakMessage(`I got all medicines for ${entries.length} medicines.`);
     setDetectedTabletCount(null);
+    setTabletCountConfidence(null);
     setTabletCountAnalysisMessage('');
     setIntakeVerificationPhotoBase64('');
     setMotionVideoUri('');
@@ -1619,6 +1661,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     const countStatus = getCountComparisonStatus(verifiedTabletCount, expectedCount);
     const verificationEntries = getVerificationEntries(intakeVerificationEntry);
     const isGroupVerification = intakeVerificationEntry?.isGroupIntake || verificationEntries.length > 1;
+    const countReady = !!intakeVerificationPhotoUri && detectedTabletCount != null && !isAnalyzingTabletCount;
+    const canRecordMotion = countReady && countMatches;
     const motionDetected = !!verificationHandToMouth && !isAnalyzingMotionVideo;
     const canMarkTaken = !!intakeVerificationPhotoUri && countMatches && motionDetected;
 
@@ -1667,7 +1711,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                 <View style={styles.verificationMedicineList}>
                   {verificationEntries.map((entry) => (
                     <Text key={entry.stableId || getEntryStatusKey(entry)} style={[styles.verificationMedicineListText, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
-                      {entry.medicineName}: {formatTabletCount(Number(entry?.dailyAmount) || 1)} tablet{Number(entry?.dailyAmount) === 1 ? '' : 's'}
+                      {entry.medicineName}: {formatTabletCount(getScheduledTabletCount(entry))} tablet{getScheduledTabletCount(entry) === 1 ? '' : 's'}
                     </Text>
                   ))}
                 </View>
@@ -1717,7 +1761,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               )}
               {detectedTabletCount != null && (
                 <Text style={styles.verificationAnalysisMeta}>
-                  AI count: {formatTabletCount(detectedTabletCount)} - {getCountComparisonLabel(getCountComparisonStatus(detectedTabletCount, expectedCount))}
+                  AI count: detected {formatTabletCount(detectedTabletCount)}, expected {formatTabletCount(expectedCount)} - {getCountComparisonLabel(getCountComparisonStatus(detectedTabletCount, expectedCount))}
+                  {Number.isFinite(Number(tabletCountConfidence)) ? ` - Confidence ${Math.round(Number(tabletCountConfidence) * 100)}%` : ''}
                 </Text>
               )}
             </View>
@@ -1737,12 +1782,12 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           <View style={styles.verificationStepCard}>
             <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Camera intake motion</Text>
             <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
-              Record a short video with your face, hand, and mouth visible. The camera check detects hand-to-mouth motion.
+              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, move it to your mouth, swallow, then stop recording.
             </Text>
             <TouchableOpacity
-              style={[styles.verificationCameraButton, isAnalyzingMotionVideo && styles.verificationCompleteButtonDisabled]}
+              style={[styles.verificationCameraButton, (!canRecordMotion || isAnalyzingMotionVideo) && styles.verificationCompleteButtonDisabled]}
               onPress={recordAndAnalyzeIntakeMotion}
-              disabled={isAnalyzingMotionVideo}
+              disabled={!canRecordMotion || isAnalyzingMotionVideo}
             >
               {isAnalyzingMotionVideo ? (
                 <ActivityIndicator color="#ffffff" size="small" />
@@ -1752,13 +1797,16 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                 </Text>
               )}
             </TouchableOpacity>
+            {!canRecordMotion && !isAnalyzingMotionVideo && (
+              <Text style={styles.verificationReadOnlyCountText}>Record Motion unlocks after the AI tablet count matches the scheduled dose.</Text>
+            )}
             <View style={[styles.verificationCheckRow, verificationHandToMouth && styles.verificationCheckRowActive]}>
               <Text style={styles.verificationCheckIcon}>{verificationHandToMouth ? '✓' : '○'}</Text>
               <Text style={[styles.verificationCheckText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
-                Camera detected hand-to-mouth motion
+                Camera detected hand-to-mouth and swallowing
               </Text>
             </View>
-            {!verificationHandToMouth && !isAnalyzingMotionVideo && (
+            {canRecordMotion && !verificationHandToMouth && !isAnalyzingMotionVideo && (
               <Text style={styles.verificationReadOnlyCountText}>Mark Taken unlocks after this camera motion check passes.</Text>
             )}
             {!!motionAnalysisMessage && (

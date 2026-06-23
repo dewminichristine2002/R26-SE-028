@@ -162,8 +162,20 @@ def main() -> None:
         print(f"Wrote {len(frames)} fallback motion frames to {args.output}")
         return
 
-    hands = mp.solutions.hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.55)
-    face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, min_detection_confidence=0.55)
+    hands = mp.solutions.hands.Hands(
+        static_image_mode=False,
+        max_num_hands=1,
+        min_detection_confidence=0.45,
+        min_tracking_confidence=0.45,
+    )
+    face_mesh = mp.solutions.face_mesh.FaceMesh(
+        static_image_mode=False,
+        max_num_faces=1,
+        min_detection_confidence=0.45,
+        min_tracking_confidence=0.45,
+    )
+    face_frame_count = 0
+    hand_frame_count = 0
 
     try:
         while True:
@@ -185,14 +197,23 @@ def main() -> None:
                     "wrist": {"x": hand[0].x, "y": hand[0].y},
                     "indexTip": {"x": hand[8].x, "y": hand[8].y},
                     "thumbTip": {"x": hand[4].x, "y": hand[4].y},
+                    "middleTip": {"x": hand[12].x, "y": hand[12].y},
+                    "pinkyTip": {"x": hand[20].x, "y": hand[20].y},
                 }
+                hand_frame_count += 1
 
             if face_result.multi_face_landmarks:
                 face = face_result.multi_face_landmarks[0].landmark
                 mouth_left = face[61]
                 mouth_right = face[291]
+                upper_lip = face[13]
+                lower_lip = face[14]
                 left_cheek = face[234]
                 right_cheek = face[454]
+                cheek_width = max(
+                    0.001,
+                    ((left_cheek.x - right_cheek.x) ** 2 + (left_cheek.y - right_cheek.y) ** 2) ** 0.5,
+                )
                 output_frame["face"] = {
                     "mouthCenter": {
                         "x": (mouth_left.x + mouth_right.x) / 2,
@@ -200,7 +221,9 @@ def main() -> None:
                     },
                     "leftCheek": {"x": left_cheek.x, "y": left_cheek.y},
                     "rightCheek": {"x": right_cheek.x, "y": right_cheek.y},
+                    "mouthOpenRatio": abs(lower_lip.y - upper_lip.y) / cheek_width,
                 }
+                face_frame_count += 1
 
             frames.append(output_frame)
             frame_index += 1
@@ -210,7 +233,18 @@ def main() -> None:
         face_mesh.close()
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps({"frames": frames}, indent=2), encoding="utf-8")
+    args.output.write_text(
+        json.dumps(
+            {
+                "frames": frames,
+                "extractionMode": "mediapipe",
+                "faceFrameCount": face_frame_count,
+                "handFrameCount": hand_frame_count,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(f"Wrote {len(frames)} landmark frames to {args.output}")
 
 

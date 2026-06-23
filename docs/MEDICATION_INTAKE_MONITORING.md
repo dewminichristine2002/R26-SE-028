@@ -46,9 +46,11 @@ The project uses **no dataset and no training** for intake motion monitoring. Th
 1. Extract hand landmarks and face/mouth landmarks with MediaPipe when available.
 2. If MediaPipe is not installed, use the OpenCV motion fallback to estimate the moving hand position.
 3. Calculate the normalized distance between the hand and mouth over time.
-4. Detect hand-to-mouth movement when the hand gets clearly closer to the mouth.
-5. Detect a mouth pause when the hand stays near the mouth for a short time.
-6. Ask the user/caregiver to confirm swallowing, because swallowing is hard to prove safely from a simple phone camera.
+4. Smooth short landmark jitter so a single noisy camera frame does not fail the check.
+5. Detect hand-to-mouth movement from the full clip, including cases where the hand starts closer to the face.
+6. Detect a mouth pause when the hand stays near the mouth for about one second.
+7. Detect swallow-like mouth activity from MediaPipe mouth opening/closing landmarks after the hand reaches the mouth.
+8. Mark the camera motion as available only when hand-to-mouth movement and swallowing activity are both detected.
 
 Backend endpoint:
 
@@ -88,7 +90,7 @@ Camera video landmark extraction helper:
 backend/scripts/extract_mediapipe_motion_landmarks.py
 ```
 
-The mobile screen uses the camera result for the hand-to-mouth check. Swallowing remains a manual confirmation step.
+The mobile screen uses the camera result for the hand-to-mouth and swallowing check. Automatic swallowing detection needs MediaPipe face landmarks; the OpenCV fallback can still explain hand/face tracking failures but cannot confirm swallowing.
 
 These checks can later be replaced by camera-based motion models.
 

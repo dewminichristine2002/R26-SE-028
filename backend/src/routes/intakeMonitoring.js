@@ -126,8 +126,8 @@ const extractMotionFramesFromVideo = async ({ videoBase64, extension = 'mp4' }) 
     await fs.writeFile(videoPath, Buffer.from(cleanBase64, 'base64'));
     await runPythonArgsScript(
       'extract_mediapipe_motion_landmarks.py',
-      ['--video', videoPath, '--output', outputPath, '--frame-step', '3'],
-      45000
+      ['--video', videoPath, '--output', outputPath, '--frame-step', '2'],
+      60000
     );
     const parsed = JSON.parse(await fs.readFile(outputPath, 'utf8'));
     return {
