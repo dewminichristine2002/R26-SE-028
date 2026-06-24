@@ -422,6 +422,9 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
 
     map.set(key, {
       medicineName: item?.medicineName || 'Medicine',
+      dosageMg: item?.dosageMg,
+      color: item?.color || '',
+      shape: item?.shape || '',
       count,
       confidence: Number(item?.confidence) || 0,
     });
@@ -441,6 +444,9 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
 
     map.set(key, {
       medicineName: match?.medicineName || 'Medicine',
+      dosageMg: match?.dosageMg,
+      color: match?.color || object?.detectedColor || '',
+      shape: match?.shape || object?.detectedShape || '',
       count: 1,
       confidence,
     });
@@ -452,6 +458,9 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
     if (key && Number(match?.confidence) >= 0.28) {
       map.set(key, {
         medicineName: match?.medicineName || 'Medicine',
+        dosageMg: match?.dosageMg,
+        color: match?.color || identityAnalysis?.detectedColor || '',
+        shape: match?.shape || identityAnalysis?.detectedShape || '',
         count: 1,
         confidence: Number(match?.confidence) || 0,
       });
@@ -496,6 +505,9 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
     return {
       key: item.stableId || getEntryStatusKey(item),
       medicineName: item.medicineName || 'Medicine',
+      dosageMg: item.dosageMg,
+      color: item.color || '',
+      shape: item.shape || '',
       requiredCount,
       detectedCount: medicineDetectedCount,
       missingCount: Math.max(0, requiredCount - medicineDetectedCount),
@@ -514,6 +526,9 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
     .map(([key, detected]) => ({
       key: `extra-${key}`,
       medicineName: detected?.medicineName || 'Medicine',
+      dosageMg: detected?.dosageMg,
+      color: detected?.color || '',
+      shape: detected?.shape || '',
       requiredCount: 0,
       detectedCount: Number(detected?.count) || 0,
       missingCount: 0,
@@ -562,6 +577,9 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
     return {
       key: item?.key || `${item?.id || 'medicine'}-${index}`,
       medicineName: item?.medicineName || 'Medicine',
+      dosageMg: item?.dosageMg,
+      color: item?.color || '',
+      shape: item?.shape || '',
       requiredCount,
       detectedCount,
       missingCount,
@@ -1987,30 +2005,51 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               )}
               {medicineAvailabilityItems.length > 0 && (
                 <View style={styles.verificationAvailabilityList}>
-                  {medicineAvailabilityItems.map((item) => (
-                    <View key={item.key} style={styles.verificationAvailabilityRow}>
-                      <View
-                        style={[
-                          styles.verificationAvailabilityDot,
-                          item.available
-                            ? styles.verificationAvailabilityDotGood
-                            : styles.verificationAvailabilityDotBad,
-                        ]}
-                      />
-                      <View style={styles.verificationAvailabilityTextWrap}>
-                        <Text style={styles.verificationAvailabilityName}>
-                          {item.medicineName} - {item.label}
-                        </Text>
-                        <Text style={styles.verificationAvailabilityMeta}>
-                          Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
-                          {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
-                          {item.missingCount > 0 ? ` - missing ${formatTabletCount(item.missingCount)}` : ''}
-                          {item.extraCount > 0 ? ` - extra ${formatTabletCount(item.extraCount)}` : ''}
-                          {item.reason ? ` - ${item.reason}` : ''}
-                        </Text>
+                  {medicineAvailabilityItems.map((item) => {
+                    const needsAttention = item.status === 'overdose'
+                      || item.status === 'unexpected'
+                      || item.status === 'underdose'
+                      || item.label === 'Missing'
+                      || item.label === 'Overdose';
+                    const colorText = item.color || 'unknown';
+                    const shapeText = item.shape || 'unknown';
+
+                    return (
+                      <View key={item.key} style={styles.verificationAvailabilityRow}>
+                        {needsAttention ? (
+                          <View style={styles.verificationAvailabilityAppearanceWrap}>
+                            {renderAppearanceIcon(item.shape, item.color)}
+                          </View>
+                        ) : (
+                          <View
+                            style={[
+                              styles.verificationAvailabilityDot,
+                              item.available
+                                ? styles.verificationAvailabilityDotGood
+                                : styles.verificationAvailabilityDotBad,
+                            ]}
+                          />
+                        )}
+                        <View style={styles.verificationAvailabilityTextWrap}>
+                          <Text style={styles.verificationAvailabilityName}>
+                            {item.medicineName} - {item.label}
+                          </Text>
+                          {needsAttention ? (
+                            <Text style={styles.verificationAvailabilityAppearanceText}>
+                              Color: {colorText} - Shape: {shapeText}
+                            </Text>
+                          ) : null}
+                          <Text style={styles.verificationAvailabilityMeta}>
+                            Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
+                            {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
+                            {item.missingCount > 0 ? ` - missing ${formatTabletCount(item.missingCount)}` : ''}
+                            {item.extraCount > 0 ? ` - extra ${formatTabletCount(item.extraCount)}` : ''}
+                            {item.reason ? ` - ${item.reason}` : ''}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -2572,6 +2611,9 @@ const styles = StyleSheet.create({
   verificationAvailabilityDotBad: {
     backgroundColor: '#9b3d47',
   },
+  verificationAvailabilityAppearanceWrap: {
+    marginRight: 9,
+  },
   verificationAvailabilityTextWrap: {
     flex: 1,
   },
@@ -2580,6 +2622,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
+  },
+  verificationAvailabilityAppearanceText: {
+    color: '#2f5d50',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '900',
+    marginTop: 1,
   },
   verificationAvailabilityMeta: {
     color: '#74665b',

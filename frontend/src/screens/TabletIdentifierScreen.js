@@ -1,7 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { medicationService } from '../services/medicationService';
+import { routineService } from '../services/routineService';
+
+const SLOT_TO_KEY = {
+  BREAKFAST: 'breakfast',
+  LUNCH: 'lunch',
+  DINNER: 'dinner',
+  'BEFORE SLEEP': 'sleep',
+};
+
+const SLOT_LABELS = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  sleep: 'Before Sleep',
+};
+
+const SLOT_ORDER = ['breakfast', 'lunch', 'dinner', 'sleep'];
 
 const colorMap = {
   red: '#e74c3c',
@@ -52,17 +69,220 @@ const getDisplayName = (match) => {
   return match.medicineName;
 };
 
+const normalizeSlotToken = (token = '') => String(token || '').toUpperCase().replace(/[_-]/g, ' ').trim();
+
+const parseTakeWith = (takeWithValue = '') =>
+  String(takeWithValue || '')
+    .split(',')
+    .map((part) => normalizeSlotToken(part))
+    .filter(Boolean);
+
+const parseRoutineTimeToDate = (timeStr, referenceDate = new Date()) => {
+  if (!timeStr || typeof timeStr !== 'string') {
+    return null;
+  }
+
+  const normalized = timeStr.trim().replace(/\./g, ':').replace(/\s+/g, ' ');
+  const now = new Date(referenceDate);
+
+  const twelveHourMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (twelveHourMatch) {
+    let hours = Number(twelveHourMatch[1]);
+    const minutes = Number(twelveHourMatch[2]);
+    const period = twelveHourMatch[3].toUpperCase();
+
+    if (period === 'PM' && hours < 12) {
+      hours += 12;
+    }
+    if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
+    const date = new Date(now);
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  }
+
+  const twentyFourHourMatch = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (twentyFourHourMatch) {
+    const hours = Number(twentyFourHourMatch[1]);
+    const minutes = Number(twentyFourHourMatch[2]);
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      const date = new Date(now);
+      date.setHours(hours, minutes, 0, 0);
+      return date;
+    }
+  }
+
+  return null;
+};
+
+const getReminderOffsetMinutes = (timingValue = '') => {
+  const normalized = String(timingValue || '').toLowerCase();
+  if (normalized.includes('before')) {
+    return -30;
+  }
+  return 30;
+};
+
+const getTakeTimeRuleLabel = (timingValue = '') => {
+  const normalized = String(timingValue || '').toLowerCase();
+  if (normalized.includes('before')) {
+    return 'Before meal -30 mins';
+  }
+  return 'After meal +30 mins';
+};
+
+const applyMinutesOffset = (sourceDate, minutesOffset) => {
+  if (!sourceDate) {
+    return null;
+  }
+
+  const next = new Date(sourceDate);
+  next.setMinutes(next.getMinutes() + minutesOffset);
+  return next;
+};
+
+const formatDateTo12Hour = (dateValue) => {
+  if (!dateValue) {
+    return '--:--';
+  }
+
+  return dateValue.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+const formatTabletCount = (count) => {
+  const normalized = Number(count);
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return '0';
+  }
+
+  if (Math.abs(normalized - 0.5) < 0.001) {
+    return '1/2';
+  }
+
+  if (Number.isInteger(normalized)) {
+    return String(normalized);
+  }
+
+  return normalized.toFixed(1).replace(/\.0$/, '');
+};
+
+const normalizeMedicineName = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const resolveMatchedMedication = (match, medications = []) => {
+  if (!match) {
+    return null;
+  }
+
+  const matchId = String(match.id || '').trim();
+  if (matchId) {
+    const byId = medications.find((item) => String(item?.id || '').trim() === matchId);
+    if (byId) {
+      return byId;
+    }
+  }
+
+  const matchName = normalizeMedicineName(match.medicineName);
+  const matchDosage = Number(match.dosageMg);
+
+  return medications.find((item) => {
+    const itemName = normalizeMedicineName(item?.medicine_name || item?.medicineName);
+    const itemDosage = Number(item?.dosage_mg ?? item?.dosageMg);
+    const dosageMatches = !Number.isFinite(matchDosage) || !Number.isFinite(itemDosage) || Math.abs(matchDosage - itemDosage) < 0.001;
+    return itemName && itemName === matchName && dosageMatches;
+  }) || null;
+};
+
+const getMedicationScheduleEntries = (medication, routine, referenceDate = new Date()) => {
+  if (!medication || !routine) {
+    return [];
+  }
+
+  const validKeys = parseTakeWith(medication.take_with || medication.takeWith)
+    .map((slot) => SLOT_TO_KEY[slot])
+    .filter(Boolean)
+    .sort((a, b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b));
+
+  return validKeys.map((key) => {
+    const baseDate = parseRoutineTimeToDate(routine[key], referenceDate);
+    const takeDate = applyMinutesOffset(baseDate, getReminderOffsetMinutes(medication.intake_timing || medication.intakeTiming)) || baseDate;
+    return {
+      key,
+      label: SLOT_LABELS[key] || key,
+      routineTimeLabel: formatDateTo12Hour(baseDate),
+      takeTimeLabel: formatDateTo12Hour(takeDate),
+      ruleLabel: getTakeTimeRuleLabel(medication.intake_timing || medication.intakeTiming),
+    };
+  });
+};
+
 const TabletIdentifierScreen = ({ onBack, reminderTextScale = 1 }) => {
   const [photoUri, setPhotoUri] = useState('');
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState('');
+  const [routine, setRoutine] = useState(null);
+  const [medications, setMedications] = useState([]);
+  const [isScheduleLoading, setIsScheduleLoading] = useState(true);
+  const [scheduleError, setScheduleError] = useState('');
   const textScale = reminderTextScale || 1;
 
   const bestMatch = analysis?.match || null;
   const matches = Array.isArray(analysis?.matches) ? analysis.matches : [];
   const closeMatches = bestMatch ? matches.slice(1, 4) : matches.slice(0, 4);
   const isMatched = analysis?.status === 'matched' && bestMatch;
+  const matchedMedication = useMemo(() => resolveMatchedMedication(bestMatch, medications), [bestMatch, medications]);
+  const scheduleEntries = useMemo(
+    () => getMedicationScheduleEntries(matchedMedication, routine),
+    [matchedMedication, routine]
+  );
+  const scheduledTabletCount = Math.max(
+    0.5,
+    Number(matchedMedication?.daily_amount ?? matchedMedication?.dailyAmount ?? bestMatch?.dailyAmount) || 1
+  );
+  const scheduledTabletUnit = scheduledTabletCount === 1 ? 'tablet' : 'tablets';
+  const shouldShowScheduleCard = Boolean(bestMatch) && analysis?.status !== 'dataset-match';
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadScheduleContext = async () => {
+      try {
+        setIsScheduleLoading(true);
+        setScheduleError('');
+        const [routineData, medicationData] = await Promise.all([
+          routineService.getRoutine(),
+          medicationService.getMyMedications(),
+        ]);
+
+        if (!isActive) {
+          return;
+        }
+
+        setRoutine(routineData?.mealTimes || null);
+        setMedications(medicationData || []);
+      } catch (error) {
+        if (isActive) {
+          setScheduleError(error?.message || 'Could not load schedule details.');
+        }
+      } finally {
+        if (isActive) {
+          setIsScheduleLoading(false);
+        }
+      }
+    };
+
+    loadScheduleContext();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const analyzePhoto = async (imageBase64) => {
     if (!imageBase64) {
@@ -224,6 +444,38 @@ const TabletIdentifierScreen = ({ onBack, reminderTextScale = 1 }) => {
                 </Text>
               </View>
             </View>
+          </View>
+        ) : null}
+
+        {shouldShowScheduleCard ? (
+          <View style={styles.scheduleCard}>
+            <Text style={[styles.scheduleTitle, { fontSize: 18 * textScale, lineHeight: 24 * textScale }]}>When to take</Text>
+            {isScheduleLoading ? (
+              <Text style={[styles.scheduleHint, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>Loading saved schedule...</Text>
+            ) : scheduleEntries.length > 0 ? (
+              <>
+                <Text style={[styles.scheduleDoseText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
+                  Take {formatTabletCount(scheduledTabletCount)} {scheduledTabletUnit} each scheduled time.
+                </Text>
+                {scheduleEntries.map((entry) => (
+                  <View key={entry.key} style={styles.scheduleRow}>
+                    <View style={styles.scheduleTimeBadge}>
+                      <Text style={[styles.scheduleTimeText, { fontSize: 15 * textScale }]}>{entry.takeTimeLabel}</Text>
+                    </View>
+                    <View style={styles.scheduleRowTextWrap}>
+                      <Text style={[styles.scheduleSlotText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}>{entry.label}</Text>
+                      <Text style={[styles.scheduleRuleText, { fontSize: 13 * textScale, lineHeight: 18 * textScale }]}>
+                        {entry.ruleLabel} from routine time {entry.routineTimeLabel}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <Text style={[styles.scheduleHint, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
+                {scheduleError ? 'Schedule details could not be loaded right now.' : 'No saved intake time found for this tablet.'}
+              </Text>
+            )}
           </View>
         ) : null}
 
@@ -456,6 +708,64 @@ const styles = StyleSheet.create({
   resultMeta: {
     marginTop: 5,
     color: '#4d645b',
+    fontWeight: '800',
+  },
+  scheduleCard: {
+    borderRadius: 22,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    borderColor: '#eadcca',
+    padding: 14,
+    marginBottom: 14,
+  },
+  scheduleTitle: {
+    color: '#2d241d',
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  scheduleDoseText: {
+    color: '#4d4038',
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  scheduleRow: {
+    minHeight: 64,
+    borderTopWidth: 1,
+    borderTopColor: '#efe3d6',
+    paddingTop: 10,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scheduleTimeBadge: {
+    minWidth: 86,
+    minHeight: 42,
+    borderRadius: 14,
+    backgroundColor: '#2f5d50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    marginRight: 10,
+  },
+  scheduleTimeText: {
+    color: '#ffffff',
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  scheduleRowTextWrap: {
+    flex: 1,
+  },
+  scheduleSlotText: {
+    color: '#24352f',
+    fontWeight: '900',
+  },
+  scheduleRuleText: {
+    marginTop: 3,
+    color: '#74665b',
+    fontWeight: '800',
+  },
+  scheduleHint: {
+    color: '#74665b',
     fontWeight: '800',
   },
   alternativesCard: {
