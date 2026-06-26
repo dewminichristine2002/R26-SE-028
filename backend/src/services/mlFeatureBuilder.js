@@ -1,6 +1,5 @@
 const {
   resolveDrugClass,
-  extractDrugClassesFromText,
 } = require('./drugClassLookupService');
 
 const NTI_TERMS = [
@@ -110,28 +109,6 @@ const encodeAtcClass = (...values) => {
   return 'unknown';
 };
 
-const allergySeverityFromContext = ({ profile, questionnaireAnswers, sameClassAllergy, severeSideEffectCount }) => {
-  const answerMap = (questionnaireAnswers || []).reduce((acc, item) => {
-    acc[item.questionKey] = item.answerText;
-    return acc;
-  }, {});
-
-  let score = 0;
-  if (profile?.hasMedicineAllergy === true || normalizeText(profile?.hasMedicineAllergy) === 'true') {
-    score = Math.max(score, 1);
-  }
-  if (sameClassAllergy) {
-    score = Math.max(score, 2);
-  }
-  if (normalizeText(answerMap.pastReaction) === 'yes') {
-    score = Math.max(score, 2);
-  }
-  if (Number(severeSideEffectCount || 0) >= 2) {
-    score = Math.max(score, 3);
-  }
-  return score;
-};
-
 const buildMlFeaturePayload = ({ analysisPayload, profile, questionnaireAnswers }) => {
   const answerMap = (questionnaireAnswers || []).reduce((acc, item) => {
     acc[item.questionKey] = item.answerText;
@@ -144,34 +121,40 @@ const buildMlFeaturePayload = ({ analysisPayload, profile, questionnaireAnswers 
     analysisPayload.ingredientName,
     analysisPayload.medicationKnowledge?.rxnormMatchedName
   );
-  const profileDrugClasses = new Set([
-    ...extractDrugClassesFromText(profile?.knownAllergiesText),
-    ...extractDrugClassesFromText(answerMap.medicineName || ''),
-  ]);
-  const sameClassAllergy = profileDrugClasses.has(drugClassInfo?.drug_class || '') ? 1 : 0;
   const chronic = chronicFlagsFromText(profile?.chronicDiseasesText);
-  const drugFlags = drugFlagsFromNames(
+  const baseDrugFlags = drugFlagsFromNames(
     analysisPayload.normalizedDrugName,
     analysisPayload.ingredientName,
     analysisPayload.medicineName
   );
+  const drugFlags = {
+    ...baseDrugFlags,
+    // Runtime ML should not inflate risk from a generic metabolism route alone.
+    // Only keep these organ-clearance flags when the patient also has matching organ disease.
+    drug_hepatic_metabolism: baseDrugFlags.drug_hepatic_metabolism && chronic.has_hepatic_disease ? 1 : 0,
+    drug_renal_excretion: baseDrugFlags.drug_renal_excretion && chronic.has_renal_disease ? 1 : 0,
+  };
+  // Keep direct allergy-history / cross-reactivity evidence on the clinical-rule side.
+  // The current FAERS-trained ML model does not have a trustworthy independent patient-allergy
+  // history signal, so feeding these rule-shaped features into runtime ML can create large,
+  // misleading disagreement between ruleScore and mlRiskScore.
+  const neutralAllergyFeatures = {
+    allergy_severity_max: 0,
+    allergy_class_overlap: 0,
+  };
 
   return {
     patient_age: Number(profile?.age || 0),
     patient_sex: encodePatientSex(profile?.gender),
     num_current_meds: countTextItems(profile?.currentMedicationsText),
     ...chronic,
-    allergy_severity_max: allergySeverityFromContext({
-      profile,
-      questionnaireAnswers,
-      sameClassAllergy,
-      severeSideEffectCount: analysisPayload.severeSideEffectCount,
-    }),
-    allergy_class_overlap: sameClassAllergy,
+    ...neutralAllergyFeatures,
     ddi_severity_max: ddiSeverityToOrdinal(analysisPayload.maxInteractionSeverity),
     ddi_pair_count: Number(analysisPayload.interactionCount || 0),
+    ddi_flag: Number(analysisPayload.interactionCount || 0) > 0 ? 1 : 0,
     sider_adr_count: Number(analysisPayload.sideEffectCount || 0),
     ...drugFlags,
+    rxnorm_matched: analysisPayload.medicationKnowledge?.matched === false ? 0 : 1,
     atc_class_encoded: encodeAtcClass(
       drugClassInfo?.atc_code,
       analysisPayload.normalizedDrugName,

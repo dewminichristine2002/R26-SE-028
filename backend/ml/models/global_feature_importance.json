@@ -3,84 +3,84 @@
   "description": "XGBoost global feature importance (gain-based MDI fallback)",
   "features": [
     {
-      "feature": "allergy_severity_max",
-      "mdi_importance": 0.5960509181022644
+      "feature": "atc_class_encoded_J",
+      "mdi_importance": 0.07679661363363266
     },
     {
       "feature": "sider_adr_count",
-      "mdi_importance": 0.05167112499475479
-    },
-    {
-      "feature": "atc_class_encoded_J",
-      "mdi_importance": 0.0386086069047451
-    },
-    {
-      "feature": "atc_class_encoded_C",
-      "mdi_importance": 0.03128723427653313
+      "mdi_importance": 0.069517582654953
     },
     {
       "feature": "atc_class_encoded_T",
-      "mdi_importance": 0.026975149288773537
+      "mdi_importance": 0.05749158933758736
     },
     {
       "feature": "atc_class_encoded_M",
-      "mdi_importance": 0.026735415682196617
+      "mdi_importance": 0.05403890088200569
     },
     {
       "feature": "drug_hepatic_metabolism",
-      "mdi_importance": 0.021584084257483482
-    },
-    {
-      "feature": "atc_class_encoded_D",
-      "mdi_importance": 0.01912243664264679
+      "mdi_importance": 0.03980649262666702
     },
     {
       "feature": "atc_class_encoded_L",
-      "mdi_importance": 0.01501933578401804
+      "mdi_importance": 0.039058420807123184
     },
     {
-      "feature": "patient_sex_unknown",
-      "mdi_importance": 0.013768267817795277
-    },
-    {
-      "feature": "atc_class_encoded_A",
-      "mdi_importance": 0.011627898551523685
+      "feature": "atc_class_encoded_C",
+      "mdi_importance": 0.03536372259259224
     },
     {
       "feature": "atc_class_encoded_O",
-      "mdi_importance": 0.01046545896679163
+      "mdi_importance": 0.03481365740299225
     },
     {
       "feature": "patient_sex_female",
-      "mdi_importance": 0.00932022649794817
+      "mdi_importance": 0.03473430499434471
     },
     {
-      "feature": "ddi_severity_max",
-      "mdi_importance": 0.009176285937428474
-    },
-    {
-      "feature": "atc_class_encoded_R",
-      "mdi_importance": 0.00903993844985962
-    },
-    {
-      "feature": "num_current_meds",
-      "mdi_importance": 0.008795597590506077
+      "feature": "atc_class_encoded_E",
+      "mdi_importance": 0.03299202769994736
     },
     {
       "feature": "atc_class_encoded_H",
-      "mdi_importance": 0.008606364019215107
+      "mdi_importance": 0.030321292579174042
+    },
+    {
+      "feature": "atc_class_encoded_B",
+      "mdi_importance": 0.028979411348700523
     },
     {
       "feature": "atc_class_encoded_P",
-      "mdi_importance": 0.0079681146889925
+      "mdi_importance": 0.028081171214580536
+    },
+    {
+      "feature": "rxnorm_matched",
+      "mdi_importance": 0.02604527398943901
+    },
+    {
+      "feature": "atc_class_encoded_I",
+      "mdi_importance": 0.025728801265358925
     },
     {
       "feature": "nti_drug_flag",
-      "mdi_importance": 0.007781430147588253
+      "mdi_importance": 0.025381145998835564
     },
     {
-      "feature": "atc_class_encoded_U",
-      "mdi_importance": 0.007466430775821209
+      "feature": "ddi_flag",
+      "mdi_importance": 0.02499127946794033
+    },
+    {
+      "feature": "patient_sex_unknown",
+      "mdi_importance": 0.024523258209228516
+    },
+    {
+      "feature": "atc_class_encoded_D",
+      "mdi_importance": 0.024338971823453903
+    },
+    {
+      "feature": "atc_class_encoded_N",
+      "mdi_importance": 0.02387620136141777
     }
   ]
 }

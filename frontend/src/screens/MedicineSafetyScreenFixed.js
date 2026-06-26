@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   InteractionManager,
   KeyboardAvoidingView,
   Platform,
@@ -158,6 +157,109 @@ const formatDate = (v) => {
   if (!v) return 'No date';
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+};
+
+const toFiniteNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const toTimestamp = (value) => {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const getScoreSnapshot = (card, analysis = null) => {
+  const ml = analysis?.mlPrediction || analysis?.medicationKnowledge?.mlPrediction || card?.medicationKnowledge?.mlPrediction || null;
+  const dataUsed = analysis?.dataUsed || card?.dataUsed || {};
+  const ruleScore = toFiniteNumber(dataUsed.ruleScore);
+  const rawMlScore =
+    toFiniteNumber(dataUsed.rawMlScore) ??
+    toFiniteNumber(card?.medicationKnowledge?.mlPrediction?.rawMlRiskScore) ??
+    toFiniteNumber(ml?.rawMlRiskScore);
+  const adjustedMlScore =
+    toFiniteNumber(dataUsed.adjustedMlScore) ??
+    toFiniteNumber(dataUsed.mlScore) ??
+    toFiniteNumber(card?.medicationKnowledge?.mlPrediction?.adjustedMlRiskScore) ??
+    toFiniteNumber(card?.medicationKnowledge?.mlPrediction?.mlRiskScore) ??
+    toFiniteNumber(ml?.adjustedMlRiskScore) ??
+    toFiniteNumber(ml?.mlRiskScore);
+  const finalScore = toFiniteNumber(analysis?.riskScore) ?? toFiniteNumber(card?.riskScore);
+  const mlScoreWasCapped = Boolean(
+    dataUsed.mlScoreWasCapped ??
+      card?.medicationKnowledge?.mlPrediction?.mlScoreWasCapped ??
+      ml?.mlScoreWasCapped
+  );
+
+  return {
+    ml,
+    dataUsed,
+    ruleScore,
+    rawMlScore,
+    adjustedMlScore,
+    finalScore,
+    mlScoreWasCapped,
+  };
+};
+
+const findBestCardForHistoryItem = (historyItem, cards = []) => {
+  const historyName = String(historyItem?.normalizedDrugName || historyItem?.medicineName || '').trim().toLowerCase();
+  const historyRxnorm = String(historyItem?.rxnormCui || '').trim();
+  const historyRiskLevel = String(historyItem?.riskLevel || '').trim().toLowerCase();
+  const historyRiskScore = toFiniteNumber(historyItem?.riskScore);
+  const historyCreatedAt = toTimestamp(historyItem?.createdAt);
+
+  const candidates = (Array.isArray(cards) ? cards : []).filter((card) => {
+    const cardName = String(card?.normalizedDrugName || card?.medicineName || '').trim().toLowerCase();
+    const cardRxnorm = String(card?.rxnormCui || '').trim();
+    return (historyRxnorm && cardRxnorm === historyRxnorm) || (historyName && cardName === historyName);
+  });
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  return candidates
+    .map((card) => {
+      const cardName = String(card?.normalizedDrugName || card?.medicineName || '').trim().toLowerCase();
+      const cardRxnorm = String(card?.rxnormCui || '').trim();
+      const cardRiskLevel = String(card?.riskLevel || '').trim().toLowerCase();
+      const cardRiskScore = toFiniteNumber(card?.riskScore);
+      const cardUpdatedAt = toTimestamp(card?.updatedAt || card?.createdAt);
+      let matchScore = 0;
+
+      if (historyRxnorm && cardRxnorm === historyRxnorm) matchScore += 8;
+      if (historyName && cardName === historyName) matchScore += 6;
+      if (historyRiskLevel && cardRiskLevel === historyRiskLevel) matchScore += 3;
+      if (historyRiskScore != null && cardRiskScore != null && historyRiskScore === cardRiskScore) matchScore += 3;
+
+      return {
+        card,
+        matchScore,
+        timeDistance:
+          historyCreatedAt != null && cardUpdatedAt != null
+            ? Math.abs(cardUpdatedAt - historyCreatedAt)
+            : Number.MAX_SAFE_INTEGER,
+      };
+    })
+    .sort((left, right) => right.matchScore - left.matchScore || left.timeDistance - right.timeDistance)[0]?.card || null;
+};
+
+const buildHistoryScoreSummary = (historyItem, matchedCard) => {
+  const scoreSnapshot = matchedCard ? getScoreSnapshot(matchedCard, null) : null;
+  const mlScore = scoreSnapshot?.adjustedMlScore ?? scoreSnapshot?.rawMlScore ?? null;
+  const finalScore = scoreSnapshot?.finalScore ?? toFiniteNumber(historyItem?.riskScore);
+  const parts = [];
+
+  if (mlScore != null) {
+    parts.push(`ML ${mlScore}/100`);
+  }
+  if (finalScore != null) {
+    parts.push(`Final ${finalScore}/100`);
+  }
+
+  return parts.join(' · ');
 };
 
 /** One-line label for confirm step, e.g. "Amoxicillin 500 mg twice daily (tds)". */
@@ -333,7 +435,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     () =>
       history.map((item) => ({
         ...item,
-        card: cards.find((card) => String(card.medicineName || '').toLowerCase() === String(item.medicineName || '').toLowerCase()),
+        card: findBestCardForHistoryItem(item, cards),
       })),
     [history, cards]
   );
@@ -1061,15 +1163,21 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
   const resultBody = (card, analysis = null) => {
     if (!card) return null;
-    const report = analysis?.riskReport || analysis?.dataUsed?.riskReport || null;
+    const report = analysis?.riskReport || analysis?.dataUsed?.riskReport || card?.dataUsed?.riskReport || null;
     const t = tone(String(card.riskLevel || 'Warning'));
-    const ml = analysis?.mlPrediction || analysis?.medicationKnowledge?.mlPrediction;
-    const dataUsed = analysis?.dataUsed || {};
-    const ruleScore = Number.isFinite(Number(dataUsed.ruleScore)) ? dataUsed.ruleScore : null;
-    const mlScore = Number.isFinite(Number(dataUsed.mlScore)) ? dataUsed.mlScore : ml?.available ? ml.mlRiskScore : null;
-    const finalScore = card.riskScore;
+    const {
+      ml,
+      dataUsed,
+      ruleScore,
+      rawMlScore,
+      adjustedMlScore,
+      finalScore,
+      mlScoreWasCapped,
+    } = getScoreSnapshot(card, analysis);
+    const mlScore = adjustedMlScore;
+    const hasMlBlend = Boolean(dataUsed.mlEnabled || ml?.available || rawMlScore != null || adjustedMlScore != null);
     const sev = interactionSeverityUserLabel(card.maxInteractionSeverity || analysis?.medicationKnowledge?.interactions?.[0]?.severity);
-    const mk = analysis?.medicationKnowledge || {};
+    const mk = analysis?.medicationKnowledge || card?.medicationKnowledge || {};
     const interactions = displayInteractions(report?.drugInteractions?.length ? report.drugInteractions : mk.interactions);
     const triggeredRules = report?.triggeredRules?.length
       ? report.triggeredRules
@@ -1144,15 +1252,36 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         ) : null}
 
         <View style={s.elderScoreSimple}>
+          {hasMlBlend && mlScore != null ? <Text style={s.elderScoreHint}>ML score: {mlScore} / 100 based on P(ADR) x 100</Text> : null}
           <Text style={s.elderScoreTitle}>Safety score: {finalScore ?? '--'} out of 100</Text>
           <Text style={s.elderScoreHint}>0–19 Safe · 20–54 Warning · 55+ Dangerous</Text>
           <View style={[s.scoreRow, { marginTop: 14, marginBottom: 0 }]}>
             <View style={[s.track, s.trackLarge]}>
-              <View style={[s.fill, s.fillLarge, { width: `${Math.max(8, Number(card.riskScore || 0))}%`, backgroundColor: t.barFill }]} />
+              <View style={[s.fill, s.fillLarge, { width: `${Math.max(8, Number(finalScore || 0))}%`, backgroundColor: t.barFill }]} />
             </View>
-            <Text style={s.scoreValueLarge}>{card.riskScore ?? '--'}</Text>
+            <Text style={s.scoreValueLarge}>{finalScore ?? '--'}</Text>
           </View>
         </View>
+
+        {(ruleScore != null || rawMlScore != null || adjustedMlScore != null || finalScore != null) ? (
+          <View style={s.scoreBlock}>
+            <Text style={s.scoreBlockTitle}>Score breakdown</Text>
+            {ruleScore != null ? <Text style={s.scoreLine}>Clinical rule score: {ruleScore} / 100</Text> : null}
+            {rawMlScore != null ? <Text style={s.scoreLine}>Raw ML score: {rawMlScore} / 100</Text> : null}
+            {adjustedMlScore != null ? <Text style={s.scoreLine}>Adjusted ML score: {adjustedMlScore} / 100</Text> : null}
+            {finalScore != null ? <Text style={s.scoreLine}>{hasMlBlend ? 'Final hybrid score' : 'Final clinical score'}: {finalScore} / 100</Text> : null}
+            {hasMlBlend && dataUsed.hybridBreakdown ? (
+              <Text style={s.scoreHint}>
+                Formula: {dataUsed.hybridBreakdown.formula || '0.6 x rule + 0.4 x ML'} -> blended {dataUsed.hybridBreakdown.blendedScore ?? finalScore}/100
+              </Text>
+            ) : null}
+            {mlScoreWasCapped && rawMlScore != null && adjustedMlScore != null ? (
+              <Text style={s.scoreHint}>
+                Hybrid guardrail applied: raw ML score {rawMlScore}/100 was reduced to {adjustedMlScore}/100 before blending.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <TouchableOpacity
           style={s.detailsToggle}
@@ -1172,18 +1301,31 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           <Text style={s.scoreLine}>Final score: {finalScore ?? '--'} / 100</Text>
           <Text style={s.scoreHint}>Levels: 0–19 Safe · 20–54 Warning · 55–100 Dangerous</Text>
           {ruleScore != null ? <Text style={s.scoreLine}>Rule-based clinical score: {ruleScore} / 100</Text> : null}
-          {mlScore != null ? (
+          {hasMlBlend && mlScore != null ? (
             <Text style={s.scoreLine}>ML score — P(Dangerous) × 100: {mlScore} / 100</Text>
           ) : null}
-          {dataUsed.hybridBreakdown?.youdensJThreshold?.optimal_threshold != null ? (
+          {hasMlBlend && rawMlScore != null ? (
+            <Text style={s.scoreLine}>Raw ML score - calibrated P(ADR) x 100: {rawMlScore} / 100</Text>
+          ) : null}
+          {hasMlBlend && adjustedMlScore != null ? (
+            <Text style={s.scoreLine}>Adjusted ML score used in hybrid blend: {adjustedMlScore} / 100</Text>
+          ) : null}
+          {mlScoreWasCapped && rawMlScore != null && adjustedMlScore != null ? (
+            <Text style={s.scoreHint}>
+              Hybrid guardrail applied: raw ML score {rawMlScore}/100 was capped to {adjustedMlScore}/100 because rule evidence was weak.
+            </Text>
+          ) : null}
+          {hasMlBlend && dataUsed.hybridBreakdown?.youdensJThreshold?.optimal_threshold != null ? (
             <Text style={s.scoreHint}>
               ML class threshold (Youden's J): P(ADR) ≥ {Number(dataUsed.hybridBreakdown.youdensJThreshold.optimal_threshold).toFixed(3)}
             </Text>
           ) : null}
           <Text style={s.scoreHint}>
-            Final blend: 60% clinical rules + 40% ML P(Dangerous) (RTAD-MSM hybrid formula), with safety guardrails.
+            {hasMlBlend
+              ? 'Final blend: 60% clinical rules + 40% ML P(Dangerous) (RTAD-MSM hybrid formula), with safety guardrails.'
+              : 'This check used the clinical rule score only because no ML score was available.'}
           </Text>
-          {dataUsed.hybridBreakdown ? (
+          {hasMlBlend && dataUsed.hybridBreakdown ? (
             <Text style={s.scoreHint}>
               Formula: {dataUsed.hybridBreakdown.formula || '0.6×rule + 0.4×ML'} → blended {dataUsed.hybridBreakdown.blendedScore ?? finalScore}/100
             </Text>
@@ -1213,9 +1355,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         <View style={s.scoreRow}>
           <Text style={s.scoreLabel}>Score bar</Text>
           <View style={s.track}>
-            <View style={[s.fill, { width: `${Math.max(8, Number(card.riskScore || 0))}%`, backgroundColor: t.barFill }]} />
+            <View style={[s.fill, { width: `${Math.max(8, Number(finalScore || 0))}%`, backgroundColor: t.barFill }]} />
           </View>
-          <Text style={s.scoreValue}>{card.riskScore ?? '--'}/100</Text>
+          <Text style={s.scoreValue}>{finalScore ?? '--'}/100</Text>
         </View>
 
         {triggeredRules.length ? (
@@ -2609,26 +2751,28 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               autoCorrect={false}
             />
             {searchBusy ? <Text style={s.helpSmall}>Searching library…</Text> : null}
-            <View style={s.suggestPanel}>
-              <FlatList
-                data={suggestions}
-                keyExtractor={(item, index) => `${item.rxnormCui || item.displayName}-${index}`}
-                keyboardShouldPersistTaps="handled"
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={s.suggestRow} onPress={() => pickSuggestion(item)} activeOpacity={0.7}>
-                    <Text style={s.suggestTitle}>{item.displayName}</Text>
-                    {item.ingredientName ? <Text style={s.suggestSub}>{item.ingredientName}</Text> : null}
-                  </TouchableOpacity>
-                )}
-                style={{ maxHeight: 220 }}
-                ListEmptyComponent={
-                  medicineInput.medicineName.length > 2 ? (
-                    <Text style={s.suggestEmpty}>No matches in our list — you can still continue with what you typed.</Text>
-                  ) : (
-                    <Text style={s.suggestEmpty}>Type at least 3 letters to see suggestions.</Text>
-                  )
-                }
-              />
+            <View style={[s.suggestPanel, { maxHeight: 220 }]}>
+              {suggestions.length === 0 ? (
+                <Text style={s.suggestEmpty}>
+                  {medicineInput.medicineName.length > 2
+                    ? "No matches in our list — you can still continue with what you typed."
+                    : "Type at least 3 letters to see suggestions."}
+                </Text>
+              ) : (
+                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                  {suggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={`${item.rxnormCui || item.displayName}-${index}`}
+                      style={s.suggestRow}
+                      onPress={() => pickSuggestion(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.suggestTitle}>{item.displayName}</Text>
+                      {item.ingredientName ? <Text style={s.suggestSub}>{item.ingredientName}</Text> : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
             </View>
             <TouchableOpacity
               style={s.bigPrimary}
@@ -2890,7 +3034,11 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }
 
   if (route === 'result') {
-    const report = latestResult?.analysis?.riskReport || latestResult?.analysis?.dataUsed?.riskReport || null;
+    const report =
+      latestResult?.analysis?.riskReport ||
+      latestResult?.analysis?.dataUsed?.riskReport ||
+      latestResult?.card?.dataUsed?.riskReport ||
+      null;
     const blocked =
       (report?.safetyControls?.requiresClinicalOverride && !clinicalOverride.accepted) ||
       (latestResult?.card?.riskLevel === 'Dangerous' && !clinicalOverride.accepted);
@@ -2979,8 +3127,10 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
               </TouchableOpacity>
             </View>
           ) : (
-            historyItems.map((item) => (
-              <TouchableOpacity
+            historyItems.map((item) => {
+              const historyScoreSummary = buildHistoryScoreSummary(item, item.card);
+              return (
+                <TouchableOpacity
                 key={`${item.id}-${item.createdAt}`}
                 style={s.historyCard}
                 onPress={() => {
@@ -3002,13 +3152,15 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                 <View style={s.historyCardMain}>
                   <Text style={s.historyMed}>{item.medicineName || 'Medicine'}</Text>
                   <Text style={s.historyDate}>{formatDate(item.createdAt)}</Text>
+                  {historyScoreSummary ? <Text style={s.historyScoreSummary}>{historyScoreSummary}</Text> : null}
                 </View>
                 <View style={[s.badge, tone(String(item.riskLevel || 'Warning')).box]}>
                   <Text style={[s.badgeText, tone(String(item.riskLevel || 'Warning')).text]}>{item.riskLevel || 'Saved'}</Text>
                 </View>
                 <Text style={s.historyChevron}>›</Text>
               </TouchableOpacity>
-            ))
+              );
+            })
           )}
         </ScrollView>
       </View>
@@ -4695,6 +4847,7 @@ const s = StyleSheet.create({
   historyCardMain: { flex: 1, paddingRight: 8 },
   historyMed: { fontSize: 19, fontWeight: '700', color: palette.text },
   historyDate: { fontSize: 16, color: palette.textSecondary, marginTop: 6 },
+  historyScoreSummary: { fontSize: 14, color: palette.textSecondary, marginTop: 8, fontWeight: '600' },
   historyChevron: { fontSize: 26, color: palette.textSecondary, marginLeft: 4 },
   emptyState: {
     backgroundColor: palette.surface,

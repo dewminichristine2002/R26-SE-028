@@ -26,11 +26,16 @@ const resolvePythonPath = () => {
 const modelAvailable = () =>
   (fs.existsSync(modelPath) || fs.existsSync(xgboostAliasPath)) && fs.existsSync(metadataPath);
 
+const clampPercent = (value) => Math.max(0, Math.min(100, value));
+
 const mapPredictionToRisk = (parsed) => {
   const adrProb = Number(parsed.adr_risk_probability ?? parsed.probability_dangerous ?? parsed.probability ?? 0);
+  const safeProb = Number(parsed.probability_safe ?? (1 - adrProb));
   const label = parsed.risk_level_label || (parsed.prediction === 1 ? 'Dangerous' : 'Safe');
-  const mlDangerScore = Math.max(0, Math.min(100, Math.round(adrProb * 100)));
-  const mlClassConfidence = mlDangerScore;
+  const mlDangerScore = clampPercent(Math.round(adrProb * 1000) / 10);
+  const mlClassConfidence = Number.isFinite(Number(parsed.class_confidence_score))
+    ? clampPercent(Number(parsed.class_confidence_score))
+    : clampPercent(Math.round(Math.max(adrProb, safeProb) * 1000) / 10);
   const youdensJThreshold = parsed.youdens_j_threshold || null;
 
   return {
@@ -100,6 +105,8 @@ const predictMedicineRisk = async ({ analysisPayload, profile, questionnaireAnsw
           probabilityDangerous: parsed.probability_dangerous,
           probabilityWarning: parsed.probability_warning,
           probabilitySafe: parsed.probability_safe,
+          mlRiskScore: parsed.ml_risk_score,
+          binaryPrediction: parsed.binary_prediction ?? parsed.prediction,
           probabilities: parsed.probabilities,
           riskLevelLabel: parsed.risk_level_label,
           youdensJThreshold: parsed.youdens_j_threshold,

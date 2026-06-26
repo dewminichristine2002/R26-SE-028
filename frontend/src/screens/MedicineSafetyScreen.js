@@ -219,9 +219,9 @@ export default function MedicineSafetyScreen({ onBack, onLogout, initialRoute = 
         {renderResultCard(card)}
         {mlPrediction?.available ? (
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>ML Support Score</Text>
+            <Text style={styles.infoTitle}>ML Score</Text>
             <Text style={styles.infoText}>{`${mlPrediction.mlRiskScore ?? '--'}/100`}</Text>
-            <Text style={styles.supportText}>Used as a support signal together with the allergy and interaction rules.</Text>
+            <Text style={styles.supportText}>Shown as P(ADR) x 100 and used as a support signal with the allergy and interaction rules.</Text>
           </View>
         ) : null}
         {medicationKnowledge ? (

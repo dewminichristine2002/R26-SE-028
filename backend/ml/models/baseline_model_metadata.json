@@ -26,6 +26,8 @@
     "drug_hepatic_metabolism",
     "drug_renal_excretion",
     "nti_drug_flag",
+    "ddi_flag",
+    "rxnorm_matched",
     "allergy_severity_max",
     "ddi_severity_max",
     "patient_sex",
@@ -46,7 +48,9 @@
     "allergy_class_overlap",
     "drug_hepatic_metabolism",
     "drug_renal_excretion",
-    "nti_drug_flag"
+    "nti_drug_flag",
+    "ddi_flag",
+    "rxnorm_matched"
   ],
   "ordinal_features": [
     "allergy_severity_max",
@@ -87,6 +91,11 @@
       "subsample": 0.8
     }
   },
+  "probability_calibration": {
+    "method": "sigmoid",
+    "calibrator_path": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\models\\probability_calibrator.joblib",
+    "fit_protocol": "LogisticRegression (Platt-style) on logit-transformed 5-fold out-of-fold training probabilities"
+  },
   "output": {
     "adr_risk_probability_range": [
       0,
@@ -94,17 +103,17 @@
     ],
     "shap_feature_importance": true,
     "global_mdi_importance_path": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\models\\global_feature_importance.json",
-    "youdens_j_optimal_threshold": 0.48474839329719543,
+    "youdens_j_optimal_threshold": 0.48957131992832137,
     "production_alias": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\models\\xgboost_production.joblib"
   },
   "threshold_tuning": {
     "method": "youdens_j",
-    "description": "Optimal binary threshold from Youden's J on 5-fold out-of-fold training probabilities",
+    "description": "Optimal binary threshold from Youden's J on calibrated 5-fold out-of-fold training probabilities",
     "youdens_j": {
-      "optimal_threshold": 0.48474839329719543,
-      "youdens_j": 0.8834241737647426,
-      "tpr": 0.9588875453446191,
-      "fpr": 0.07546337157987644
+      "optimal_threshold": 0.48957131992832137,
+      "youdens_j": 0.8878181149374256,
+      "tpr": 0.9590890769850866,
+      "fpr": 0.07127096204766108
     }
   },
   "comparative_study": {

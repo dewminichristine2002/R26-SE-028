@@ -1,6 +1,6 @@
 {
   "section": "FAERS_training_pipeline",
-  "output": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\data\\faers_adrs.csv",
+  "output": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S1\\Research\\ElderMeds\\backend\\ml\\data\\faers_adrs_20260623_122246.csv",
   "rows": 11868,
   "adr_event_positive": 6203,
   "adr_event_negative": 5665,
@@ -94,6 +94,5 @@
     "model": "RandomForest (train_baseline.py)",
     "runtime_risk": "hybrid 0.6 rule + 0.4 ML -> thresholds 25/60",
     "rules": "clinical rule engine (not trained)"
-  },
-  "risk_label_derivation": "adr_event=1 -> Dangerous; adr_event=0 and ddi_flag=1 -> Warning; else Safe"
+  }
 }

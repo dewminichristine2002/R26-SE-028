@@ -2,7 +2,9 @@
 
 **Project:** ElderMeds (RTAD-MSM)  
 **Constraint:** No database schema changes  
-**Audit date:** Generated with implementation artifacts below  
+**Audit date:** June 2026 — aligned with production artifacts in `backend/ml/models/` and `backend/src/config/hybridScoring.js`
+
+> **Footnote:** This document was revised in **June 2026** to match the implemented system: **three** ML algorithms in `compare_models.py` (Random Forest, XGBoost, Logistic Regression), **production thresholds 20/55** (not legacy 25/60), and **FAERS-first** training (`faers_adrs.csv`, n ≈ 11,868). Older references to five algorithms or 25/60 thresholds are obsolete.
 
 ---
 
@@ -14,12 +16,12 @@
 | **O2** Knowledge bases | ✅ Yes | ✅ Integrated in runtime | No |
 | **O3** Rule engine | ✅ Yes | ✅ Auditable `riskFactors` | No |
 | **O4** ML pipeline | ✅ Yes | ✅ `compare_models_results.json` | No |
-| **O5** Hybrid scoring | ✅ Yes | ✅ `hybrid_weight_ablation.json` | No |
-| **O6** System evaluation | ✅ Technical | ✅ `system_evaluation.json` | **SUS study** |
+| **O5** Hybrid scoring | ✅ Yes | ✅ `hybrid_weight_ablation.json`, `selected_hybrid_thresholds.json` | No |
+| **O6** System evaluation | ✅ Technical | ✅ `baseline_metrics.json`, `compare_models_results.json` | **SUS study** |
 | **O7** Continuous learning | ✅ Yes | ✅ `continuous_learning_simulation.json` | No |
 
-**Verdict:** **6/7 objectives are 100% complete in software + automated evaluation.**  
-**O6** requires you to run the SUS study with real participants (template provided).
+**Verdict:** **6/7 objectives are complete in software + automated evaluation.**  
+**O6** requires a **SUS usability study** with elderly users and/or caregivers — see [SUS_QUESTIONNAIRE.md](SUS_QUESTIONNAIRE.md) and [SUS_STUDY_PROTOCOL.md](SUS_STUDY_PROTOCOL.md).
 
 ---
 
@@ -34,10 +36,10 @@
 | OCR | `prescriptionOcrService.js`, `POST /api/prescriptions/ocr` |
 | Voice | Expo speech modules in `MedicineSafetyScreenFixed.js` |
 | OCR post-correction | `ocrPostCorrection.js` |
-| NLP normalization | `medicationKnowledgeService.js` fuzzy + RxNorm index |
-| Pipeline audit trail | `medicineInputPipeline.js` → returned as `analysis.inputPipeline` |
+| NLP normalization | `medicationKnowledgeService.js`, `drugNormalizationService.js` (RxNorm API) |
+| Pipeline audit trail | `medicineInputPipeline.js` → `analysis.inputPipeline` |
 
-**Dissertation note:** TF-IDF + fuzzy matching used instead of BioBERT/scispaCy (document as pragmatic deployment choice).
+**Dissertation note:** TF-IDF + fuzzy matching used instead of BioBERT/scispaCy (pragmatic deployment choice).
 
 ---
 
@@ -45,7 +47,7 @@
 
 | KB | Evidence |
 |----|----------|
-| **RxNorm** | `medicationKnowledge.js`, `resolveMedication`, `rxnormCui` |
+| **RxNorm** | `resolveMedication`, `drugNormalizationService.js`, `rxnormCui` |
 | **SIDER** | Side effects on drug records, `sideEffectMatchCount` |
 | **DDInter** | `DDINTER_INTERACTIONS`, `findInteractions` |
 | **WHO ATC** | `drug_class_dataset.json` (3523 drugs), `whoAtc` on `enrichMedication` |
@@ -60,14 +62,14 @@
 
 | Rule category (proposal) | Implemented |
 |--------------------------|-------------|
-| Direct allergy match (+80) | ✅ `allergy_match` |
-| ATC/class allergy (+65) | ✅ `allergy_class_match` |
+| Direct allergy match (+80) | ✅ `allergy_match` (P1) |
+| ATC/class allergy (+65) | ✅ `allergy_class_match` (P2) |
 | DDI severe/moderate | ✅ `ddinter_interaction` |
 | Chronic contraindication | ✅ `chronic_condition` |
 | Polypharmacy | ✅ `polypharmacy_risk` |
 | Elderly risk | ✅ `elder_risk`, `elder_high_caution_medicine` |
 | Pregnancy (+70) | ✅ `pregnancy_contraindication` |
-| Hepatic/renal (+20) | ✅ `hepatic_impairment_risk`, `renal_impairment_risk` |
+| Hepatic/renal | ✅ `hepatic_impairment_risk`, `renal_impairment_risk` |
 | Narrow therapeutic index (+15) | ✅ `narrow_therapeutic_index` |
 | Audit trail | ✅ `riskFactors[]` + DB history |
 
@@ -75,16 +77,25 @@
 
 ## O4 — Machine Learning Pipeline
 
+**Primary training data:** FAERS (`faers_adrs.csv`, **11,868 rows**, target `adr_event`).
+
+**Algorithm comparison (Section 11.1):** exactly **three** models in `compare_models.py`:
+
+| Algorithm | Hold-out F1 (weighted) | AUC-ROC | Severe ADR recall | Artifact |
+|-----------|------------------------|---------|-------------------|----------|
+| **XGBoost** | **0.934** | **0.984** | **95.3%** | `compare_models_results.json` |
+| Random Forest | 0.932 | 0.974 | 93.8% | same |
+| Logistic Regression | 0.654 | 0.713 | 62.9% | same |
+
+**Production model:** Tuned XGBoost → `baseline_model.joblib` (see `baseline_metrics.json`, `baseline_model_metadata.json`).
+
 | Item | Evidence |
 |------|----------|
-| Random Forest (tuned) | `train_baseline.py`, `baseline_model.joblib` |
-| Logistic Regression | `compare_models_results.json` |
-| Decision Tree | same |
-| Gradient Boosting | same |
-| SVM (RBF) | same |
-| 5-fold CV | `baseline_cv_metrics.json` |
+| 5-fold CV + SMOTE | `compare_models.py`, `train_production_model.py` |
+| GridSearchCV (production) | `baseline_model_metadata.json` |
+| 17 tabular features | `feature_schema.py` |
 
-**Run:** `npm run ml:compare`
+**Run:** `npm run ml:compare` then `npm run ml:train`
 
 ---
 
@@ -93,12 +104,12 @@
 | Item | Evidence |
 |------|----------|
 | Formula α=0.6, β=0.4 | `hybridScoring.js`, `applyMlPrediction` |
-| Thresholds 25 / 60 | `classifyRiskLevel` |
+| **Production thresholds** | **Warning ≥ 20, Dangerous ≥ 55** (`hybridScoring.js`, `selected_hybrid_thresholds.json`) |
+| Threshold selection | Min FNR_D s.t. Precision_D ≥ 0.99 → **20/55** (`evaluate_thresholds.py`) |
 | Ablation (rule/ML/hybrid) | `hybrid_weight_ablation.json` |
-| Threshold sensitivity | `threshold_sensitivity.json` |
 | Explainable breakdown | `dataUsed.hybridBreakdown` in API + app UI |
 
-**Key result:** Hybrid 0.6/0.4 F1 **0.986** vs rule-only **0.862** vs ML-only **0.547**.
+**Note:** Weight ablation CV may favour α=0.9/β=0.1; **0.6/0.4** retained as design-proposed blend (document in dissertation).
 
 **Run:** `npm run ml:hybrid-ablation` and `npm run ml:thresholds`
 
@@ -106,24 +117,29 @@
 
 ## O6 — System Evaluation
 
-### Automated (complete)
+### Automated (complete — cite FAERS artifacts)
 
-| Metric | File | Example result |
-|--------|------|----------------|
-| Precision / Recall / F1 | `system_evaluation.json` | F1 macro 0.994 |
-| ROC-AUC | `system_evaluation.json` | 1.000 OVR |
-| Brier (calibration) | `system_evaluation.json` | 0.0016 (Dangerous) |
-| Dangerous recall | `system_evaluation.json` | 0.993 |
-| Baseline comparisons | `compare_models_results.json` | 5 models |
+| Metric | File | FAERS / production value |
+|--------|------|-------------------------|
+| Binary F1 (weighted) | `baseline_metrics.json` | **0.933** |
+| ROC-AUC | `baseline_metrics.json` | **0.984** |
+| Brier (calibration) | `baseline_metrics.json` | **0.048** |
+| Algorithm comparison | `compare_models_results.json` | **3 algorithms** |
+| Hybrid thresholds | `selected_hybrid_thresholds.json` | **20 / 55** |
 
-**Run:** `npm run ml:evaluate` or `npm run ml:evaluate-all`
+**Run:** `npm run ml:evaluate-all`
 
-### Human study (you must run)
+> `system_evaluation.json` may reflect legacy mixed corpora — prefer **`baseline_metrics.json`** and **`compare_models_results.json`** for viva tables.
+
+### Human study (required to close O6)
 
 | Item | Status | Resource |
 |------|--------|----------|
-| SUS ≥ 70 | ⬜ Pending participants | [SUS_QUESTIONNAIRE.md](SUS_QUESTIONNAIRE.md) |
-| Task completion ≥ 80% | ⬜ Record in study sheet | Same doc |
+| SUS ≥ 70 (target) | ⬜ Pending | [SUS_QUESTIONNAIRE.md](SUS_QUESTIONNAIRE.md) |
+| SUS protocol (elderly/caregiver) | ⬜ Pending | [SUS_STUDY_PROTOCOL.md](SUS_STUDY_PROTOCOL.md) |
+| Task completion ≥ 80% | ⬜ Record in study sheet | Same |
+
+**Minimum defensible sample:** n ≥ **8** participants if recruitment is limited; target **10–15**.
 
 ---
 
@@ -131,12 +147,10 @@
 
 | Item | Evidence |
 |------|----------|
-| Feedback logging | `POST /api/allergies/reactions`, `reaction_logs` table |
+| Feedback logging | `POST /api/allergies/reactions`, `reaction_logs` |
 | Check history for training | `medicine_check_history`, `ml/scripts/exportDataset.js` |
 | Retrain pipeline | `retrain_pipeline.py` → `npm run ml:retrain` |
 | Simulated deployment | `continuous_learning_simulation.json` |
-
-**Simulation result:** Retrain after simulated feedback: F1 0.930 on hold-out cycle 3 (see JSON for drift PSI).
 
 **Run:** `npm run ml:simulate-learning`
 
@@ -150,13 +164,13 @@ From `backend/`:
 npm run ml:evaluate-all
 ```
 
-Produces/updates all JSON artifacts under `backend/ml/models/`.
+Produces/updates JSON artifacts under `backend/ml/models/`.
 
 ---
 
 ## Honest limitations (state in dissertation)
 
-1. Training data mixes **real + synthetic** rows — high accuracy does not imply clinical validation.
-2. **SUS** not run until you complete participant sessions.
-3. **Barcode** intentionally excluded; three modalities: manual, OCR, voice.
-4. Stack is **Node/Express + Python ML**, not FastAPI (document as implementation variant).
+1. **FAERS proxy labels** for Warning/Safe — not clinician-validated (see [DISSERTATION_LIMITATIONS.md](DISSERTATION_LIMITATIONS.md)).
+2. **SUS** must be completed with elderly/caregiver participants before claiming full O6.
+3. **Barcode** excluded; modalities: manual, OCR, voice.
+4. **Hybrid Dangerous recall** on proxy 3-class labels (~48% at 20/55) ≠ binary severe-ADR recall (~95%).

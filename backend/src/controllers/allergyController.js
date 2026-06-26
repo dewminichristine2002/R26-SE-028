@@ -23,7 +23,7 @@ const {
   RISK_THRESHOLDS,
 } = require('../config/hybridScoring');
 const { buildPipelineReport } = require('../services/medicineInputPipeline');
-const { CLINICAL_RULES } = require('../config/clinicalRules');
+const { CLINICAL_RULES, hasClassCrossReactivity } = require('../config/clinicalRules');
 const {
   buildClinicalFactor,
   buildRuleAuditTrail,
@@ -261,6 +261,61 @@ const isBenignLowSeverityOnlyInteractionAnalysis = (analysisPayload) =>
     hasHighInteraction: analysisPayload?.medicationKnowledge?.maxInteractionSeverity === 'high',
   });
 
+const hasClinicallySpecificRuleEvidence = (analysisPayload) =>
+  (analysisPayload?.riskFactors || []).some((factor) => {
+    const factorType = normalizeText(factor?.factorType);
+    const severity = normalizeText(factor?.severity);
+    const score = Number(factor?.score || 0);
+
+    if (!factorType || factorType === 'no_direct_penicillin_conflict') {
+      return false;
+    }
+
+    return score >= 10 && (severity === 'high' || severity === 'medium');
+  });
+
+const weakEvidenceMlSafeCeiling = (ruleScore) => {
+  const maxPreRoundBlend = RISK_THRESHOLDS.warningMin - 0.51;
+  const mlCeiling = Math.floor((maxPreRoundBlend - HYBRID_RULE_WEIGHT * Number(ruleScore || 0)) / HYBRID_ML_WEIGHT);
+  return Math.max(0, Math.min(100, mlCeiling));
+};
+
+const shouldLimitWeakEvidenceMlLift = ({ analysisPayload, ruleScore, rawMlScore, adrRiskProbability, youdenThreshold }) => {
+  if (ruleScore >= 10 || rawMlScore <= 0) {
+    return false;
+  }
+
+  if (!Number.isFinite(Number(adrRiskProbability)) || !Number.isFinite(Number(youdenThreshold))) {
+    return false;
+  }
+
+  if (Number(adrRiskProbability) >= Number(youdenThreshold)) {
+    return false;
+  }
+
+  if (hasClinicallySpecificRuleEvidence(analysisPayload)) {
+    return false;
+  }
+
+  if (Number(analysisPayload?.medicationKnowledge?.interactionCount || 0) > 0) {
+    return false;
+  }
+
+  if (Number(analysisPayload?.medicationKnowledge?.sideEffectMatchCount || 0) > 0) {
+    return false;
+  }
+
+  if (Number(analysisPayload?.dataUsed?.historyDangerousCount || 0) > 0) {
+    return false;
+  }
+
+  if (Number(analysisPayload?.dataUsed?.historyWarningCount || 0) > 0) {
+    return false;
+  }
+
+  return true;
+};
+
 const includesAnyTerm = (haystack, terms = []) => {
   const normalizedHaystack = normalizeText(haystack).toLowerCase();
   if (!normalizedHaystack) {
@@ -319,6 +374,30 @@ const getMedicationFlags = (...values) => {
     isNtiDrug: ['warfarin', 'digoxin', 'lithium', 'phenytoin', 'theophylline', 'levothyroxine', 'methotrexate', 'cyclosporine'].some((term) =>
       combined.includes(term)
     ),
+    isAntihypertensive: [
+      'amlodipine',
+      'nifedipine',
+      'felodipine',
+      'losartan',
+      'valsartan',
+      'olmesartan',
+      'telmisartan',
+      'irbesartan',
+      'enalapril',
+      'lisinopril',
+      'ramipril',
+      'captopril',
+      'atenolol',
+      'metoprolol',
+      'bisoprolol',
+      'carvedilol',
+      'propranolol',
+      'hydrochlorothiazide',
+      'chlorthalidone',
+      'furosemide',
+      'spironolactone',
+      'indapamide',
+    ].some((term) => combined.includes(term)),
     isRenalExcretion: ['metformin', 'digoxin', 'lithium', 'atenolol', 'nitrofurantoin', 'allopurinol'].some((term) => combined.includes(term)),
     isHepaticMetabolism: ['warfarin', 'statins', 'atorvastatin', 'simvastatin', 'carbamazepine', 'phenytoin', 'paracetamol', 'acetaminophen'].some(
       (term) => combined.includes(term)
@@ -352,27 +431,96 @@ const expandFamilyTerms = (...values) => {
   return Array.from(extraTerms);
 };
 
-const hasChronicContraindicationRisk = ({ chronicDiseasesText, therapeuticClass, ingredientName, medicineName }) => {
+const assessChronicContraindicationRisk = ({
+  chronicDiseasesText,
+  currentMedicationsText,
+  therapeuticClass,
+  ingredientName,
+  medicineName,
+}) => {
   const chronic = normalizeText(chronicDiseasesText).toLowerCase();
   const medicineText = [therapeuticClass, ingredientName, medicineName].map((value) => normalizeText(value).toLowerCase()).join(' ');
+  const currentMeds = normalizeText(currentMedicationsText).toLowerCase();
 
   if (!chronic || !medicineText) {
-    return false;
+    return {
+      hasRisk: false,
+      score: 0,
+      label: '',
+      hasAsthmaRisk: false,
+      hasHypertensionRisk: false,
+      hasCardioOrRenalRisk: false,
+      hasAntihypertensiveUse: false,
+    };
   }
 
   const flags = getMedicationFlags(therapeuticClass, ingredientName, medicineName);
+  const currentMedicationFlags = getMedicationFlags(currentMedicationsText);
   const hasCardioOrRenalRisk = ['hypertension', 'kidney', 'renal', 'heart failure', 'cardiac', 'diabetes'].some((term) => chronic.includes(term));
+  const hasHypertensionRisk = ['hypertension', 'high blood pressure'].some((term) => chronic.includes(term));
+  const hasAsthmaRisk =
+    ['asthma', 'wheeze', 'wheezing', 'bronchospasm'].some((term) => chronic.includes(term)) ||
+    ['salbutamol', 'albuterol', 'ventolin', 'inhaler'].some((term) => currentMeds.includes(term));
+  const hasAntihypertensiveUse = currentMedicationFlags.isAntihypertensive;
   const hasBleedingRisk = ['ulcer', 'bleeding', 'gastritis', 'stomach bleed'].some((term) => chronic.includes(term));
 
+  if (flags.isNsaid && hasAsthmaRisk && hasHypertensionRisk) {
+    return {
+      hasRisk: true,
+      score: 0,
+      label: 'Asthma and hypertension plus NSAID class may worsen breathing symptoms and blood-pressure control.',
+      hasAsthmaRisk,
+      hasHypertensionRisk,
+      hasCardioOrRenalRisk,
+      hasAntihypertensiveUse,
+    };
+  }
+
+  if (flags.isNsaid && hasAsthmaRisk) {
+    return {
+      hasRisk: true,
+      score: 0,
+      label: 'Asthma plus NSAID class may worsen breathing symptoms and should be reviewed carefully.',
+      hasAsthmaRisk,
+      hasHypertensionRisk,
+      hasCardioOrRenalRisk,
+      hasAntihypertensiveUse,
+    };
+  }
+
   if (flags.isNsaid && hasCardioOrRenalRisk) {
-    return true;
+    return {
+      hasRisk: true,
+      score: 0,
+      label: 'Hypertension/chronic condition plus NSAID class may increase medicine risk.',
+      hasAsthmaRisk,
+      hasHypertensionRisk,
+      hasCardioOrRenalRisk,
+      hasAntihypertensiveUse,
+    };
   }
 
   if ((flags.isAnticoagulant || flags.isAntiplatelet) && hasBleedingRisk) {
-    return true;
+    return {
+      hasRisk: true,
+      score: 10,
+      label: 'Bleeding-prone chronic condition plus anticoagulant/antiplatelet medicine needs extra caution.',
+      hasAsthmaRisk,
+      hasHypertensionRisk,
+      hasCardioOrRenalRisk,
+      hasAntihypertensiveUse,
+    };
   }
 
-  return false;
+  return {
+    hasRisk: false,
+    score: 0,
+    label: '',
+    hasAsthmaRisk,
+    hasHypertensionRisk,
+    hasCardioOrRenalRisk,
+    hasAntihypertensiveUse,
+  };
 };
 
 const hasDangerousMedicationCombination = ({ medicineFlags, currentMedicationsText }) => {
@@ -498,6 +646,10 @@ const buildGuidelines = ({ riskLevel, medicationKnowledge, profile, payload, ris
     guidelines.push('A known allergy or medicine-family allergy match was detected in your history/profile.');
   }
 
+  if ((riskFactors || []).some((factor) => factor.factorType === 'no_direct_penicillin_conflict')) {
+    guidelines.push('No direct penicillin allergy conflict was detected for this medicine, but other clinical cautions still apply.');
+  }
+
   return Array.from(new Set(guidelines));
 };
 
@@ -578,6 +730,19 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     ...extractDrugClassesFromText(profile?.knownAllergiesText),
     ...extractDrugClassesFromText(questionnaireText),
   ]);
+  const hasPenicillinAllergyInProfile = includesAnyTerm(
+    `${knownAllergiesText} ${questionnaireText}`,
+    ['penicillin', 'penicillin antibiotic', 'beta-lactam', 'beta lactam', 'amoxicillin', 'ampicillin', 'augmentin']
+  );
+  let chronicRiskAssessment = {
+    hasRisk: false,
+    score: 0,
+    label: '',
+    hasAsthmaRisk: false,
+    hasHypertensionRisk: false,
+    hasCardioOrRenalRisk: false,
+    hasAntihypertensiveUse: false,
+  };
 
   if (userAllergyEvidence) {
     addRule(
@@ -624,19 +789,32 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     );
   }
 
+  // P2: Check for drug class cross-reactivity (e.g., penicillin allergy + cephalosporin medicine)
   if (
     currentDrugClassInfo?.drug_class &&
     currentDrugClassInfo.drug_class !== 'unknown' &&
-    profileDrugClasses.has(currentDrugClassInfo.drug_class) &&
     !riskFactors.some((factor) => factor.factorType === 'allergy_match')
   ) {
-    const p2Score = scoreAllergyCrossReactivityRule(65, maxAllergySeverity);
-    addRule(
-      'P2',
-      `This medicine belongs to the same drug class/family (${currentDrugClassInfo.drug_class}) as a previous allergy in the profile or questionnaire (severity-adjusted score × ${maxAllergySeverity}).`,
-      'high',
-      p2Score
-    );
+    let foundCrossReactivity = false;
+    let crossReactiveAllergyClass = null;
+
+    for (const allergyClass of profileDrugClasses) {
+      if (hasClassCrossReactivity(allergyClass, currentDrugClassInfo.drug_class)) {
+        foundCrossReactivity = true;
+        crossReactiveAllergyClass = allergyClass;
+        break;
+      }
+    }
+
+    if (foundCrossReactivity) {
+      const p2Score = scoreAllergyCrossReactivityRule(65, maxAllergySeverity);
+      addRule(
+        'P2',
+        `This medicine (${currentDrugClassInfo.drug_class}) cross-reacts with a known allergy (${crossReactiveAllergyClass}). Beta-lactam family members (penicillins, cephalosporins) have documented cross-reactivity. Severity-adjusted (× ${maxAllergySeverity}).`,
+        'high',
+        p2Score
+      );
+    }
   }
 
   if (payload.hadReactionBefore === true || questionnaireAllergyEvidence) {
@@ -711,13 +889,57 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     );
   }
 
-  if (hasChronicContraindicationRisk({
+  chronicRiskAssessment = assessChronicContraindicationRisk({
     chronicDiseasesText,
+    currentMedicationsText: profile?.currentMedicationsText,
     therapeuticClass: medicationKnowledge.therapeuticClass || fallbackMedication.therapeuticClass,
     ingredientName: medicationKnowledge.ingredientName || fallbackMedication.ingredientName,
     medicineName: payload.medicineName,
-  })) {
-    addRule('P8', 'Hypertension/chronic condition plus NSAID class may increase medicine risk.', 'medium', CLINICAL_RULES.P8.defaultScore);
+  });
+  if (medicationFlags.isNsaid && chronicRiskAssessment.hasAsthmaRisk) {
+    addFactor(
+      'nsaid_asthma_caution',
+      'NSAID caution in asthma: this medicine may worsen wheezing or breathing symptoms and should be reviewed carefully.',
+      'high',
+      22
+    );
+  }
+  if (medicationFlags.isNsaid && chronicRiskAssessment.hasHypertensionRisk) {
+    addFactor(
+      'nsaid_hypertension_caution',
+      'NSAID may increase blood pressure: hypertension is recorded, so extra caution is needed.',
+      'medium',
+      15
+    );
+  }
+  if (medicationFlags.isNsaid && chronicRiskAssessment.hasAntihypertensiveUse) {
+    addFactor(
+      'nsaid_antihypertensive_monitoring',
+      'Monitor hypertension / antihypertensive effectiveness: NSAIDs can reduce blood-pressure control while using medicines such as amlodipine, ACE inhibitors, ARBs, beta blockers, or diuretics.',
+      'medium',
+      10
+    );
+  }
+  if (chronicRiskAssessment.hasRisk && !medicationFlags.isNsaid) {
+    addRule(
+      'P8',
+      chronicRiskAssessment.label || 'Hypertension/chronic condition plus NSAID class may increase medicine risk.',
+      chronicRiskAssessment.hasAsthmaRisk ? 'high' : 'medium',
+      chronicRiskAssessment.score || CLINICAL_RULES.P8.defaultScore
+    );
+  }
+  if (
+    hasPenicillinAllergyInProfile &&
+    medicationFlags.isNsaid &&
+    !medicationFlags.isPenicillinFamily &&
+    !riskFactors.some((factor) => factor.factorType === 'allergy_match' || factor.factorType === 'allergy_class_match')
+  ) {
+    addFactor(
+      'no_direct_penicillin_conflict',
+      'No direct penicillin allergy conflict: the recorded penicillin allergy does not directly match this NSAID medicine, so the caution here comes from asthma, blood pressure, and current-medicine factors instead.',
+      'low',
+      0
+    );
   }
 
   const profileAndQuestionnaireText = `${chronicDiseasesText} ${questionnaireText}`.toLowerCase();
@@ -936,6 +1158,12 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     }
   }
 
+  if (medicationFlags.isNsaid && chronicRiskAssessment.hasAsthmaRisk && chronicRiskAssessment.hasHypertensionRisk) {
+    ruleScore = Math.max(ruleScore, 40);
+  } else if (medicationFlags.isNsaid && chronicRiskAssessment.hasAsthmaRisk) {
+    ruleScore = Math.max(ruleScore, 32);
+  }
+
   if ((hasMediumOrHighInteraction || hasGeneralCautionMedicine || severeReactionSignal) && ruleScore < 15) {
     ruleScore = 15;
   }
@@ -1104,7 +1332,7 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
 
   const ruleScore = Number(analysisPayload.dataUsed?.ruleScore ?? analysisPayload.riskScore ?? 0);
   const ruleRiskLevel = classifyRiskLevel(ruleScore);
-  const mlDangerScore = Number.isFinite(Number(mlPrediction.mlRiskScore))
+  const rawMlScore = Number.isFinite(Number(mlPrediction.mlRiskScore))
     ? Number(mlPrediction.mlRiskScore)
     : Math.max(
         0,
@@ -1116,14 +1344,39 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
   const mlClassConf = Number.isFinite(Number(mlPrediction.mlClassConfidenceScore))
     ? Number(mlPrediction.mlClassConfidenceScore)
     : Math.max(0, Math.min(100, Math.round(Number(mlPrediction.probability || 0) * 100)));
-  const hybridBlend = blendHybridScore(ruleScore, mlDangerScore);
-  let combinedRiskScore = hybridBlend.blendedScore;
-  if (mlDangerScore >= 50 && ruleScore >= 20) {
-    combinedRiskScore = Math.max(
-      combinedRiskScore,
-      Math.round(HYBRID_RULE_WEIGHT * ruleScore + HYBRID_ML_WEIGHT * mlDangerScore) + 3
-    );
+  const youdensJ = mlPrediction.youdensJThreshold || null;
+  const youdenThreshold = youdensJ?.optimal_threshold != null ? Number(youdensJ.optimal_threshold) : null;
+  const adrRiskProbability = Number(
+    mlPrediction.adrRiskProbability ?? mlPrediction.probabilityDangerous ?? mlPrediction.probability ?? 0
+  );
+  let adjustedMlScore = rawMlScore;
+  let mlAdjustmentReason = null;
+
+  if (ruleScore < 20 && rawMlScore > 80) {
+    adjustedMlScore = 70;
+    mlAdjustmentReason = 'weak_rule_high_ml_cap';
   }
+
+  if (
+    shouldLimitWeakEvidenceMlLift({
+      analysisPayload,
+      ruleScore,
+      rawMlScore,
+      adrRiskProbability,
+      youdenThreshold,
+    })
+  ) {
+    const safeCeiling = weakEvidenceMlSafeCeiling(ruleScore);
+    if (safeCeiling < adjustedMlScore) {
+      adjustedMlScore = safeCeiling;
+      mlAdjustmentReason = 'weak_rule_safe_class_cap';
+    }
+  }
+
+  const mlScoreWasCapped = adjustedMlScore !== rawMlScore;
+  const scoreGap = Math.abs(ruleScore - rawMlScore);
+  const hybridBlend = blendHybridScore(ruleScore, adjustedMlScore);
+  let combinedRiskScore = hybridBlend.blendedScore;
   let combinedRiskLevel = classifyRiskLevel(combinedRiskScore);
 
   if (compareRiskLevel(ruleRiskLevel, combinedRiskLevel) > 0) {
@@ -1170,22 +1423,36 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     combinedRiskScore = Math.max(combinedRiskScore, 28);
   }
 
-  const youdensJ = mlPrediction.youdensJThreshold || null;
-  const youdenThreshold = youdensJ?.optimal_threshold != null ? Number(youdensJ.optimal_threshold) : null;
-
   const riskFactors = [...analysisPayload.riskFactors];
+  const capNote = mlScoreWasCapped
+    ? mlAdjustmentReason === 'weak_rule_safe_class_cap'
+      ? ` Hybrid protection applied: raw ML ADR Probability Score ${rawMlScore}/100 was adjusted to ${adjustedMlScore}/100 because rule evidence was minimal and the ML model still remained below its severe-ADR threshold.`
+      : ` Hybrid protection applied: raw ML ADR Probability Score ${rawMlScore}/100 was adjusted to ${adjustedMlScore}/100 because rule evidence was still weak.`
+    : '';
   const thresholdNote =
     youdenThreshold != null
       ? ` Youden's J tuned threshold: P(ADR) ≥ ${youdenThreshold.toFixed(3)} → severe ADR.`
       : '';
   riskFactors.push({
     factorType: 'ml_prediction',
-    factorLabel: `Baseline ML model: P(Dangerous) ≈ ${mlDangerScore}/100; predicted class ${mlPrediction.mlRiskLevel || 'n/a'} (confidence ≈ ${mlClassConf}/100).${thresholdNote}`,
+    factorLabel: `Baseline ML ADR Probability Score: P(ADR) ~ ${rawMlScore}/100; predicted class ${mlPrediction.mlRiskLevel || 'n/a'} (confidence ~ ${mlClassConf}/100).${capNote}${thresholdNote}`,
     severity: mlPrediction.mlRiskLevel === 'Dangerous' ? 'high' : mlPrediction.mlRiskLevel === 'Warning' ? 'medium' : 'low',
-    score: mlDangerScore,
+    score: adjustedMlScore,
   });
 
-  let mlExplanation = `Rule score was ${ruleScore}/100. ML dangerous-class probability was ${mlDangerScore}/100 (predicted ${mlPrediction.mlRiskLevel || 'n/a'} with ~${mlClassConf}/100 class confidence). Hybrid score = ${HYBRID_RULE_WEIGHT}×rule + ${HYBRID_ML_WEIGHT}×ML = ${combinedRiskScore}/100.`;
+  let mlExplanation = `Rule score was ${ruleScore}/100. ML ADR Probability Score was ${rawMlScore}/100 (predicted ${mlPrediction.mlRiskLevel || 'n/a'} with ~${mlClassConf}/100 class confidence).`;
+  if (mlScoreWasCapped) {
+    if (mlAdjustmentReason === 'weak_rule_safe_class_cap') {
+      mlExplanation += ` Because rule evidence was minimal and the ML probability stayed below its severe-ADR threshold, the hybrid calculation used an adjusted ML score of ${adjustedMlScore}/100 so a generic background ADR signal could not upgrade the case to warning on its own.`;
+    } else {
+      mlExplanation += ` Because rule evidence was below 20/100, the hybrid calculation used an adjusted ML score of ${adjustedMlScore}/100 to avoid overconfident weighting.`;
+    }
+  }
+  if (scoreGap >= 35) {
+    mlExplanation +=
+      ' A large gap between rule score and ML score can happen because the rule score measures case-specific clinical contraindications, while the ML score estimates general severe-ADR probability from FAERS-style patterns. Direct allergy-match and cross-reactivity evidence are intentionally kept on the rule side.';
+  }
+  mlExplanation += ` Hybrid score = ${HYBRID_RULE_WEIGHT}xrule + ${HYBRID_ML_WEIGHT}xML = ${combinedRiskScore}/100.`;
   if (youdenThreshold != null) {
     mlExplanation += ` ML binary class uses Youden's J threshold P(ADR) ≥ ${youdenThreshold.toFixed(3)} (not default 0.5).`;
   }
@@ -1221,13 +1488,18 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     medicationKnowledge: {
       ...analysisPayload.medicationKnowledge,
       mlPrediction: {
+        available: true,
         target: mlPrediction.target,
         adrRiskProbability: mlPrediction.adrRiskProbability,
         probability: mlPrediction.probability,
         probabilityDangerous: mlPrediction.probabilityDangerous,
         probabilityWarning: mlPrediction.probabilityWarning,
         probabilitySafe: mlPrediction.probabilitySafe,
-        mlRiskScore: mlDangerScore,
+        mlRiskScore: adjustedMlScore,
+        rawMlRiskScore: rawMlScore,
+        adjustedMlRiskScore: adjustedMlScore,
+        mlScoreWasCapped,
+        mlAdjustmentReason,
         mlClassConfidenceScore: mlClassConf,
         mlRiskLevel: mlPrediction.mlRiskLevel,
         youdensJThreshold: youdensJ,
@@ -1244,14 +1516,20 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
       ...(analysisPayload.dataUsed || {}),
       mlEnabled: true,
       ruleScore,
-      mlScore: mlDangerScore,
+      mlScore: adjustedMlScore,
+      rawMlScore,
+      adjustedMlScore,
+      mlScoreWasCapped,
+      mlAdjustmentReason,
       mlClassConfidenceScore: mlClassConf,
       hybridBreakdown: {
         alpha: hybridBlend.alpha,
         beta: hybridBlend.beta,
         formula: hybridBlend.formula,
         ruleScore,
-        mlDangerScore,
+        rawMlScore,
+        adjustedMlScore,
+        mlAdjustmentReason,
         blendedScore: combinedRiskScore,
         ruleRiskLevel,
         mlRiskLevel: mlPrediction.mlRiskLevel || 'Safe',
@@ -1262,13 +1540,14 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
         riskLevel: combinedRiskLevel,
         riskScore: combinedRiskScore,
         ruleScore,
-        mlDangerScore,
+        mlDangerScore: adjustedMlScore,
         hybridBreakdown: {
           alpha: hybridBlend.alpha,
           beta: hybridBlend.beta,
           formula: hybridBlend.formula,
           ruleScore,
-          mlDangerScore,
+          rawMlScore,
+          adjustedMlScore,
           blendedScore: combinedRiskScore,
         },
         riskFactors,
@@ -1503,6 +1782,9 @@ const analyzeMedicine = async (req, res, next) => {
       questionnaireAnswers,
     });
     const analysisPayload = applyMlPrediction(ruleAnalysis, mlPrediction);
+    const responseMlPrediction = analysisPayload.medicationKnowledge?.mlPrediction?.available
+      ? analysisPayload.medicationKnowledge.mlPrediction
+      : mlPrediction;
     const inputPipeline = buildPipelineReport({
       inputMethod: payload.inputMethod,
       rawInput: payload.notes || payload.medicineName,
@@ -1522,7 +1804,7 @@ const analyzeMedicine = async (req, res, next) => {
         guidelines: analysisPayload.guidelines,
         riskFactors: analysisPayload.riskFactors,
         medicationKnowledge: analysisPayload.medicationKnowledge,
-        mlPrediction,
+        mlPrediction: responseMlPrediction,
         inputPipeline,
         riskReport: analysisPayload.dataUsed?.riskReport || null,
         ruleAuditTrail: analysisPayload.dataUsed?.ruleAuditTrail || [],

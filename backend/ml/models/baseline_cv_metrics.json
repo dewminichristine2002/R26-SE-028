@@ -1,5 +1,5 @@
 {
-  "best_cv_f1_weighted_mean": 0.9408921202362966,
+  "best_cv_f1_weighted_mean": 0.9441377964786396,
   "best_params": {
     "learning_rate": 0.05,
     "max_depth": 8,

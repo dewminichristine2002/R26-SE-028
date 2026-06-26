@@ -26,6 +26,8 @@ BINARY_FEATURES = [
     "drug_hepatic_metabolism",
     "drug_renal_excretion",
     "nti_drug_flag",
+    "ddi_flag",
+    "rxnorm_matched",
 ]
 ORDINAL_FEATURES = [
     "allergy_severity_max",
@@ -53,6 +55,8 @@ CLINICAL_FEATURE_EXPLANATIONS: dict[str, str] = {
     "drug_hepatic_metabolism": "This medicine is mainly processed by the liver — hepatic risk factor.",
     "drug_renal_excretion": "This medicine is mainly cleared by the kidneys — renal risk factor.",
     "nti_drug_flag": "Narrow therapeutic index — small dose changes can cause harm.",
+    "ddi_flag": "Binary signal that at least one known drug–drug interaction was detected.",
+    "rxnorm_matched": "Medicine name matched successfully to the RxNorm-style knowledge base.",
     "allergy_severity_max": "Severity of documented allergy history (none → severe).",
     "ddi_severity_max": "Highest severity among detected drug–drug interactions.",
     "patient_sex": "Biological sex may influence metabolism and ADR susceptibility.",
@@ -206,10 +210,6 @@ def allergy_severity_from_row(row: pd.Series) -> int:
         score = max(score, 2)
     if str(row.get("q_past_reaction", "")).strip().lower() in {"yes", "true", "1"}:
         score = max(score, 2)
-    if int(row.get("has_severe_reaction_log", 0) or 0) > 0:
-        score = max(score, 3)
-    if int(row.get("severe_side_effect_count", 0) or 0) >= 2:
-        score = max(score, 3)
     return score
 
 
@@ -313,8 +313,19 @@ def row_to_features(row: pd.Series) -> dict[str, object]:
         "allergy_class_overlap": same_class_allergy_from_row(row),
         "ddi_severity_max": ddi_severity_to_ordinal(row.get("ddi_severity_max", row.get("max_interaction_severity", "none"))),
         "ddi_pair_count": int(pd.to_numeric(row.get("ddi_pair_count", row.get("interaction_count", 0)), errors="coerce") or 0),
+        "ddi_flag": int(
+            pd.to_numeric(
+                row.get(
+                    "ddi_flag",
+                    int(pd.to_numeric(row.get("ddi_pair_count", row.get("interaction_count", 0)), errors="coerce") or 0) > 0,
+                ),
+                errors="coerce",
+            )
+            or 0
+        ),
         "sider_adr_count": int(pd.to_numeric(row.get("sider_adr_count", row.get("side_effect_count", 0)), errors="coerce") or 0),
         **drug_flags,
+        "rxnorm_matched": int(pd.to_numeric(row.get("rxnorm_matched", 0), errors="coerce") or 0),
         "atc_class_encoded": encode_atc_class(
             row.get("atc_class_encoded", ""),
             row.get("atc_code", ""),

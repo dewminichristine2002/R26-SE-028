@@ -488,7 +488,9 @@ def build_feature_row(
         "patient_sex": encode_patient_sex(patient.get("patientsex")),
         "num_current_meds": len(drug_bundle.get("all_drugs") or []),
         **chronic_flags,
-        "allergy_severity_max": int(query_meta.get("allergy_severity_max", 0)),
+        # FAERS rows do not include patient allergy-history severity independent of the ADR label,
+        # so keep this neutral instead of leaking the queried reaction category into training.
+        "allergy_severity_max": 0,
         "allergy_class_overlap": 0,
         "ddi_severity_max": int(ddi_max),
         "ddi_pair_count": int(ddi_count),

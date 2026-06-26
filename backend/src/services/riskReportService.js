@@ -33,7 +33,7 @@ const CLASS_ALTERNATIVES = {
 const getClinicalAction = (riskLevel) => {
   if (riskLevel === 'Dangerous') {
     return {
-      band: '60–100',
+      band: `${RISK_THRESHOLDS.dangerousMin}-100`,
       icon: '🚫',
       label: 'Dangerous',
       action: 'Block; require clinical override with documented justification',
@@ -42,7 +42,7 @@ const getClinicalAction = (riskLevel) => {
   }
   if (riskLevel === 'Warning') {
     return {
-      band: '25–59',
+      band: `${RISK_THRESHOLDS.warningMin}-${RISK_THRESHOLDS.dangerousMin - 1}`,
       icon: '⚠️',
       label: 'Warning',
       action: 'Display alert; recommend GP consultation',
@@ -50,11 +50,11 @@ const getClinicalAction = (riskLevel) => {
     };
   }
   return {
-    band: '0–24',
-    icon: '✅',
-    label: 'Safe',
-    action: 'Proceed; log interaction',
-    proceedAllowed: true,
+    band: `0-${RISK_THRESHOLDS.warningMin - 1}`,
+      icon: '✅',
+      label: 'Safe',
+      action: 'Proceed; log interaction',
+      proceedAllowed: true,
   };
 };
 

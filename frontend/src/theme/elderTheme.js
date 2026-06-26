@@ -22,9 +22,9 @@ export const palette = {
 
 export const elder = {
   minTouch: 56,
-  body: 18,
-  bodyLine: 28,
-  label: 17,
-  button: 19,
-  input: 18,
+  body: 14,
+  bodyLine: 20,
+  label: 12,
+  button: 14,
+  input: 14,
 };

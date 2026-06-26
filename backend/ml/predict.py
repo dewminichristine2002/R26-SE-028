@@ -23,7 +23,21 @@ MODEL_PATH = MODELS_DIR / "baseline_model.joblib"
 XGBOOST_ALIAS_PATH = MODELS_DIR / "xgboost_production.joblib"
 METADATA_PATH = MODELS_DIR / "baseline_model_metadata.json"
 SHAP_BACKGROUND_PATH = MODELS_DIR / "shap_background.joblib"
+CALIBRATOR_PATH = MODELS_DIR / "probability_calibrator.joblib"
 DEFAULT_YOUDENS_J_THRESHOLD = 0.5
+CALIBRATION_EPS = 1e-6
+
+
+def json_default(value):
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
 
 
 def load_youdens_j_threshold(metadata: dict) -> dict:
@@ -143,6 +157,31 @@ def resolve_model_path() -> Path:
     )
 
 
+def load_probability_calibrator():
+    if not CALIBRATOR_PATH.exists():
+        raise FileNotFoundError(
+            f"Probability calibrator not found: {CALIBRATOR_PATH}. "
+            "Run npm run ml:train to rebuild the production ML artifacts."
+        )
+    return joblib.load(CALIBRATOR_PATH)
+
+
+def resolve_adr_index(model) -> tuple[list[int], int]:
+    classes = list(getattr(model.named_steps["classifier"], "classes_", []))
+    if classes != [0, 1]:
+        raise ValueError(
+            f"Unexpected classifier classes {classes!r}. "
+            "Expected binary labels [0, 1] for no_adr/severe_adr."
+        )
+    return classes, classes.index(1)
+
+
+def calibration_design_matrix(raw_prob: float | list[float] | np.ndarray) -> np.ndarray:
+    clipped = np.clip(np.asarray(raw_prob, dtype=float), CALIBRATION_EPS, 1.0 - CALIBRATION_EPS)
+    logits = np.log(clipped / (1.0 - clipped))
+    return logits.reshape(-1, 1)
+
+
 def main() -> None:
     model_file = resolve_model_path()
     if not METADATA_PATH.exists():
@@ -151,12 +190,15 @@ def main() -> None:
     payload = read_payload()
     metadata = json.loads(METADATA_PATH.read_text(encoding="utf8"))
     model = joblib.load(model_file)
+    calibrator = load_probability_calibrator()
     frame = payload_to_dataframe(payload)
 
-    probabilities = model.predict_proba(frame)[0]
-    classes = list(getattr(model.named_steps["classifier"], "classes_", []))
-    adr_index = classes.index(1) if 1 in classes else len(classes) - 1
-    adr_risk_probability = float(probabilities[adr_index])
+    raw_probabilities = model.predict_proba(frame)[0]
+    classes, adr_index = resolve_adr_index(model)
+    raw_adr_risk_probability = float(raw_probabilities[adr_index])
+    adr_risk_probability = float(
+        calibrator.predict_proba(calibration_design_matrix([raw_adr_risk_probability]))[0][1]
+    )
     threshold_info = load_youdens_j_threshold(metadata)
     prediction = classify_with_youdens_j(adr_risk_probability, threshold_info)
 
@@ -164,26 +206,36 @@ def main() -> None:
 
     risk_level_label = "Dangerous" if prediction == 1 else "Safe"
     probability_dangerous = adr_risk_probability
-    probability_safe = float(1.0 - adr_risk_probability) if len(classes) == 2 else float(probabilities[0])
+    probability_safe = float(1.0 - adr_risk_probability) if len(classes) == 2 else float(raw_probabilities[0])
+    ml_risk_score = round(adr_risk_probability * 100, 1)
+    class_confidence_score = round(max(probability_dangerous, probability_safe) * 100, 1)
+    calibrated_probabilities = [probability_safe, probability_dangerous] if len(classes) == 2 else raw_probabilities.tolist()
 
     print(
         json.dumps(
             {
                 "prediction": prediction,
+                "binary_prediction": prediction,
                 "adr_risk_probability": adr_risk_probability,
+                "raw_adr_risk_probability": raw_adr_risk_probability,
+                "ml_risk_score": ml_risk_score,
                 "risk_level_label": risk_level_label,
                 "probability": adr_risk_probability,
                 "probability_dangerous": probability_dangerous,
                 "probability_warning": 0.0,
                 "probability_safe": probability_safe,
-                "probabilities": probabilities.tolist(),
+                "class_confidence_score": class_confidence_score,
+                "probabilities": calibrated_probabilities,
+                "raw_probabilities": raw_probabilities.tolist(),
+                "model_classes": classes,
                 "youdens_j_threshold": threshold_info,
                 "shap": shap_payload,
                 "feature_columns": FEATURE_COLUMNS,
                 "model_path": str(model_file),
                 "model_type": metadata.get("model_type", "XGBClassifier"),
                 "target": metadata.get("target", "adr_event"),
-            }
+            },
+            default=json_default,
         )
     )
 

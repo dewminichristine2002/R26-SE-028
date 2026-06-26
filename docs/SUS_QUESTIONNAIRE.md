@@ -1,7 +1,9 @@
 # System Usability Scale (SUS) — Objective 6
 
-Use this when running the **clinician/pharmacist usability study** (10–15 participants).  
-Technical metrics are generated automatically (`npm run ml:evaluate`); SUS requires human participants.
+Use this when running the **elderly user and caregiver usability study** (target **10–15** participants; minimum **8** defensible).  
+Full protocol: [SUS_STUDY_PROTOCOL.md](SUS_STUDY_PROTOCOL.md). Results sheet: [SUS_RESULTS_SHEET.md](SUS_RESULTS_SHEET.md).
+
+Technical metrics are generated automatically (`npm run ml:evaluate-all`); SUS requires human participants.
 
 ## Protocol
 
@@ -25,7 +27,7 @@ Rate 1 = Strongly disagree … 5 = Strongly agree:
 9. I felt very confident using the system.
 10. I needed to learn a lot of things before I could get going with this system.
 
-**Scoring:** For items 1,3,5,7,9,11: score = response − 1. For items 2,4,6,8,10: score = 5 − response. Sum × 2.5 = SUS (0–100). Target: **≥ 70**.
+**Scoring:** For items **1, 3, 5, 7, 9**: score = response − 1. For items **2, 4, 6, 8, 10**: score = 5 − response. Sum × 2.5 = SUS (0–100). Target: **≥ 70**.
 
 ## Suggested scenarios
 

@@ -210,8 +210,132 @@ const RULE_BY_FACTOR_TYPE = Object.fromEntries(
 
 const P1_RULE = CLINICAL_RULES.P1;
 
+/**
+ * Cross-reactivity matrix for drug classes.
+ * Maps allergen drug classes to arrays of drug classes that cross-react with them.
+ * Based on pharmacological beta-lactam family, NSAID cross-reactivity, etc.
+ */
+const DRUG_CLASS_CROSS_REACTIVITY_MATRIX = Object.freeze({
+  // Beta-lactam family: Penicillins cross-react with cephalosporins and carbapenems
+  penicillin: [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'cephalosporins',
+    'first-generation cephalosporin',
+    'first generation cephalosporin',
+    'second-generation cephalosporin',
+    'second generation cephalosporin',
+    'third-generation cephalosporin',
+    'third generation cephalosporin',
+    'carbapenems',
+    'carbapenem',
+  ],
+
+  // Cephalosporins cross-react with penicillins (beta-lactam family)
+  cephalosporin: [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'cephalosporins',
+    'first-generation cephalosporin',
+    'first generation cephalosporin',
+    'second-generation cephalosporin',
+    'second generation cephalosporin',
+    'third-generation cephalosporin',
+    'third generation cephalosporin',
+    'carbapenems',
+  ],
+  cephalosporins: [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'cephalosporins',
+    'first-generation cephalosporin',
+    'first generation cephalosporin',
+    'second-generation cephalosporin',
+    'second generation cephalosporin',
+    'third-generation cephalosporin',
+    'third generation cephalosporin',
+  ],
+
+  // Specific cephalosporin generations
+  'first-generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'first-generation cephalosporin',
+  ],
+  'first generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'first generation cephalosporin',
+  ],
+  'second-generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'second-generation cephalosporin',
+  ],
+  'second generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'second generation cephalosporin',
+  ],
+  'third-generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'third-generation cephalosporin',
+  ],
+  'third generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'third generation cephalosporin',
+  ],
+
+  // NSAID and Aspirin/Salicylate cross-reactivity
+  nsaid: ['nsaid', 'nonsteroidal anti-inflammatory', 'non steroidal anti inflammatory', 'salicylate', 'aspirin'],
+  salicylate: ['salicylate', 'nsaid', 'aspirin', 'nonsteroidal anti-inflammatory'],
+  aspirin: ['aspirin', 'salicylate', 'nsaid', 'nonsteroidal anti-inflammatory'],
+});
+
+/**
+ * Check if two drug classes cross-react with each other.
+ * @param {string} allergyDrugClass - The drug class from the allergy profile
+ * @param {string} currentDrugClass - The drug class of the current medication
+ * @returns {boolean} true if cross-reactivity exists between the classes
+ */
+const hasClassCrossReactivity = (allergyDrugClass, currentDrugClass) => {
+  if (!allergyDrugClass || !currentDrugClass) {
+    return false;
+  }
+
+  const allergyNormalized = String(allergyDrugClass).toLowerCase().trim();
+  const currentNormalized = String(currentDrugClass).toLowerCase().trim();
+
+  const crossReactiveClasses = DRUG_CLASS_CROSS_REACTIVITY_MATRIX[allergyNormalized] || [];
+  return crossReactiveClasses.some(
+    (cl) => cl === currentNormalized || currentNormalized.includes(cl) || cl.includes(currentNormalized)
+  );
+};
+
 module.exports = {
   CLINICAL_RULES,
   RULE_BY_FACTOR_TYPE,
   P1_RULE,
+  DRUG_CLASS_CROSS_REACTIVITY_MATRIX,
+  hasClassCrossReactivity,
 };

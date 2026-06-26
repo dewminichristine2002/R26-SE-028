@@ -21,6 +21,13 @@ const safeJsonParse = (value, fallback) => {
 };
 
 const normalizeText = (value) => (value == null ? '' : String(value).trim());
+const toIntegerScore = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.round(numeric);
+};
 
 const parseDosageMg = (value) => {
   const match = String(value || '').match(/(\d+(?:\.\d+)?)\s*mg\b/i);
@@ -730,6 +737,7 @@ const createCard = async (userId, payload) => {
     const riskFactors = [];
 
     for (const factor of payload.riskFactors) {
+      const factorScore = toIntegerScore(factor.score);
       const insertedFactor = await client.query(
         `
           INSERT INTO allergy_card_risk_factors (
@@ -742,7 +750,7 @@ const createCard = async (userId, payload) => {
           VALUES ($1, $2, $3, $4, $5)
           RETURNING id, factor_type, factor_label, severity, score, created_at
         `,
-        [card.id, factor.factorType, factor.factorLabel, factor.severity, factor.score]
+        [card.id, factor.factorType, factor.factorLabel, factor.severity, factorScore]
       );
 
       const row = insertedFactor.rows[0];
