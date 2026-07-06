@@ -7,3 +7,6 @@ yarn-error.log
 dist/
 build/
 coverage/
+ml/data/public/ePillID_data/
+ml/data/public/pillbox/
+.npm-cache/
