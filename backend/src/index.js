@@ -5,32 +5,25 @@ const emotionalSupportRoutes = require('./routes/emotionalSupportRoutes');
 
 dotenv.config();
 
-const {
-  initializeDatabase,
-  getDatabaseStatus,
-  getDatabaseTroubleshootingHints,
-  dbState,
-} = require('./config/db');
+const { initializeDatabase } = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '35mb' }));
 
 // Routes
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'Server is running',
-    database: getDatabaseStatus(),
-  });
+  res.json({ status: 'Server is running' });
 });
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/medications', require('./routes/medications'));
 app.use('/api/routines', require('./routes/routines'));
+app.use('/api/intake-monitoring', require('./routes/intakeMonitoring'));
 app.use('/api/allergies', require('./routes/allergies'));
 app.use('/api/prescriptions', require('./routes/prescriptions'));
 app.use('/api/emotional-support', emotionalSupportRoutes);
@@ -44,35 +37,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-const connectDatabaseWithRetry = async () => {
+const startServer = async () => {
   try {
     await initializeDatabase();
-    console.log('[DB] Database initialization complete');
-  } catch (error) {
-    dbState.connected = false;
-    dbState.lastError = error.message;
-    console.error('Failed to initialize database:', error.message);
-    const hints = getDatabaseTroubleshootingHints(error.message);
-    hints.forEach((hint) => {
-      console.error(`[DB] Hint: ${hint}`);
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
     });
-    console.log('[DB] Retrying database connection in 10 seconds...');
-    setTimeout(connectDatabaseWithRetry, 10000);
+  } catch (error) {
+    console.error('Failed to initialize server:', error.message);
+    process.exit(1);
   }
 };
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  connectDatabaseWithRetry();
-});
-
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`[Server] Port ${PORT} is already in use.`);
-    console.error('[Server] Stop the existing process on that port or change PORT in backend/.env.');
-    process.exit(1);
-  }
-
-  console.error('[Server] Failed to start:', error.message);
-  process.exit(1);
-});
+startServer();

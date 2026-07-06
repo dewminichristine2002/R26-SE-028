@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { BackHandler, Platform } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './src/i18n/config';
-import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
 import { languageService } from './src/services/languageService';
 import HomeScreen from './src/screens/HomeScreen';
 import SplashScreen from './src/screens/SplashScreen';
@@ -42,7 +41,6 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState('home');
   const [currentUser, setCurrentUser] = useState(null);
-  const [isLocalMode, setIsLocalMode] = useState(false);
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState('');
   const [assistantReturnScreen, setAssistantReturnScreen] = useState('home');
@@ -100,9 +98,34 @@ export default function App() {
     setAssistantInitialPrompt('');
   };
 
+  // Android hardware back button navigation
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      // If on login/register, exit app
+      if (!isAuthenticated) {
+        return false;
+      }
+      // If on profile/settings, go back to home
+      if (activeScreen === 'profile' || activeScreen === 'settings') {
+        setActiveScreen('home');
+        return true;
+      }
+      // If not on home, go back to home
+      if (activeScreen !== 'home') {
+        setActiveScreen('home');
+        return true;
+      }
+      // Otherwise, let default (exit app)
+      return false;
+    };
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [isAuthenticated, activeScreen]);
+
   useEffect(() => {
     const bootstrap = async () => {
-      languageService.loadSavedLanguage();
+      await languageService.loadSavedLanguage();
 
       const token = await authService.getToken();
 
@@ -111,29 +134,9 @@ export default function App() {
           const profile = await userService.getMyProfile();
           setCurrentUser(profile);
           setIsAuthenticated(true);
-          setIsLocalMode(await authService.isUsingLocalMode());
         } catch (error) {
-          const status = error.response?.status;
-          const storedUser = await authService.getStoredUser();
-
-          if (status === 401) {
-            console.log('[App] Session restore failed with 401, clearing local auth.');
-            await authService.logout();
-          } else if (status === 503) {
-            console.log('[App] Session restore skipped because database is unavailable:', error.response?.data?.error);
-            if (storedUser) {
-              setCurrentUser(storedUser);
-            }
-            setIsAuthenticated(true);
-            setIsLocalMode(await authService.isUsingLocalMode());
-          } else {
-            console.log('[App] Session restore skipped because backend is unreachable:', error.message);
-            if (storedUser) {
-              setCurrentUser(storedUser);
-            }
-            setIsAuthenticated(true);
-            setIsLocalMode(await authService.isUsingLocalMode());
-          }
+          console.log('[App] Session restore failed, clearing local auth:', error.message);
+          await authService.logout();
         }
       }
 
@@ -214,7 +217,6 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveScreen('home');
-    setIsLocalMode(await authService.isUsingLocalMode());
   };
 
   const handleLogout = async () => {
@@ -223,7 +225,6 @@ export default function App() {
     setIsAuthenticated(false);
     setAuthMode('login');
     setActiveScreen('home');
-    setIsLocalMode(false);
   };
 
   const handleProfileUpdated = (updatedUser) => {
@@ -276,16 +277,9 @@ export default function App() {
 
     if (activeScreen === 'allergies' || activeScreen === 'history' || activeScreen === 'medicine-profile') {
       return (
-        <MedicineSafetyScreen
-          onBack={() => setActiveScreen('home')}
+        <SettingsScreen
+          onBack={() => setActiveScreen('profile')}
           onLogout={handleLogout}
-          initialRoute={
-            activeScreen === 'history'
-              ? 'history'
-              : activeScreen === 'medicine-profile'
-                ? 'profile-view'
-                : 'home'
-          }
         />
       );
     }

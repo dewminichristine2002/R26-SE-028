@@ -1,10 +1,64 @@
 const express = require('express');
-const { requireDatabase } = require('../middleware/databaseMiddleware');
-const { requireAuth } = require('../middleware/authMiddleware');
-const { searchMedications, enrichMedication } = require('../services/medicationKnowledgeService');
+const path = require('path');
+const { spawn } = require('child_process');
 const { pool } = require('../config/db');
 
 const router = express.Router();
+
+const getPythonCommand = () => process.env.TABLET_IDENTITY_PYTHON || process.env.PILL_ML_PYTHON || 'python';
+
+const runPythonJsonScript = (scriptName, payload, timeoutMs = 30000) =>
+  new Promise((resolve, reject) => {
+    const scriptPath = path.resolve(__dirname, '..', '..', 'scripts', scriptName);
+    const child = spawn(getPythonCommand(), [scriptPath], {
+      cwd: path.resolve(__dirname, '..', '..'),
+      env: {
+        ...process.env,
+      },
+      windowsHide: true,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error(`${scriptName} timed out.`));
+    }, timeoutMs);
+
+    child.stdout.on('data', (data) => {
+      stdout += String(data);
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += String(data);
+    });
+
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      try {
+        const parsed = JSON.parse(stdout || '{}');
+        if (code !== 0 && parsed?.error) {
+          reject(new Error(parsed.error));
+          return;
+        }
+        if (code !== 0) {
+          reject(new Error(stderr || 'Tablet identity analysis failed.'));
+          return;
+        }
+        resolve(parsed);
+      } catch (error) {
+        reject(new Error(stderr || error.message || 'Invalid tablet identity analysis response.'));
+      }
+    });
+
+    child.stdin.write(JSON.stringify(payload));
+    child.stdin.end();
+  });
 
 const quoteIdentifier = (identifier) => `"${String(identifier).replace(/"/g, '""')}"`;
 
@@ -265,6 +319,86 @@ router.get('/appearances', async (req, res) => {
   } catch (error) {
     console.error('[Medications] appearances error:', error.message);
     return res.status(500).json({ error: 'Failed to load medicine appearances' });
+  }
+});
+
+router.post('/identify-photo', requireAuth, async (req, res) => {
+  const imageBase64 = String(req.body?.imageBase64 || '').trim();
+
+  if (!imageBase64) {
+    return res.status(400).json({ error: 'A tablet photo is required.' });
+  }
+
+  try {
+    const medicineNameColumn = await resolveMedicineNameColumn();
+    const medicineColorColumn = await resolveMedicineColorColumn();
+    const medicineShapeColumn = await resolveMedicineShapeColumn();
+
+    const qName = quoteIdentifier(medicineNameColumn);
+    const qColor = medicineColorColumn ? quoteIdentifier(medicineColorColumn) : null;
+    const qShape = medicineShapeColumn ? quoteIdentifier(medicineShapeColumn) : null;
+
+    const colorSelect = qColor
+      ? `(SELECT BTRIM(m.${qColor}) FROM medicines m WHERE LOWER(BTRIM(m.${qName})) = LOWER(BTRIM(um.medicine_name)) LIMIT 1)`
+      : `NULL::text`;
+
+    const shapeSelect = qShape
+      ? `(SELECT BTRIM(m.${qShape})
+          FROM medicines m
+          WHERE LOWER(BTRIM(m.${qName})) = LOWER(BTRIM(um.medicine_name))
+            AND (
+              (um.selected_color IS NULL OR BTRIM(um.selected_color) = '' OR ${qColor ? `LOWER(BTRIM(m.${qColor})) = LOWER(BTRIM(um.selected_color))` : 'TRUE'})
+              AND (um.selected_shape IS NULL OR BTRIM(um.selected_shape) = '' OR LOWER(BTRIM(m.${qShape})) = LOWER(BTRIM(um.selected_shape)))
+            )
+          LIMIT 1)`
+      : `NULL::text`;
+
+    const result = await pool.query(
+      `
+        SELECT
+          um.id,
+          um.medicine_name,
+          um.dosage_mg,
+          COALESCE(NULLIF(BTRIM(um.selected_color), ''), ${colorSelect}) AS medicine_color,
+          COALESCE(NULLIF(BTRIM(um.selected_shape), ''), ${shapeSelect}) AS medicine_shape
+        FROM user_medications um
+        WHERE um.user_id = $1
+        ORDER BY um.created_at DESC;
+      `,
+      [req.user.id]
+    );
+
+    const candidates = result.rows
+      .map((row) => ({
+        id: row.id,
+        medicineName: row.medicine_name,
+        dosageMg: row.dosage_mg,
+        color: row.medicine_color || '',
+        shape: row.medicine_shape || '',
+      }))
+      .filter((item) => item.medicineName);
+
+    const analysis = await runPythonJsonScript(
+      'analyze_tablet_identity.py',
+      {
+        imageBase64,
+        candidates,
+      },
+      45000
+    );
+
+    return res.json({
+      ...analysis,
+      candidateCount: candidates.length,
+    });
+  } catch (error) {
+    console.error('[Medications] tablet identity error:', error?.message || error);
+    return res.status(500).json({
+      status: 'uncertain',
+      confidence: 0,
+      matches: [],
+      error: 'Could not identify the tablet. Retake the photo on a plain background with one tablet centered.',
+    });
   }
 });
 
@@ -1239,34 +1373,6 @@ router.delete('/:id', requireAuth, async (req, res) => {
     console.error('[Medications] delete error:', error.message);
     return res.status(500).json({ error: 'Failed to delete medication' });
   }
-});
-
-router.use(requireDatabase);
-router.use(requireAuth);
-
-router.get('/search', (req, res) => {
-  const query = String(req.query.q || '').trim();
-  return res.json({
-    results: searchMedications(query),
-  });
-});
-
-router.get('/knowledge', (req, res) => {
-  const medicineName = String(req.query.medicineName || '').trim();
-  const currentMedicationsText = String(req.query.currentMedicationsText || '').trim();
-  const symptomMatch = String(req.query.symptomMatch || '').trim();
-
-  if (!medicineName) {
-    return res.status(400).json({ error: 'medicineName query parameter is required' });
-  }
-
-  return res.json({
-    knowledge: enrichMedication({
-      medicineName,
-      currentMedicationsText,
-      symptomMatch,
-    }),
-  });
 });
 
 module.exports = router;

@@ -1,11 +1,8 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/authMiddleware');
-const { requireDatabase } = require('../middleware/databaseMiddleware');
 
 const router = express.Router();
-
-router.use(requireDatabase);
 
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
