@@ -13,22 +13,49 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      "expo-speech-recognition",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/medicine_reminder.mp3"
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ElderMeds reads prescription photos to help check medicine safety.",
+          "cameraPermission": "ElderMeds can use the camera to capture a prescription for safety checking."
+        }
+      ]
+    ],
     "ios": {
       "bundleIdentifier": "com.eldermeds.app",
-      "buildNumber": "1"
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "ElderMeds reads prescription photos to help check medicine safety.",
+        "NSCameraUsageDescription": "ElderMeds can use the camera to capture a prescription for safety checking.",
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+      }
     },
     "android": {
       "package": "com.eldermeds.app",
-      "versionCode": 1
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "sandanima",
     "extra": {
       "eas": {
-        "projectId": "a4f3c948-9552-4422-bfb1-981aa85e78c8"
+        "projectId": "24a21b0b-dd9d-4e1c-a8b2-92f84bbd7322"
       }
-    }
+    },
+    "owner": "dewmini_expo"
   }
 }

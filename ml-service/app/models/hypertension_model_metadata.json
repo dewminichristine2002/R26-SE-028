@@ -1,0 +1,190 @@
+{
+  "selectedAlgorithm": "Decision Tree",
+  "accuracy": 0.5205017572934822,
+  "balancedAccuracy": 0.5049481592994369,
+  "precision": 0.7225528749070039,
+  "recall": 0.5404857494931828,
+  "f1Score": 0.6183968163729392,
+  "rocAuc": 0.5031237608307633,
+  "confusionMatrix": [
+    [
+      4619,
+      5221
+    ],
+    [
+      11560,
+      13597
+    ]
+  ],
+  "featuresUsed": [
+    "Age",
+    "BMI",
+    "Cholesterol",
+    "Systolic_BP",
+    "Diastolic_BP",
+    "Alcohol_Intake",
+    "Stress_Level",
+    "Salt_Intake",
+    "Sleep_Duration",
+    "Heart_Rate",
+    "LDL",
+    "HDL",
+    "Triglycerides",
+    "Glucose",
+    "Country",
+    "Smoking_Status",
+    "Physical_Activity_Level",
+    "Family_History",
+    "Diabetes",
+    "Gender",
+    "Education_Level",
+    "Employment_Status"
+  ],
+  "numericFeatures": [
+    "Age",
+    "BMI",
+    "Cholesterol",
+    "Systolic_BP",
+    "Diastolic_BP",
+    "Alcohol_Intake",
+    "Stress_Level",
+    "Salt_Intake",
+    "Sleep_Duration",
+    "Heart_Rate",
+    "LDL",
+    "HDL",
+    "Triglycerides",
+    "Glucose"
+  ],
+  "categoricalFeatures": [
+    "Country",
+    "Smoking_Status",
+    "Physical_Activity_Level",
+    "Family_History",
+    "Diabetes",
+    "Gender",
+    "Education_Level",
+    "Employment_Status"
+  ],
+  "numericDefaults": {
+    "Age": 54.0,
+    "BMI": 27.5,
+    "Cholesterol": 225.0,
+    "Systolic_BP": 135.0,
+    "Diastolic_BP": 89.0,
+    "Alcohol_Intake": 15.0,
+    "Stress_Level": 5.0,
+    "Salt_Intake": 8.5,
+    "Sleep_Duration": 7.0,
+    "Heart_Rate": 75.0,
+    "LDL": 130.0,
+    "HDL": 65.0,
+    "Triglycerides": 150.0,
+    "Glucose": 134.0
+  },
+  "categoricalDefaults": {
+    "Country": "Saudi Arabia",
+    "Smoking_Status": "Current",
+    "Physical_Activity_Level": "Low",
+    "Family_History": "No",
+    "Diabetes": "No",
+    "Gender": "Female",
+    "Education_Level": "Secondary",
+    "Employment_Status": "Retired"
+  },
+  "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\hypertension_dataset.csv",
+  "classBalance": {
+    "trainPositive": 100624,
+    "trainNegative": 39361
+  },
+  "modelComparison": [
+    {
+      "algorithm": "Logistic Regression",
+      "metrics": {
+        "accuracy": 0.49852844529531104,
+        "balancedAccuracy": 0.4948616974021034,
+        "precision": 0.7147292948681759,
+        "recall": 0.5032396549668084,
+        "f1Score": 0.5906228131560531,
+        "rocAuc": 0.49536848429262603,
+        "confusionMatrix": [
+          [
+            4787,
+            5053
+          ],
+          [
+            12497,
+            12660
+          ]
+        ],
+        "positiveRate": 0.5000264530435551
+      }
+    },
+    {
+      "algorithm": "Decision Tree",
+      "metrics": {
+        "accuracy": 0.5205017572934822,
+        "balancedAccuracy": 0.5049481592994369,
+        "precision": 0.7225528749070039,
+        "recall": 0.5404857494931828,
+        "f1Score": 0.6183968163729392,
+        "rocAuc": 0.5031237608307633,
+        "confusionMatrix": [
+          [
+            4619,
+            5221
+          ],
+          [
+            11560,
+            13597
+          ]
+        ],
+        "positiveRate": 0.5304933493547253
+      }
+    },
+    {
+      "algorithm": "Random Forest",
+      "metrics": {
+        "accuracy": 0.7188044689544818,
+        "balancedAccuracy": 0.49998012481615456,
+        "precision": 0.7188250085724083,
+        "recall": 0.9999602496323091,
+        "f1Score": 0.8364005120276627,
+        "rocAuc": 0.503275515130832,
+        "confusionMatrix": [
+          [
+            0,
+            9840
+          ],
+          [
+            1,
+            25156
+          ]
+        ],
+        "positiveRate": 0.6134521508047655
+      }
+    },
+    {
+      "algorithm": "XGBoost",
+      "metrics": {
+        "accuracy": 0.5291024944995285,
+        "balancedAccuracy": 0.5020514340672285,
+        "precision": 0.720306707967298,
+        "recall": 0.5638589656954327,
+        "f1Score": 0.6325529542920847,
+        "rocAuc": 0.5019811155051965,
+        "confusionMatrix": [
+          [
+            4332,
+            5508
+          ],
+          [
+            10972,
+            14185
+          ]
+        ],
+        "positiveRate": 0.5048015117645264
+      }
+    }
+  ]
+}

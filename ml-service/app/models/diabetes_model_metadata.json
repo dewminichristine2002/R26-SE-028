@@ -1,0 +1,121 @@
+{
+  "selectedAlgorithm": "XGBoost",
+  "accuracy": 0.7426975033595021,
+  "precision": 0.7195137555982086,
+  "recall": 0.7954449002687792,
+  "f1Score": 0.7555764579414136,
+  "rocAuc": 0.820350913595088,
+  "confusionMatrix": [
+    [
+      4878,
+      2192
+    ],
+    [
+      1446,
+      5623
+    ]
+  ],
+  "featuresUsed": [
+    "Age",
+    "Sex",
+    "BMI",
+    "HighBP",
+    "Smoker",
+    "PhysActivity",
+    "HeartDiseaseorAttack",
+    "Stroke",
+    "GenHlth",
+    "DiffWalk"
+  ],
+  "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\diabetes_binary_5050split_health_indicators_BRFSS2015.csv",
+  "classBalance": {
+    "trainPositive": 28277,
+    "trainNegative": 28276
+  },
+  "modelComparison": [
+    {
+      "algorithm": "Logistic Regression",
+      "metrics": {
+        "accuracy": 0.7370393945823609,
+        "precision": 0.7279902027486733,
+        "recall": 0.7568255764606027,
+        "f1Score": 0.7421278956859482,
+        "rocAuc": 0.812735526932642,
+        "confusionMatrix": [
+          [
+            5071,
+            1999
+          ],
+          [
+            1719,
+            5350
+          ]
+        ],
+        "positiveRate": 0.5020019449022084
+      }
+    },
+    {
+      "algorithm": "Decision Tree",
+      "metrics": {
+        "accuracy": 0.7286229577763632,
+        "precision": 0.7179072276159655,
+        "recall": 0.7531475456217287,
+        "f1Score": 0.7351052813255091,
+        "rocAuc": 0.8021990850743219,
+        "confusionMatrix": [
+          [
+            4978,
+            2092
+          ],
+          [
+            1745,
+            5324
+          ]
+        ],
+        "positiveRate": 0.4989727643511089
+      }
+    },
+    {
+      "algorithm": "Random Forest",
+      "metrics": {
+        "accuracy": 0.7047174481929415,
+        "precision": 0.698327850877193,
+        "recall": 0.7207525816947234,
+        "f1Score": 0.7093630351548904,
+        "rocAuc": 0.769963061621523,
+        "confusionMatrix": [
+          [
+            4869,
+            2201
+          ],
+          [
+            1974,
+            5095
+          ]
+        ],
+        "positiveRate": 0.49949289896304666
+      }
+    },
+    {
+      "algorithm": "XGBoost",
+      "metrics": {
+        "accuracy": 0.7426975033595021,
+        "precision": 0.7195137555982086,
+        "recall": 0.7954449002687792,
+        "f1Score": 0.7555764579414136,
+        "rocAuc": 0.820350913595088,
+        "confusionMatrix": [
+          [
+            4878,
+            2192
+          ],
+          [
+            1446,
+            5623
+          ]
+        ],
+        "positiveRate": 0.5014088153839111
+      }
+    }
+  ]
+}

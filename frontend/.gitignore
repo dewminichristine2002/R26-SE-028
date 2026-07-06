@@ -27,3 +27,5 @@ eas-builds/
 # OS
 Thumbs.db
 .cache/
+
+ml-service/.venv/

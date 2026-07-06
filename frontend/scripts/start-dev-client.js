@@ -36,20 +36,27 @@ if (!ip) {
   process.exit(1);
 }
 
+const metroPort = String(process.env.METRO_PORT || process.env.RCT_METRO_PORT || '8081');
+
 const env = {
   ...process.env,
   REACT_NATIVE_PACKAGER_HOSTNAME: ip,
+  RCT_METRO_PORT: metroPort,
 };
 
 console.log(`Using LAN host: ${ip}`);
+console.log(`Metro port: ${metroPort}`);
 
-const expoCmd = 'npx';
-const args = ['expo', 'start', '--dev-client', '--lan', '--clear', '--port', '8081'];
+const isWindows = process.platform === 'win32';
+const expoCmd = isWindows ? 'cmd' : 'npx';
+const args = isWindows
+  ? ['/c', 'npx', 'expo', 'start', '--dev-client', '--lan', '--clear', '--port', metroPort]
+  : ['expo', 'start', '--dev-client', '--lan', '--clear', '--port', metroPort];
 
 const child = spawn(expoCmd, args, {
   stdio: 'inherit',
   env,
-  shell: process.platform === 'win32',
+  shell: false,
 });
 
 child.on('close', (code) => {

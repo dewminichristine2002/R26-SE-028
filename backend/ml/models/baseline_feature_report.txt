@@ -1,0 +1,12 @@
+Baseline training complete (tuned RandomForest + 5-fold CV).
+Dataset: medicine_safety_training_dataset.csv
+Rows: 4075
+Target: risk_level
+Best CV F1 (macro): 0.9948 (+/- 0.0021)
+Best CV accuracy: 0.9948 (+/- 0.0021)
+Hold-out accuracy (20%): 0.9939
+Hold-out F1 macro: 0.9938
+Best params: {'preprocessor__txt__tfidf__max_features': 300, 'classifier__n_estimators': 800, 'classifier__min_samples_split': 2, 'classifier__min_samples_leaf': 1, 'classifier__max_features': 'sqrt', 'classifier__max_depth': 32}
+Numeric features: ['side_effect_count', 'severe_side_effect_count', 'side_effect_match_count', 'interaction_count']
+Categorical features: ['gender', 'input_method', 'max_interaction_severity', 'has_medicine_allergy', 'has_severe_reaction_log']
+Text feature: combined_text
