@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     fusion_model_dir: Path = Path("artifacts/fusion-model")
     use_model_artifacts: bool = True
 
+    # --- Unified Conversational Dashboard (RAG) ---
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3:8b"
+    ollama_timeout_seconds: float = 90.0
+    ollama_temperature: float = 0.0
+    ollama_num_predict: int = 1024
+    spacy_model: str = "en_core_web_sm"
+    rag_max_rows_in_context: int = 50
+
     model_config = SettingsConfigDict(
         env_prefix="ELDERMEDS_ML_",
         env_file=".env",

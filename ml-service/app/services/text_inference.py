@@ -22,11 +22,97 @@ def _normalize_emotion(label: str) -> str:
     return label
 
 
+def _contains_any(text: str, phrases: list[str]) -> bool:
+    return any(phrase in text for phrase in phrases)
+
+
+def _explicit_emotion_signal(text: str) -> str | None:
+    if "not bad" in text:
+        return None
+
+    phrase_groups = [
+        (
+            "lonely",
+            [
+                "i am alone",
+                "i feel alone",
+                "i feel lonely",
+                "nobody visited",
+                "no one visited",
+                "i miss my",
+            ],
+        ),
+        (
+            "sad",
+            [
+                "not good",
+                "not feeling good",
+                "not feel good",
+                "not okay",
+                "not ok",
+                "not fine",
+                "not well",
+                "not better",
+                "i feel bad",
+                "feeling bad",
+                "bad today",
+                "very bad",
+                "i am sad",
+                "i feel sad",
+            ],
+        ),
+        (
+            "anxious",
+            [
+                "i am worried",
+                "i feel worried",
+                "i am anxious",
+                "i feel anxious",
+                "i am scared",
+                "i feel scared",
+                "i cannot sleep",
+                "i can't sleep",
+            ],
+        ),
+        (
+            "confused",
+            [
+                "i am confused",
+                "i feel confused",
+                "i forgot",
+                "i cannot remember",
+                "i can't remember",
+                "i do not remember",
+                "i don't remember",
+                "not sure",
+            ],
+        ),
+        (
+            "angry",
+            [
+                "i am angry",
+                "i feel angry",
+                "i am mad",
+                "i feel mad",
+                "i am frustrated",
+                "i feel frustrated",
+            ],
+        ),
+    ]
+
+    for emotion, phrases in phrase_groups:
+        if _contains_any(text, phrases):
+            return emotion
+    return None
+
+
 def _build_keyword_fallback(text: str) -> dict[str, Any]:
     normalized = text.lower()
-    emotion = "neutral"
+    emotion = _explicit_emotion_signal(normalized) or "neutral"
 
-    if any(token in normalized for token in ["alone", "lonely", "isolated"]):
+    if emotion != "neutral":
+        pass
+    elif any(token in normalized for token in ["alone", "lonely", "isolated"]):
         emotion = "lonely"
     elif any(token in normalized for token in ["angry", "anger", "mad", "furious", "frustrated", "annoyed", "irritated"]):
         emotion = "angry"
@@ -34,9 +120,9 @@ def _build_keyword_fallback(text: str) -> dict[str, Any]:
         emotion = "confused"
     elif any(token in normalized for token in ["worried", "stress", "anxious", "anxiety", "panic", "pressure", "nervous"]):
         emotion = "anxious"
-    elif any(token in normalized for token in ["sad", "down", "hurt", "cry"]):
+    elif any(token in normalized for token in ["sad", "down", "hurt", "cry", "bad"]):
         emotion = "sad"
-    elif any(token in normalized for token in ["happy", "grateful", "good", "great"]):
+    elif "not good" not in normalized and any(token in normalized for token in ["happy", "grateful", "good", "great"]):
         emotion = "happy"
 
     scores = {label: 0.05 for label in FINAL_LABELS}
