@@ -9,3 +9,4 @@ backend/ml/models/*.npz
 Ultralytics/
 yolo11n.pt
 runs/
+.venv/
