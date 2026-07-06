@@ -29,6 +29,13 @@
           "photosPermission": "ElderMeds reads prescription photos to help check medicine safety.",
           "cameraPermission": "ElderMeds can use the camera to capture a prescription for safety checking."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "ElderMeds uses your microphone to capture medicine names for allergy checks.",
+          "speechRecognitionPermission": "ElderMeds converts your speech to medicine names for allergy checks."
+        }
       ]
     ],
     "ios": {

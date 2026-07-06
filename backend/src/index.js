@@ -5,7 +5,12 @@ const emotionalSupportRoutes = require('./routes/emotionalSupportRoutes');
 
 dotenv.config();
 
-const { initializeDatabase } = require('./config/db');
+const {
+  initializeDatabase,
+  getPublicDatabaseStatus,
+  getDatabaseTroubleshootingHints,
+  dbState,
+} = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,7 +21,10 @@ app.use(express.json({ limit: '35mb' }));
 
 // Routes
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  res.json({
+    status: 'Server is running',
+    database: getPublicDatabaseStatus(),
+  });
 });
 
 app.use('/api/auth', require('./routes/auth'));

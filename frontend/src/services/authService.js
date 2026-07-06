@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { API_BASE_URL } from './apiConfig';
+import { API_BASE_URL, getBackendConnectionHelp } from './apiConfig';
 
 const TOKEN_KEY = 'eldermeds_token';
 const USER_KEY = 'eldermeds_user';
@@ -12,6 +12,12 @@ const authClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+const isBackendUnavailableError = (error) =>
+  error?.response?.status === 503 || error?.message === 'Network Error';
+
+const toBackendUnavailableError = () => new Error(getBackendConnectionHelp());
+const isLocalTokenValue = (token) => String(token || '').startsWith('local-token-');
 
 export const authService = {
   async register(payload) {
@@ -35,6 +41,10 @@ export const authService = {
 
   async getToken() {
     return AsyncStorage.getItem(TOKEN_KEY);
+  },
+
+  isLocalToken(token) {
+    return isLocalTokenValue(token);
   },
 
   async getStoredUser() {
