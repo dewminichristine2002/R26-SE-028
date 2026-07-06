@@ -1,8 +1,14 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const defaultApi = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+const configuredApi = process.env.EXPO_PUBLIC_API_URL;
 
-const physicalDeviceApi = 'http://192.168.8.140:5000/api';
+const derivedHost = (() => {
+  const scriptURL = NativeModules?.SourceCode?.scriptURL;
+
+  if (!scriptURL) {
+    return null;
+  }
 
   const expoMatch = scriptURL.match(/exp(?:s)?:\/\/([^/:]+)/i);
   if (expoMatch?.[1]) {

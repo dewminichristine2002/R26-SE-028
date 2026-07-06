@@ -14,7 +14,7 @@ import ReceiptScanScreen from './ReceiptScanScreen';
 import TabletIdentifierScreen from './TabletIdentifierScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenDiabetesPrediction, onOpenStrokePrediction, onOpenHypertensionPrediction, onOpenAssistant, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenDiabetesPrediction, onOpenStrokePrediction, onOpenHypertensionPrediction, onOpenAssistant, onLogout, launchIntent }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(true);
@@ -161,24 +161,27 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
   ];
 
   const handleButtonPress = (item) => {
-    if (item.label === 'home.reminder') {
+    if (item.id === 1 || item.label === 'home.reminder') {
       setActiveReminderView('menu');
       setShowReminderMenu(true);
       return;
     }
 
-    if (item.label === 'Reminder') {
-      setShowReminderMenu(true);
+    if (item.id === 2 || item.label === 'home.allergies') {
+      setShowReminderMenu(false);
       setActiveReminderView('menu');
+      onOpenAllergies?.();
       return;
     }
 
-    if (item.label === 'Emotions') {
+    if (item.id === 3 || item.label === 'home.emotions') {
+      setShowReminderMenu(false);
+      setActiveReminderView('menu');
       onOpenEmotionalSupport?.();
       return;
     }
 
-    if (item.label === 'Dashboard') {
+    if (item.id === 4 || item.label === 'home.dashboard') {
       setShowReminderMenu(false);
       setActiveReminderView('menu');
       onOpenDashboard?.();
@@ -1001,13 +1004,6 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
     );
   }
 
-  const todayLabel = new Date().toLocaleDateString([], {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
-  const firstName = String(user?.fullName || '').trim().split(/\s+/)[0] || 'there';
-
   return (
     <ScrollView style={styles.homeScroll} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.homeTopBar}>
@@ -1415,98 +1411,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#333',
-  },
-    flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 30,
-  homeContent: {
-  },
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-    width: 132,
-    height: 40,
-  },
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  },
-    fontSize: 24,
-    lineHeight: 28,
-  },
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#0f4f7a',
-  },
-  homeTopBar: {
-  homeBrandLogo: {
-    flexShrink: 1,
-  homeTopActions: {
-    marginLeft: 8,
-  homeTopProfileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    backgroundColor: '#fbfdff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  homeTopProfileIcon: {
-  homeTopLogoutButton: {
-    minWidth: 104,
-    minHeight: 50,
-    borderRadius: 18,
-    backgroundColor: '#fbfdff',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  homeTopLogoutIconFrame: {
-    width: 24,
-    height: 24,
-    marginRight: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  homeTopLogoutDoor: {
-    position: 'absolute',
-    left: 2,
-    width: 11,
-    height: 18,
-    borderRadius: 3,
-    borderWidth: 2,
-    borderColor: '#1f6894',
-    borderRightWidth: 0,
-  },
-  homeTopLogoutArrow: {
-    position: 'absolute',
-    right: 0,
-    color: '#1f6894',
-    fontSize: 19,
-    lineHeight: 23,
-    fontWeight: '900',
-  },
-  homeTopLogoutText: {
-    color: '#1f6894',
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '900',
   },
   caregiverDiabetesButton: {
     width: '48%',

@@ -16,6 +16,7 @@ import DiabetesPredictionScreen from './src/screens/DiabetesPredictionScreen';
 import StrokePredictionScreen from './src/screens/StrokePredictionScreen';
 import HypertensionPredictionScreen from './src/screens/HypertensionPredictionScreen';
 import AssistantFAB from './src/components/AssistantFAB';
+import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
 import { reminderNotificationService } from './src/services/reminderNotificationService';
@@ -275,7 +276,17 @@ export default function App() {
       );
     }
 
-    if (activeScreen === 'allergies' || activeScreen === 'history' || activeScreen === 'medicine-profile') {
+    if (activeScreen === 'allergies') {
+      return (
+        <MedicineSafetyScreen
+          onBack={() => setActiveScreen('home')}
+          onLogout={handleLogout}
+          initialRoute="home"
+        />
+      );
+    }
+
+    if (activeScreen === 'history' || activeScreen === 'medicine-profile') {
       return (
         <SettingsScreen
           onBack={() => setActiveScreen('profile')}
@@ -340,7 +351,6 @@ export default function App() {
     return (
       <HomeScreen
         user={currentUser}
-        isLocalMode={isLocalMode}
         onOpenProfile={() => setActiveScreen('profile')}
         onOpenAllergies={() => setActiveScreen('allergies')}
         onOpenMedicine={() => setActiveScreen('allergies')}

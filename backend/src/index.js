@@ -52,7 +52,23 @@ const startServer = async () => {
       console.log(`Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to initialize server:', error.message);
+    const details = [
+      error?.name && `name=${error.name}`,
+      error?.code && `code=${error.code}`,
+      error?.message && `message=${error.message}`,
+    ].filter(Boolean);
+    console.error('Failed to initialize server:', details.join(' ') || String(error));
+
+    const hints = getDatabaseTroubleshootingHints(error?.message || error?.code);
+    hints.forEach((hint) => console.error(`[DB hint] ${hint}`));
+
+    if (dbState.lastError && dbState.lastError !== error?.message) {
+      console.error(`[DB last error] ${dbState.lastError}`);
+    }
+
+    if (error?.stack) {
+      console.error(error.stack);
+    }
     process.exit(1);
   }
 };

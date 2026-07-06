@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { spawn } = require('child_process');
 const { pool } = require('../config/db');
+const { requireAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
