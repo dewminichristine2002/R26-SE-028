@@ -70,7 +70,7 @@ const responseTemplates = {
   },
   neutral: {
     type: 'empathetic_reply',
-    text: 'Thank you for checking in. Let us keep the day steady with one small mental activity.',
+    text: 'Thank you for telling me. A quiet or ordinary day is still worth checking in about. Let us do one simple activity together.',
     followUp: 'Would you like to do a quick orientation check?',
   },
 };

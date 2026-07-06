@@ -62,6 +62,7 @@ async function createCheckIn(req, res) {
       caregiverId: null,
       detectedEmotion: analysis.detectedEmotion,
       riskLevel,
+      negativeMoodCount7d,
     });
     const createdAlerts = await createAlertsForCaregivers({
       elderId: req.body.elderId,

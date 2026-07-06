@@ -1,12 +1,30 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../../../services/apiConfig';
 
-const rawApiBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
-const normalizedApiBaseUrl = rawApiBaseUrl.replace(/\/$/, '');
+const normalizedApiBaseUrl = API_BASE_URL.replace(/\/$/, '');
 
 const emotionalSupportApi = axios.create({
-  baseURL: `${normalizedApiBaseUrl}/api/emotional-support`,
+  baseURL: `${normalizedApiBaseUrl}/emotional-support`,
   timeout: 10000,
 });
+
+export const emotionalSupportApiBaseUrl = `${normalizedApiBaseUrl}/emotional-support`;
+
+const withComponent4ErrorHandling = async (request) => {
+  try {
+    const response = await request();
+    return response.data;
+  } catch (error) {
+    const message =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.response?.data?.errors?.join?.(', ') ||
+      error.message ||
+      'Component 4 emotional support request failed.';
+
+    throw new Error(message);
+  }
+};
 
 export const createCheckIn = (payload) => emotionalSupportApi.post('/check-ins', payload);
 export const getChatLogs = (sessionId) =>
@@ -27,5 +45,25 @@ export const acknowledgeAlert = (alertId, caregiverId) =>
   emotionalSupportApi.patch(`/alerts/${alertId}/acknowledge`, { caregiverId });
 export const getCaregiverElderDetail = (caregiverId, elderId) =>
   emotionalSupportApi.get(`/caregivers/${caregiverId}/elders/${elderId}`);
+
+export const createMoodCheckin = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/mood-checkin', payload));
+
+export const processNarrative = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/process-narrative', payload));
+
+export const getNextAdaptiveQuestion = (payload) =>
+  withComponent4ErrorHandling(() =>
+    emotionalSupportApi.get('/adaptive-question-bank/next', { params: payload })
+  );
+
+export const startAdaptiveChat = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-chat/start', payload));
+
+export const respondAdaptiveChat = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-chat/respond', payload));
+
+export const getEmotionalTrends = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/trends/${Number(userId)}`));
 
 export default emotionalSupportApi;

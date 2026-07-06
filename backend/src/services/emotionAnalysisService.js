@@ -3,6 +3,7 @@ const axios = require('axios');
 const {
   inferEmotionFromEmoji,
   inferEmotionFromText,
+  getExplicitEmotionSignal,
   normalizeEmotion,
   normalizeText,
 } = require('../utils/emotionMapper');
@@ -88,10 +89,27 @@ async function analyzeWithMlService({ text, transcript }) {
 }
 
 async function analyzeCheckIn(payload) {
+  const fallbackAnalysis = buildFallbackAnalysis(payload);
+  const mergedText = [payload.text, payload.transcript].filter(Boolean).join(' ').trim();
+  const explicitEmotion = getExplicitEmotionSignal(mergedText);
+
   try {
-    return await analyzeWithMlService(payload);
+    const mlAnalysis = await analyzeWithMlService(payload);
+
+    if (explicitEmotion && normalizeEmotion(explicitEmotion) !== mlAnalysis.detectedEmotion) {
+      return fallbackAnalysis;
+    }
+
+    if (
+      fallbackAnalysis.detectedEmotion !== 'neutral' &&
+      (mlAnalysis.detectedEmotion === 'neutral' || Number(mlAnalysis.confidence || 0) < 0.7)
+    ) {
+      return fallbackAnalysis;
+    }
+
+    return mlAnalysis;
   } catch (error) {
-    return buildFallbackAnalysis(payload);
+    return fallbackAnalysis;
   }
 }
 
