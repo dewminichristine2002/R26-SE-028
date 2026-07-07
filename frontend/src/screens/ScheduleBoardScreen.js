@@ -2081,39 +2081,41 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               {medicineAvailabilityItems.length > 0 && (
                 <View style={styles.verificationAvailabilityList}>
                   {medicineAvailabilityItems.map((item) => {
-                    const needsAttention = item.status === 'overdose'
-                      || item.status === 'unexpected'
-                      || item.status === 'underdose'
-                      || item.label === 'Missing'
-                      || item.label === 'Overdose';
                     const colorText = item.color || 'unknown';
                     const shapeText = item.shape || 'unknown';
+                    const isAvailable = item.label === 'Available';
+                    const isOverdose = item.label === 'Overdose' || item.status === 'overdose' || item.status === 'unexpected';
+                    const rowToneStyle = isAvailable
+                      ? styles.verificationAvailabilityRowAvailable
+                      : isOverdose
+                      ? styles.verificationAvailabilityRowOverdose
+                      : styles.verificationAvailabilityRowMissing;
+                    const statusBadgeStyle = isAvailable
+                      ? styles.verificationAvailabilityBadgeAvailable
+                      : isOverdose
+                      ? styles.verificationAvailabilityBadgeOverdose
+                      : styles.verificationAvailabilityBadgeMissing;
+                    const statusBadgeTextStyle = isAvailable
+                      ? styles.verificationAvailabilityBadgeTextAvailable
+                      : isOverdose
+                      ? styles.verificationAvailabilityBadgeTextOverdose
+                      : styles.verificationAvailabilityBadgeTextMissing;
 
                     return (
-                      <View key={item.key} style={styles.verificationAvailabilityRow}>
-                        {needsAttention ? (
-                          <View style={styles.verificationAvailabilityAppearanceWrap}>
-                            {renderAppearanceIcon(item.shape, item.color)}
-                          </View>
-                        ) : (
-                          <View
-                            style={[
-                              styles.verificationAvailabilityDot,
-                              item.available
-                                ? styles.verificationAvailabilityDotGood
-                                : styles.verificationAvailabilityDotBad,
-                            ]}
-                          />
-                        )}
+                      <View key={item.key} style={[styles.verificationAvailabilityRow, rowToneStyle]}>
+                        <View style={styles.verificationAvailabilityAppearanceWrap}>
+                          {renderAppearanceIcon(item.shape, item.color)}
+                        </View>
                         <View style={styles.verificationAvailabilityTextWrap}>
-                          <Text style={styles.verificationAvailabilityName}>
-                            {item.medicineName} - {item.label}
+                          <View style={styles.verificationAvailabilityNameRow}>
+                            <Text style={styles.verificationAvailabilityName}>{item.medicineName}</Text>
+                            <View style={[styles.verificationAvailabilityBadge, statusBadgeStyle]}>
+                              <Text style={[styles.verificationAvailabilityBadgeText, statusBadgeTextStyle]}>{item.label}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.verificationAvailabilityAppearanceText}>
+                            Color: {colorText} - Shape: {shapeText}
                           </Text>
-                          {needsAttention ? (
-                            <Text style={styles.verificationAvailabilityAppearanceText}>
-                              Color: {colorText} - Shape: {shapeText}
-                            </Text>
-                          ) : null}
                           <Text style={styles.verificationAvailabilityMeta}>
                             Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
                             {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
@@ -2672,19 +2674,23 @@ const styles = StyleSheet.create({
     minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 7,
   },
-  verificationAvailabilityDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    marginRight: 9,
+  verificationAvailabilityRowAvailable: {
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
   },
-  verificationAvailabilityDotGood: {
-    backgroundColor: '#1e6f5c',
+  verificationAvailabilityRowOverdose: {
+    backgroundColor: '#fff0f2',
+    borderColor: '#edbdc4',
   },
-  verificationAvailabilityDotBad: {
-    backgroundColor: '#9b3d47',
+  verificationAvailabilityRowMissing: {
+    backgroundColor: '#fff8e8',
+    borderColor: '#f1d29b',
   },
   verificationAvailabilityAppearanceWrap: {
     marginRight: 9,
@@ -2692,11 +2698,45 @@ const styles = StyleSheet.create({
   verificationAvailabilityTextWrap: {
     flex: 1,
   },
+  verificationAvailabilityNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
   verificationAvailabilityName: {
     color: '#2d241d',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
+    marginRight: 6,
+  },
+  verificationAvailabilityBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  verificationAvailabilityBadgeAvailable: {
+    backgroundColor: '#1e6f5c',
+  },
+  verificationAvailabilityBadgeOverdose: {
+    backgroundColor: '#9b3d47',
+  },
+  verificationAvailabilityBadgeMissing: {
+    backgroundColor: '#b87918',
+  },
+  verificationAvailabilityBadgeText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '900',
+  },
+  verificationAvailabilityBadgeTextAvailable: {
+    color: '#ffffff',
+  },
+  verificationAvailabilityBadgeTextOverdose: {
+    color: '#ffffff',
+  },
+  verificationAvailabilityBadgeTextMissing: {
+    color: '#ffffff',
   },
   verificationAvailabilityAppearanceText: {
     color: '#2f5d50',
