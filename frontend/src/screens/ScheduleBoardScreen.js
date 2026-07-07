@@ -2038,6 +2038,32 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     const canRecordMotion = countReady && countMatches && medicineDoseMatches;
     const motionDetected = !!verificationHandToMouth && !isAnalyzingMotionVideo;
     const canMarkTaken = !!intakeVerificationPhotoUri && countMatches && medicineDoseMatches && motionDetected;
+    const availabilitySections = [
+      {
+        key: 'available',
+        title: 'Available tablets',
+        items: medicineAvailabilityItems.filter((item) => item.label === 'Available' && item.status !== 'overdose'),
+        sectionStyle: styles.verificationAvailabilitySectionAvailable,
+        headerStyle: styles.verificationAvailabilityHeaderAvailable,
+        badgeStyle: styles.verificationAvailabilityBadgeAvailable,
+      },
+      {
+        key: 'missing',
+        title: 'Missing tablets',
+        items: medicineAvailabilityItems.filter((item) => item.label === 'Missing' || item.status === 'underdose'),
+        sectionStyle: styles.verificationAvailabilitySectionMissing,
+        headerStyle: styles.verificationAvailabilityHeaderMissing,
+        badgeStyle: styles.verificationAvailabilityBadgeMissing,
+      },
+      {
+        key: 'overdose',
+        title: 'Overdose tablets',
+        items: medicineAvailabilityItems.filter((item) => item.label === 'Overdose' || item.status === 'overdose'),
+        sectionStyle: styles.verificationAvailabilitySectionOverdose,
+        headerStyle: styles.verificationAvailabilityHeaderOverdose,
+        badgeStyle: styles.verificationAvailabilityBadgeOverdose,
+      },
+    ].filter((section) => section.items.length > 0);
 
     return (
       <View style={styles.page}>
@@ -2142,33 +2168,46 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               )}
               {medicineAvailabilityItems.length > 0 && (
                 <View style={styles.verificationAvailabilityList}>
-                  {medicineAvailabilityItems.map((item) => {
-                    const colorText = item.color || 'unknown';
-                    const shapeText = item.shape || 'unknown';
-
-                    return (
-                      <View key={item.key} style={styles.verificationAvailabilityRow}>
-                        <View style={styles.verificationAvailabilityAppearanceWrap}>
-                          {renderAppearanceIcon(item.shape, item.color)}
-                        </View>
-                        <View style={styles.verificationAvailabilityTextWrap}>
-                          <Text style={styles.verificationAvailabilityName}>
-                            {item.medicineName} - {item.label}
-                          </Text>
-                          <Text style={styles.verificationAvailabilityAppearanceText}>
-                            Color: {colorText} - Shape: {shapeText}
-                          </Text>
-                          <Text style={styles.verificationAvailabilityMeta}>
-                            Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
-                            {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
-                            {item.missingCount > 0 ? ` - missing ${formatTabletCount(item.missingCount)}` : ''}
-                            {item.extraCount > 0 ? ` - extra ${formatTabletCount(item.extraCount)}` : ''}
-                            {item.reason ? ` - ${item.reason}` : ''}
-                          </Text>
-                        </View>
+                  {availabilitySections.map((section) => (
+                    <View key={section.key} style={[styles.verificationAvailabilitySection, section.sectionStyle]}>
+                      <View style={[styles.verificationAvailabilitySectionHeader, section.headerStyle]}>
+                        <Text style={styles.verificationAvailabilitySectionTitle}>{section.title}</Text>
+                        <Text style={styles.verificationAvailabilitySectionCount}>{section.items.length}</Text>
                       </View>
-                    );
-                  })}
+                      {section.items.map((item) => {
+                        const colorText = item.color || 'unknown';
+                        const shapeText = item.shape || 'unknown';
+
+                        return (
+                          <View key={item.key} style={styles.verificationAvailabilityRow}>
+                            <View style={styles.verificationAvailabilityAppearanceWrap}>
+                              {renderAppearanceIcon(item.shape, item.color)}
+                            </View>
+                            <View style={styles.verificationAvailabilityTextWrap}>
+                              <View style={styles.verificationAvailabilityTitleRow}>
+                                <Text style={styles.verificationAvailabilityName}>
+                                  {item.medicineName}
+                                </Text>
+                                <Text style={[styles.verificationAvailabilityBadge, section.badgeStyle]}>
+                                  {item.label}
+                                </Text>
+                              </View>
+                              <Text style={styles.verificationAvailabilityAppearanceText}>
+                                Color: {colorText} - Shape: {shapeText}
+                              </Text>
+                              <Text style={styles.verificationAvailabilityMeta}>
+                                Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
+                                {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
+                                {item.missingCount > 0 ? ` - missing ${formatTabletCount(item.missingCount)}` : ''}
+                                {item.extraCount > 0 ? ` - extra ${formatTabletCount(item.extraCount)}` : ''}
+                                {item.reason ? ` - ${item.reason}` : ''}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))}
                 </View>
               )}
             </View>
@@ -2712,11 +2751,68 @@ const styles = StyleSheet.create({
     borderTopColor: '#eadcca',
     paddingTop: 8,
   },
+  verificationAvailabilitySection: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  verificationAvailabilitySectionAvailable: {
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
+  },
+  verificationAvailabilitySectionMissing: {
+    backgroundColor: '#fff7dc',
+    borderColor: '#f0d27a',
+  },
+  verificationAvailabilitySectionOverdose: {
+    backgroundColor: '#fff0f2',
+    borderColor: '#edbdc4',
+  },
+  verificationAvailabilitySectionHeader: {
+    minHeight: 34,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  verificationAvailabilityHeaderAvailable: {
+    backgroundColor: '#1e6f5c',
+  },
+  verificationAvailabilityHeaderMissing: {
+    backgroundColor: '#8a641c',
+  },
+  verificationAvailabilityHeaderOverdose: {
+    backgroundColor: '#9b3d47',
+  },
+  verificationAvailabilitySectionTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '900',
+  },
+  verificationAvailabilitySectionCount: {
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    color: '#ffffff',
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   verificationAvailabilityRow: {
     minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(45,36,29,0.08)',
   },
   verificationAvailabilityDot: {
     width: 11,
@@ -2736,11 +2832,37 @@ const styles = StyleSheet.create({
   verificationAvailabilityTextWrap: {
     flex: 1,
   },
+  verificationAvailabilityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   verificationAvailabilityName: {
     color: '#2d241d',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
+    marginRight: 6,
+  },
+  verificationAvailabilityBadge: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    color: '#ffffff',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '900',
+  },
+  verificationAvailabilityBadgeAvailable: {
+    backgroundColor: '#1e6f5c',
+  },
+  verificationAvailabilityBadgeMissing: {
+    backgroundColor: '#8a641c',
+  },
+  verificationAvailabilityBadgeOverdose: {
+    backgroundColor: '#9b3d47',
   },
   verificationAvailabilityAppearanceText: {
     color: '#2f5d50',
