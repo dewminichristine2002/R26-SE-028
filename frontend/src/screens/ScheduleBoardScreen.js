@@ -1557,6 +1557,27 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     return match?.[1]?.toLowerCase() || 'mp4';
   };
 
+  const getMotionVideoBase64 = async (asset) => {
+    const directBase64 = String(asset?.base64 || '').trim();
+    if (directBase64) {
+      return directBase64;
+    }
+
+    const uri = String(asset?.uri || '').trim();
+    if (!uri) {
+      return '';
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      return '';
+    }
+
+    return FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  };
+
   const recordAndAnalyzeIntakeMotion = async () => {
     const expectedCount = getExpectedTabletCount(intakeVerificationEntry);
     const countMatches = Math.abs(Number(verifiedTabletCount) - expectedCount) <= 0.001;
@@ -1582,6 +1603,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         cameraType: ImagePicker.CameraType?.front || 'front',
         videoMaxDuration: 10,
         quality: 0.8,
+        base64: true,
       });
 
       if (pickerResult.canceled || !pickerResult.assets?.length) {
@@ -1599,24 +1621,29 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       }
 
       setMotionVideoUri(uri);
-      setMotionAnalysisMessage('Analyzing hand-to-mouth motion...');
-      const videoBase64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      setMotionAnalysisMessage('Analyzing wrist lift, hand-to-mouth proximity, and mouth-area pause...');
+      const videoBase64 = await getMotionVideoBase64(asset);
+      if (!videoBase64) {
+        setVerificationHandToMouth(false);
+        setMotionAnalysisMessage('The recorded video file was not available long enough to analyze. Please record again and keep the face and hand visible until the video finishes saving.');
+        return;
+      }
       const analysis = await intakeMonitoringService.analyzeMotionVideo({
         videoBase64,
         extension: getFileExtensionFromUri(uri),
         swallowConfirmed: verificationSwallowComplete,
       });
 
-      const motionAvailable = analysis?.motionAvailable ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected && !!analysis?.swallowDetected);
+      const motionAvailable = analysis?.motionAvailable
+        ?? (!!analysis?.wristElevationDetected && !!analysis?.handMouthProximityDetected && !!analysis?.mouthDwellDetected)
+        ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected);
       setVerificationHandToMouth(!!motionAvailable);
 
       const confidenceText = Number.isFinite(Number(analysis?.confidence))
         ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
         : '';
       if (motionAvailable) {
-        setMotionAnalysisMessage(`Camera detected hand-to-mouth and swallowing motion${confidenceText}.`);
+        setMotionAnalysisMessage(`Camera detected intake motion${confidenceText}: wrist raised, hand reached the mouth, and paused near the mouth.`);
       } else {
         const frameHint = Number.isFinite(Number(analysis?.handFrameCount)) || Number.isFinite(Number(analysis?.faceFrameCount))
           ? ` Hand frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
@@ -1624,7 +1651,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setMotionAnalysisMessage(
           analysis?.message ||
             analysis?.error ||
-            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, swallow, then stop recording.`
+            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, raise the hand to the mouth, pause for one second, then stop recording.`
         );
       }
     } catch (error) {
@@ -1637,7 +1664,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         responseData?.message ||
           (responseData?.error ? `${responseData.error}${frameHint}` : '') ||
           error?.message ||
-          'Could not analyze intake motion. Record again from chest level, move the hand to the mouth, swallow, then stop recording.'
+          'Could not analyze intake motion. Record again from chest level, raise the hand to the mouth, pause for one second, then stop recording.'
       );
     } finally {
       setIsAnalyzingMotionVideo(false);
@@ -2227,7 +2254,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           <View style={styles.verificationStepCard}>
             <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Camera intake motion</Text>
             <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
-              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, move it to your mouth, swallow, then stop recording.
+              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, raise it to your mouth, pause there for one second, then stop recording.
             </Text>
             <TouchableOpacity
               style={[styles.verificationCameraButton, (!canRecordMotion || isAnalyzingMotionVideo) && styles.verificationCompleteButtonDisabled]}
@@ -2248,7 +2275,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <View style={[styles.verificationCheckRow, verificationHandToMouth && styles.verificationCheckRowActive]}>
               <Text style={styles.verificationCheckIcon}>{verificationHandToMouth ? '✓' : '○'}</Text>
               <Text style={[styles.verificationCheckText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
-                Camera detected hand-to-mouth and swallowing
+                Camera detected wrist lift, hand-to-mouth, and mouth-area pause
               </Text>
             </View>
             {canRecordMotion && !verificationHandToMouth && !isAnalyzingMotionVideo && (

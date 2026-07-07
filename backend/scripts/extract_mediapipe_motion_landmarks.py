@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+
+import numpy as np
 
 
 def main() -> None:
@@ -22,6 +25,8 @@ def main() -> None:
     except Exception:
         mp = None
     if mp is not None and not hasattr(mp, "solutions"):
+        mp = None
+    if os.environ.get("ELDERMEDS_FORCE_OPENCV_MOTION", "").strip() == "1":
         mp = None
 
     if not args.video.exists():
@@ -88,6 +93,23 @@ def main() -> None:
                 output_frame["face"] = _face_landmarks(active_face_box, width, height)
 
                 if previous_gray is not None:
+                    flow = cv2.calcOpticalFlowFarneback(
+                        previous_gray,
+                        gray,
+                        None,
+                        0.5,
+                        3,
+                        15,
+                        3,
+                        5,
+                        1.2,
+                        0,
+                    )
+                    magnitude, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+                    upper_height = max(1, int(height * 0.75))
+                    upper_magnitude = magnitude[:upper_height, :]
+                    output_frame["fallbackMotionMagnitude"] = float(upper_magnitude.mean())
+
                     delta = cv2.absdiff(previous_gray, gray)
                     _, threshold = cv2.threshold(delta, 22, 255, cv2.THRESH_BINARY)
                     threshold = cv2.dilate(threshold, None, iterations=2)
@@ -132,6 +154,16 @@ def main() -> None:
 
                         contour = min(contours, key=_contour_score)
                         moments = cv2.moments(contour)
+                        if moments["m00"]:
+                            cx = moments["m10"] / moments["m00"]
+                            cy = moments["m01"] / moments["m00"]
+                            output_frame["hand"] = {
+                                "wrist": {"x": cx / width, "y": cy / height},
+                            }
+                            hand_frame_count += 1
+                    elif output_frame["fallbackMotionMagnitude"] >= 0.45:
+                        motion_mask = (upper_magnitude >= max(0.35, float(np.percentile(upper_magnitude, 92)))).astype("uint8")
+                        moments = cv2.moments(motion_mask)
                         if moments["m00"]:
                             cx = moments["m10"] / moments["m00"]
                             cy = moments["m01"] / moments["m00"]

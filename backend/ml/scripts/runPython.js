@@ -4,18 +4,22 @@ const path = require('path');
 
 const mlRoot = path.resolve(__dirname, '..');
 const backendRoot = path.resolve(mlRoot, '..');
+const preferredVenvName = '.venv311';
 
 const resolvePythonPath = () => {
   if (process.env.ML_PYTHON_PATH) {
-    return process.env.ML_PYTHON_PATH;
+    const configuredPath = process.env.ML_PYTHON_PATH;
+    if (fs.existsSync(configuredPath)) {
+      return configuredPath;
+    }
   }
 
-  const windowsVenv = path.join(mlRoot, '.venv', 'Scripts', 'python.exe');
+  const windowsVenv = path.join(mlRoot, preferredVenvName, 'Scripts', 'python.exe');
   if (fs.existsSync(windowsVenv)) {
     return windowsVenv;
   }
 
-  const unixVenv = path.join(mlRoot, '.venv', 'bin', 'python');
+  const unixVenv = path.join(mlRoot, preferredVenvName, 'bin', 'python');
   if (fs.existsSync(unixVenv)) {
     return unixVenv;
   }
@@ -29,8 +33,10 @@ const ensureVenv = () => {
     return python;
   }
 
-  const windowsVenv = path.join(mlRoot, '.venv', 'Scripts', 'python.exe');
-  const create = spawnSync('python', ['-m', 'venv', '.venv'], { cwd: mlRoot, stdio: 'inherit' });
+  const windowsVenv = path.join(mlRoot, preferredVenvName, 'Scripts', 'python.exe');
+  const create = process.platform === 'win32'
+    ? spawnSync('py', ['-3.11', '-m', 'venv', preferredVenvName], { cwd: mlRoot, stdio: 'inherit' })
+    : spawnSync('python3.11', ['-m', 'venv', preferredVenvName], { cwd: mlRoot, stdio: 'inherit' });
   if (create.status !== 0) {
     return 'python';
   }
@@ -43,7 +49,7 @@ const ensureRequirements = (python) => {
     return;
   }
 
-  const install = spawnSync(python, ['-m', 'pip', 'install', '-r', requirementsPath], {
+  const install = spawnSync(python, ['-m', 'pip', 'install', '--trusted-host', 'pypi.org', '--trusted-host', 'files.pythonhosted.org', '-r', requirementsPath], {
     cwd: mlRoot,
     stdio: 'inherit',
   });

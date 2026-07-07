@@ -9,4 +9,6 @@ build/
 coverage/
 ml/data/public/ePillID_data/
 ml/data/public/pillbox/
+.venv-mediapipe/
+ml/.venv311/
 .npm-cache/

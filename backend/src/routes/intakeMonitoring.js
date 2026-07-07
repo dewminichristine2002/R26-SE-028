@@ -1,5 +1,6 @@
 const express = require('express');
-const fs = require('fs/promises');
+const fs = require('fs');
+const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -8,14 +9,25 @@ const { requireAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+const projectPythonPath = path.resolve(__dirname, '..', '..', 'ml', '.venv311', 'Scripts', 'python.exe');
+const projectPythonFallbackPath = path.resolve(__dirname, '..', '..', 'ml', '.venv311', 'bin', 'python');
+
+const firstExistingPath = (...candidates) => candidates.find((candidate) => candidate && candidate !== 'python' && fs.existsSync(candidate));
+
 const getPythonCommand = (purpose) => {
+  const projectPython = firstExistingPath(projectPythonPath, projectPythonFallbackPath);
+
   if (purpose === 'vision') {
-    return process.env.INTAKE_VISION_PYTHON || process.env.PILL_ML_PYTHON || 'python';
+    return firstExistingPath(process.env.INTAKE_VISION_PYTHON, process.env.PILL_ML_PYTHON, process.env.INTAKE_ML_PYTHON) || projectPython || 'python';
   }
   if (purpose === 'identity') {
-    return process.env.TABLET_IDENTITY_PYTHON || process.env.PILL_ML_PYTHON || process.env.INTAKE_ML_PYTHON || 'python';
+    return firstExistingPath(
+      process.env.TABLET_IDENTITY_PYTHON,
+      process.env.PILL_ML_PYTHON,
+      process.env.INTAKE_ML_PYTHON,
+    ) || projectPython || 'python';
   }
-  return process.env.PILL_ML_PYTHON || process.env.INTAKE_ML_PYTHON || 'python';
+  return firstExistingPath(process.env.PILL_ML_PYTHON, process.env.INTAKE_ML_PYTHON) || projectPython || 'python';
 };
 
 const runPythonJsonScript = (scriptName, payload, timeoutMs = 20000, purpose = 'ml') =>
@@ -471,7 +483,7 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
   };
 };
 
-const runPythonArgsScript = (scriptName, args, timeoutMs = 30000) =>
+const runPythonArgsScript = (scriptName, args, timeoutMs = 30000, envOverrides = {}) =>
   new Promise((resolve, reject) => {
     const scriptPath = path.resolve(__dirname, '..', '..', 'scripts', scriptName);
     const pythonCommand = getPythonCommand('vision');
@@ -479,6 +491,7 @@ const runPythonArgsScript = (scriptName, args, timeoutMs = 30000) =>
       cwd: path.resolve(__dirname, '..', '..'),
       env: {
         ...process.env,
+        ...envOverrides,
       },
       windowsHide: true,
     });
@@ -515,29 +528,50 @@ const runPythonArgsScript = (scriptName, args, timeoutMs = 30000) =>
 
 const extractMotionFramesFromVideo = async ({ videoBase64, extension = 'mp4' }) => {
   const safeExtension = String(extension || 'mp4').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'mp4';
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'eldermeds-motion-'));
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'eldermeds-motion-'));
   const videoPath = path.join(tempDir, `intake-motion.${safeExtension}`);
   const outputPath = path.join(tempDir, 'landmarks.json');
+  const fallbackOutputPath = path.join(tempDir, 'landmarks-fallback.json');
 
   try {
     const cleanBase64 = String(videoBase64 || '').includes(',')
       ? String(videoBase64).split(',', 2)[1]
       : String(videoBase64 || '');
-    await fs.writeFile(videoPath, Buffer.from(cleanBase64, 'base64'));
+    await fsp.writeFile(videoPath, Buffer.from(cleanBase64, 'base64'));
     await runPythonArgsScript(
       'extract_mediapipe_motion_landmarks.py',
       ['--video', videoPath, '--output', outputPath, '--frame-step', '2'],
       60000
     );
-    const parsed = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+    let parsed = JSON.parse(await fsp.readFile(outputPath, 'utf8'));
+    const needsFallback = parsed?.extractionMode !== 'opencv-motion-fallback'
+      && ((Number(parsed?.handFrameCount) || 0) < 6 || (Number(parsed?.faceFrameCount) || 0) < 3);
+    if (needsFallback) {
+      await runPythonArgsScript(
+        'extract_mediapipe_motion_landmarks.py',
+        ['--video', videoPath, '--output', fallbackOutputPath, '--frame-step', '2'],
+        60000,
+        { ELDERMEDS_FORCE_OPENCV_MOTION: '1' }
+      );
+      const fallbackParsed = JSON.parse(await fsp.readFile(fallbackOutputPath, 'utf8'));
+      parsed = {
+        ...fallbackParsed,
+        primaryExtractionMode: parsed?.extractionMode || 'mediapipe',
+        primaryFaceFrameCount: Number(parsed?.faceFrameCount) || 0,
+        primaryHandFrameCount: Number(parsed?.handFrameCount) || 0,
+      };
+    }
     return {
       frames: Array.isArray(parsed?.frames) ? parsed.frames : [],
       extractionMode: parsed?.extractionMode || 'mediapipe',
+      primaryExtractionMode: parsed?.primaryExtractionMode,
+      primaryFaceFrameCount: Number(parsed?.primaryFaceFrameCount) || 0,
+      primaryHandFrameCount: Number(parsed?.primaryHandFrameCount) || 0,
       faceFrameCount: Number(parsed?.faceFrameCount) || 0,
       handFrameCount: Number(parsed?.handFrameCount) || 0,
     };
   } finally {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 };
 
@@ -699,6 +733,9 @@ router.post('/analyze-motion-video', requireAuth, async (req, res) => {
       ...result,
       extractedFrameCount: frames.length,
       extractionMode: extraction.extractionMode,
+      primaryExtractionMode: extraction.primaryExtractionMode,
+      primaryFaceFrameCount: extraction.primaryFaceFrameCount,
+      primaryHandFrameCount: extraction.primaryHandFrameCount,
       faceFrameCount: extraction.faceFrameCount,
       handFrameCount: extraction.handFrameCount,
     });
