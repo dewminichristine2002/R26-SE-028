@@ -89,57 +89,6 @@ const getColorValue = (color) => {
   return colorMap[normalized] || '#d5dde8';
 };
 
-const expandHexColor = (hexColor) => {
-  const hex = String(hexColor || '').replace('#', '');
-  if (hex.length === 3) {
-    return hex.split('').map((char) => `${char}${char}`).join('');
-  }
-  return hex;
-};
-
-const getColorLuminance = (hexColor) => {
-  const expandedHex = expandHexColor(hexColor);
-  if (!/^[0-9a-f]{6}$/i.test(expandedHex)) {
-    return 0.75;
-  }
-
-  const channels = [0, 2, 4].map((offset) => {
-    const value = parseInt(expandedHex.slice(offset, offset + 2), 16) / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-
-  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
-};
-
-const getPillContrastStyle = (hexColor) => {
-  const luminance = getColorLuminance(hexColor);
-
-  if (luminance > 0.72) {
-    return {
-      borderColor: '#24352f',
-      shadowColor: '#24352f',
-      highlightColor: 'rgba(255,255,255,0.85)',
-      detailColor: 'rgba(36,53,47,0.28)',
-    };
-  }
-
-  if (luminance < 0.24) {
-    return {
-      borderColor: '#ffffff',
-      shadowColor: '#17231f',
-      highlightColor: 'rgba(255,255,255,0.34)',
-      detailColor: 'rgba(255,255,255,0.46)',
-    };
-  }
-
-  return {
-    borderColor: '#24352f',
-    shadowColor: '#24352f',
-    highlightColor: 'rgba(255,255,255,0.48)',
-    detailColor: 'rgba(36,53,47,0.24)',
-  };
-};
-
 const parseRoutineTimeToDate = (timeStr, referenceDate = new Date()) => {
   if (!timeStr || typeof timeStr !== 'string') {
     return null;
@@ -606,7 +555,6 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
     const detectedCount = rawDetectedCount > 0 ? rawDetectedCount : hasMedicinePercentage ? 1 : 0;
     const missingCount = Math.max(0, requiredCount - detectedCount);
     const extraCount = Number(item?.extraCount) || 0;
-    const countOnlyFallback = item?.countOnlyFallback === true;
     const label = status === 'correct'
       ? 'Available'
     : status === 'overdose' || status === 'unexpected'
@@ -618,16 +566,13 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
       : status === 'underdose'
       ? 'Missing'
       : 'Missing';
-    const baseReason = label === 'Overdose'
+    const reason = label === 'Overdose'
       ? `Overdose by ${formatTabletCount(extraCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : label === 'Underdose'
       ? `Missing ${formatTabletCount(missingCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : label === 'Missing'
       ? `Missing ${formatTabletCount(missingCount || requiredCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : item?.message || `Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`;
-    const reason = countOnlyFallback
-      ? `${baseReason}. Medicine identity was uncertain, so this result uses the tablet count.`
-      : baseReason;
 
     return {
       key: item?.key || `${item?.id || 'medicine'}-${index}`,
@@ -643,7 +588,6 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
       detected: detectedCount > 0,
       confidence: detectedCount > 0 ? confidence : 0,
       status,
-      countOnlyFallback,
       label,
       reason,
     };
@@ -761,7 +705,6 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   const renderAppearanceIcon = (shape, color, isLarge = false) => {
     const normalizedShape = String(shape || '').trim().toLowerCase();
     const resolvedColor = getColorValue(color);
-    const contrastStyle = getPillContrastStyle(resolvedColor);
     const isTriangle = normalizedShape === 'triangle';
     const shapeStyle = [
       styles.pillShape,
@@ -771,33 +714,15 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       ['capsule', 'oblong'].includes(normalizedShape) && styles.pillShapeCapsule,
       ['tablet', 'square'].includes(normalizedShape) && styles.pillShapeSquare,
       normalizedShape === 'diamond' && styles.pillShapeDiamond,
-      {
-        backgroundColor: resolvedColor,
-        borderColor: contrastStyle.borderColor,
-        shadowColor: contrastStyle.shadowColor,
-      },
+      { backgroundColor: resolvedColor },
     ];
 
     return (
       <View style={[styles.appearanceIconFrame, isLarge && styles.appearanceIconFrameLarge]}>
         {isTriangle ? (
-          <Text
-            style={[
-              styles.pillShapeTriangle,
-              isLarge && styles.pillShapeTriangleLarge,
-              {
-                color: resolvedColor,
-                textShadowColor: contrastStyle.borderColor,
-              },
-            ]}
-          >
-            ▲
-          </Text>
+          <Text style={[styles.pillShapeTriangle, isLarge && styles.pillShapeTriangleLarge, { color: resolvedColor }]}>▲</Text>
         ) : (
-          <View style={shapeStyle}>
-            <View style={[styles.pillShapeHighlight, { backgroundColor: contrastStyle.highlightColor }]} />
-            <View style={[styles.pillShapeDivider, { backgroundColor: contrastStyle.detailColor }]} />
-          </View>
+          <View style={shapeStyle} />
         )}
       </View>
     );
@@ -2081,41 +2006,39 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               {medicineAvailabilityItems.length > 0 && (
                 <View style={styles.verificationAvailabilityList}>
                   {medicineAvailabilityItems.map((item) => {
+                    const needsAttention = item.status === 'overdose'
+                      || item.status === 'unexpected'
+                      || item.status === 'underdose'
+                      || item.label === 'Missing'
+                      || item.label === 'Overdose';
                     const colorText = item.color || 'unknown';
                     const shapeText = item.shape || 'unknown';
-                    const isAvailable = item.label === 'Available';
-                    const isOverdose = item.label === 'Overdose' || item.status === 'overdose' || item.status === 'unexpected';
-                    const rowToneStyle = isAvailable
-                      ? styles.verificationAvailabilityRowAvailable
-                      : isOverdose
-                      ? styles.verificationAvailabilityRowOverdose
-                      : styles.verificationAvailabilityRowMissing;
-                    const statusBadgeStyle = isAvailable
-                      ? styles.verificationAvailabilityBadgeAvailable
-                      : isOverdose
-                      ? styles.verificationAvailabilityBadgeOverdose
-                      : styles.verificationAvailabilityBadgeMissing;
-                    const statusBadgeTextStyle = isAvailable
-                      ? styles.verificationAvailabilityBadgeTextAvailable
-                      : isOverdose
-                      ? styles.verificationAvailabilityBadgeTextOverdose
-                      : styles.verificationAvailabilityBadgeTextMissing;
 
                     return (
-                      <View key={item.key} style={[styles.verificationAvailabilityRow, rowToneStyle]}>
-                        <View style={styles.verificationAvailabilityAppearanceWrap}>
-                          {renderAppearanceIcon(item.shape, item.color)}
-                        </View>
-                        <View style={styles.verificationAvailabilityTextWrap}>
-                          <View style={styles.verificationAvailabilityNameRow}>
-                            <Text style={styles.verificationAvailabilityName}>{item.medicineName}</Text>
-                            <View style={[styles.verificationAvailabilityBadge, statusBadgeStyle]}>
-                              <Text style={[styles.verificationAvailabilityBadgeText, statusBadgeTextStyle]}>{item.label}</Text>
-                            </View>
+                      <View key={item.key} style={styles.verificationAvailabilityRow}>
+                        {needsAttention ? (
+                          <View style={styles.verificationAvailabilityAppearanceWrap}>
+                            {renderAppearanceIcon(item.shape, item.color)}
                           </View>
-                          <Text style={styles.verificationAvailabilityAppearanceText}>
-                            Color: {colorText} - Shape: {shapeText}
+                        ) : (
+                          <View
+                            style={[
+                              styles.verificationAvailabilityDot,
+                              item.available
+                                ? styles.verificationAvailabilityDotGood
+                                : styles.verificationAvailabilityDotBad,
+                            ]}
+                          />
+                        )}
+                        <View style={styles.verificationAvailabilityTextWrap}>
+                          <Text style={styles.verificationAvailabilityName}>
+                            {item.medicineName} - {item.label}
                           </Text>
+                          {needsAttention ? (
+                            <Text style={styles.verificationAvailabilityAppearanceText}>
+                              Color: {colorText} - Shape: {shapeText}
+                            </Text>
+                          ) : null}
                           <Text style={styles.verificationAvailabilityMeta}>
                             Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
                             {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
@@ -2674,23 +2597,19 @@ const styles = StyleSheet.create({
     minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 7,
+    paddingVertical: 5,
   },
-  verificationAvailabilityRowAvailable: {
-    backgroundColor: '#e9f7f1',
-    borderColor: '#a8dbc8',
+  verificationAvailabilityDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    marginRight: 9,
   },
-  verificationAvailabilityRowOverdose: {
-    backgroundColor: '#fff0f2',
-    borderColor: '#edbdc4',
+  verificationAvailabilityDotGood: {
+    backgroundColor: '#1e6f5c',
   },
-  verificationAvailabilityRowMissing: {
-    backgroundColor: '#fff8e8',
-    borderColor: '#f1d29b',
+  verificationAvailabilityDotBad: {
+    backgroundColor: '#9b3d47',
   },
   verificationAvailabilityAppearanceWrap: {
     marginRight: 9,
@@ -2698,45 +2617,11 @@ const styles = StyleSheet.create({
   verificationAvailabilityTextWrap: {
     flex: 1,
   },
-  verificationAvailabilityNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
   verificationAvailabilityName: {
     color: '#2d241d',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
-    marginRight: 6,
-  },
-  verificationAvailabilityBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  verificationAvailabilityBadgeAvailable: {
-    backgroundColor: '#1e6f5c',
-  },
-  verificationAvailabilityBadgeOverdose: {
-    backgroundColor: '#9b3d47',
-  },
-  verificationAvailabilityBadgeMissing: {
-    backgroundColor: '#b87918',
-  },
-  verificationAvailabilityBadgeText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-  },
-  verificationAvailabilityBadgeTextAvailable: {
-    color: '#ffffff',
-  },
-  verificationAvailabilityBadgeTextOverdose: {
-    color: '#ffffff',
-  },
-  verificationAvailabilityBadgeTextMissing: {
-    color: '#ffffff',
   },
   verificationAvailabilityAppearanceText: {
     color: '#2f5d50',
@@ -3183,16 +3068,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 14,
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#24352f',
+    backgroundColor: '#f7efe4',
+    borderWidth: 1,
+    borderColor: '#d8c9b7',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#17231f',
-    shadowOpacity: 0.16,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
   },
   appearanceIconFrameLarge: {
     width: 46,
@@ -3205,28 +3085,6 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     borderWidth: 2,
     borderColor: 'rgba(36,53,47,0.22)',
-    overflow: 'hidden',
-    shadowOpacity: 0.22,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  pillShapeHighlight: {
-    position: 'absolute',
-    top: 3,
-    left: 5,
-    right: 5,
-    height: 4,
-    borderRadius: 99,
-  },
-  pillShapeDivider: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -1,
-    left: 4,
-    right: 4,
-    height: 2,
-    borderRadius: 99,
   },
   pillShapeLarge: {
     width: 36,
@@ -3263,10 +3121,8 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     fontWeight: '900',
     textShadowColor: 'rgba(36,53,47,0.22)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 3,
-    textAlign: 'center',
-    textAlignVertical: 'center',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   pillShapeTriangleLarge: {
     fontSize: 36,
