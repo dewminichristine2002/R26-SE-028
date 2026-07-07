@@ -780,6 +780,36 @@ const getCountComparisonMessage = (status, count, expectedCount) => {
   return `This dose needs ${expectedText} ${expectedUnit}.`;
 };
 
+const getTabletVoiceCountText = (count) => {
+  const normalized = Number(count);
+  const unit = Math.abs(normalized - 1) <= 0.001 ? 'tablet' : 'tablets';
+  return Math.abs(normalized - 1) <= 0.001 ? `one ${unit}` : `${formatTabletCount(normalized)} ${unit}`;
+};
+
+const buildTabletVerificationVoiceMessage = ({ comparisonStatus, detectedCount, expectedCount, medicinesAvailable }) => {
+  const normalizedDetected = Number(detectedCount);
+  const normalizedExpected = Number(expectedCount);
+  if (!Number.isFinite(normalizedDetected) || !Number.isFinite(normalizedExpected) || normalizedExpected <= 0) {
+    return '';
+  }
+
+  if (comparisonStatus === 'overdose') {
+    const extraCount = Math.max(0, normalizedDetected - normalizedExpected);
+    return `Extra ${getTabletVoiceCountText(extraCount || 1)}.`;
+  }
+
+  if (comparisonStatus === 'underdose') {
+    const missingCount = Math.max(0, normalizedExpected - normalizedDetected);
+    return `Missed ${getTabletVoiceCountText(missingCount || normalizedExpected)}.`;
+  }
+
+  if ((comparisonStatus === 'okay' || comparisonStatus === 'correct') && medicinesAvailable) {
+    return 'Correct tablets available.';
+  }
+
+  return '';
+};
+
 const getIntakeAmountText = (entry) => {
   const tabletCount = getScheduledTabletCount(entry);
   const formattedCount = formatTabletCount(tabletCount);
@@ -1195,6 +1225,23 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     });
   };
 
+  const speakTabletVerificationVoiceMessage = (message) => {
+    if (!message || !SpeechModule) {
+      return;
+    }
+
+    try {
+      SpeechModule.stop?.();
+      SpeechModule.speak(message, {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.95,
+      });
+    } catch (speechError) {
+      console.log('[ScheduleBoard] intake verification speech unavailable:', speechError?.message || speechError);
+    }
+  };
+
   const buildVoiceMarkMessage = (statusKey, entry) => {
     const medicineName = entry?.medicineName ? `: ${entry.medicineName}.` : '.';
 
@@ -1446,8 +1493,9 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         const doseItems = analysis?.medicineDoseAnalysis
           ? getMedicineAvailabilityItemsFromDoseAnalysis(analysis.medicineDoseAnalysis)
           : getMedicineAvailabilityItems({ entry, detectedCount: count, identityAnalysis });
+        const allScheduledMedicinesAvailable = areAllScheduledMedicinesAvailable(doseItems);
         setMedicineAvailabilityItems(doseItems);
-        setMedicineDoseMatches(areAllScheduledMedicinesAvailable(doseItems));
+        setMedicineDoseMatches(allScheduledMedicinesAvailable);
         const confidenceText = Number.isFinite(Number(analysis?.confidence))
           ? ` Confidence: ${Math.round(Number(analysis.confidence) * 100)}%.`
           : '';
@@ -1470,6 +1518,12 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setTabletCountAnalysisMessage(
           `${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${confidenceText}${modelText}${sourceText}`
         );
+        speakTabletVerificationVoiceMessage(buildTabletVerificationVoiceMessage({
+          comparisonStatus,
+          detectedCount: count,
+          expectedCount,
+          medicinesAvailable: allScheduledMedicinesAvailable,
+        }));
       } else {
         setDetectedTabletCount(0);
         setTabletCountConfidence(null);
@@ -1479,6 +1533,14 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setMedicineAvailabilityItems(doseItems);
         setMedicineDoseMatches(false);
         setTabletCountAnalysisMessage(analysis?.error || 'Could not clearly count tablets. Retake the palm photo with all tablets separated.');
+        if (Number.isFinite(count)) {
+          speakTabletVerificationVoiceMessage(buildTabletVerificationVoiceMessage({
+            comparisonStatus: 'underdose',
+            detectedCount: 0,
+            expectedCount,
+            medicinesAvailable: false,
+          }));
+        }
       }
     } catch (error) {
       setDetectedTabletCount(null);
