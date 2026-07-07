@@ -1,7 +1,9 @@
 import { NativeModules, Platform } from 'react-native';
 
+const normalizeApiUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
+
 const defaultApi = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
-const configuredApi = process.env.EXPO_PUBLIC_API_URL;
+const configuredApi = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
 
 const derivedHost = (() => {
   const scriptURL = NativeModules?.SourceCode?.scriptURL;
