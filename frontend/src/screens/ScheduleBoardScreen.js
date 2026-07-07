@@ -217,6 +217,8 @@ const STATUS_LABELS = {
   'not-taken': 'Not Taken',
 };
 
+const COMPLETED_INTAKE_STATUSES = new Set(['taken', 'overdose', 'not-taken']);
+
 const getEntryStatusKey = (entry) => `${entry?.medicationId || 'med'}-${entry?.rowKey || 'slot'}-${entry?.doseNumber || 1}`;
 const getEntryDoseInstanceKey = (entry) => {
   const baseKey = getEntryStatusKey(entry);
@@ -407,6 +409,12 @@ const getExpectedMedicinePayload = (entry) =>
 
 const getMedicineKey = (entry) => String(entry?.medicationId || entry?.id || '').trim();
 
+const isCompletedIntakeEntry = (entry, statusMap = {}) => {
+  const entryState = statusMap[getEntryStatusKey(entry)];
+  const status = String(entryState?.status || '').toLowerCase();
+  return COMPLETED_INTAKE_STATUSES.has(status);
+};
+
 const getDetectedMedicineCountMap = (identityAnalysis) => {
   const map = new Map();
   const detectedMedicines = Array.isArray(identityAnalysis?.detectedMedicines)
@@ -482,7 +490,7 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
     const detected = detectedMap.get(getMedicineKey(item));
     const medicineDetectedCount = Number(detected?.count) || 0;
 
-    let status = photoWasAnalyzed ? 'underdose' : 'unknown';
+    let status = photoWasAnalyzed ? 'missing' : 'unknown';
     let label = 'Missing';
     let reason = 'Medicine was not found in the palm photo or could not be identified';
 
@@ -496,8 +504,8 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
         label = 'Overdose';
         reason = `Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       } else {
-        status = 'underdose';
-        label = medicineDetectedCount > 0 ? 'Underdose' : 'Missing';
+        status = 'missing';
+        label = 'Missing';
         reason = `Missing ${formatTabletCount(requiredCount - medicineDetectedCount)}. Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       }
     }
@@ -551,25 +559,20 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
     const rawDetectedCount = Number(item?.detectedCount) || 0;
     const requiredCount = Number(item?.expectedCount) || 0;
     const confidence = Number(item?.confidence) || 0;
-    const hasMedicinePercentage = confidence > 0;
-    const detectedCount = rawDetectedCount > 0 ? rawDetectedCount : hasMedicinePercentage ? 1 : 0;
+    const detectedCount = rawDetectedCount > 0 ? rawDetectedCount : 0;
     const missingCount = Math.max(0, requiredCount - detectedCount);
     const extraCount = Number(item?.extraCount) || 0;
     const label = status === 'correct'
       ? 'Available'
     : status === 'overdose' || status === 'unexpected'
       ? 'Overdose'
-      : detectedCount > 0 && missingCount > 0
-      ? 'Underdose'
-      : detectedCount > 0
-      ? 'Available'
-      : status === 'underdose'
+    : detectedCount > 0
+      ? 'Missing'
+      : status === 'underdose' || status === 'missing'
       ? 'Missing'
       : 'Missing';
     const reason = label === 'Overdose'
       ? `Overdose by ${formatTabletCount(extraCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
-      : label === 'Underdose'
-      ? `Missing ${formatTabletCount(missingCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : label === 'Missing'
       ? `Missing ${formatTabletCount(missingCount || requiredCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : item?.message || `Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`;
@@ -587,7 +590,7 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
       available: label === 'Available',
       detected: detectedCount > 0,
       confidence: detectedCount > 0 ? confidence : 0,
-      status,
+      status: label === 'Missing' ? 'missing' : status,
       label,
       reason,
     };
@@ -610,7 +613,7 @@ const getCountComparisonStatus = (count, expectedCount) => {
   if (Math.abs(normalizedCount - normalizedExpected) <= 0.001) {
     return 'okay';
   }
-  return normalizedCount > normalizedExpected ? 'overdose' : 'underdose';
+  return normalizedCount > normalizedExpected ? 'overdose' : 'missing';
 };
 
 const getCountComparisonLabel = (status) => {
@@ -620,8 +623,8 @@ const getCountComparisonLabel = (status) => {
   if (status === 'overdose') {
     return 'Overdose count';
   }
-  if (status === 'underdose') {
-    return 'Underdose count';
+  if (status === 'underdose' || status === 'missing') {
+    return 'Missing count';
   }
   return 'Count uncertain';
 };
@@ -637,8 +640,8 @@ const getCountComparisonMessage = (status, count, expectedCount) => {
   if (status === 'overdose') {
     return `Possible overdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
-  if (status === 'underdose') {
-    return `Possible underdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
+  if (status === 'underdose' || status === 'missing') {
+    return `Possible missing tablets: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   return `This dose needs ${expectedText} ${expectedUnit}.`;
 };
@@ -648,6 +651,41 @@ const getIntakeAmountText = (entry) => {
   const formattedCount = formatTabletCount(tabletCount);
   const unit = tabletCount === 1 ? 'tablet' : 'tablets';
   return `💊 Take ${formattedCount} ${unit} for this intake`;
+};
+
+const ensureImagePickerCacheDirectory = async () => {
+  if (!FileSystem.cacheDirectory) {
+    return;
+  }
+
+  try {
+    await FileSystem.makeDirectoryAsync(`${FileSystem.cacheDirectory}ImagePicker`, {
+      intermediates: true,
+    });
+  } catch (error) {
+    console.log('[ScheduleBoard] ImagePicker cache directory unavailable:', error?.message || error);
+  }
+};
+
+const isImagePickerVideoWriteError = (error) => {
+  const message = String(error?.message || error || '');
+  return /failed to write a file|ImagePicker\/.+\.mp4|launchCameraAsync/i.test(message);
+};
+
+const canUseManualMotionConfirmation = (error) => {
+  const responseData = error?.response?.data || {};
+  const message = [
+    responseData?.error,
+    responseData?.message,
+    responseData?.detail,
+    error?.message,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return Boolean(responseData?.manualConfirmationAllowed) ||
+    isImagePickerVideoWriteError(error) ||
+    /mediapipe|opencv|landmark|motion video|face and hand/i.test(message);
 };
 
 const isExpectedVoiceAbort = (event) => {
@@ -909,7 +947,13 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       .filter((item) => !!item.nextDate)
       .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
 
-    const visibleCandidates = withFutureMarker.filter((entry) => !hiddenNextDoseEntries[getEntryDoseInstanceKey(entry)]);
+    const visibleCandidates = withFutureMarker.filter((entry) => {
+      if (hiddenNextDoseEntries[getEntryDoseInstanceKey(entry)]) {
+        return false;
+      }
+
+      return !isCompletedIntakeEntry(entry, lastSavedStatusByEntry);
+    });
 
     if (!visibleCandidates.length) {
       return [];
@@ -917,7 +961,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
 
     const firstTime = visibleCandidates[0].nextDate.getTime();
     return visibleCandidates.filter((item) => item.nextDate.getTime() === firstTime);
-  }, [flatSchedule, currentTime, hiddenNextDoseEntries]);
+  }, [flatSchedule, currentTime, hiddenNextDoseEntries, lastSavedStatusByEntry]);
 
   const nextDoseDisplayTime = useMemo(() => {
     const firstNextDose = nextDoseGroup[0];
@@ -1363,6 +1407,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         return;
       }
 
+      await ensureImagePickerCacheDirectory();
       const pickerResult = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.75,
@@ -1440,6 +1485,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         return;
       }
 
+      await ensureImagePickerCacheDirectory();
       const pickerResult = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         cameraType: ImagePicker.CameraType?.front || 'front',
@@ -1479,7 +1525,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
         : '';
       if (motionAvailable) {
-        setMotionAnalysisMessage(`Camera detected hand-to-mouth and swallowing motion${confidenceText}.`);
+        setMotionAnalysisMessage(`Rule-based motion analysis detected hand-to-mouth and swallowing motion${confidenceText}.`);
       } else {
         const frameHint = Number.isFinite(Number(analysis?.handFrameCount)) || Number.isFinite(Number(analysis?.faceFrameCount))
           ? ` Hand frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
@@ -1487,21 +1533,40 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setMotionAnalysisMessage(
           analysis?.message ||
             analysis?.error ||
-            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, swallow, then stop recording.`
+            `Rule-based motion analysis could not confirm the intake${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, pause, swallow, then move the hand away.`
         );
       }
     } catch (error) {
       setVerificationHandToMouth(false);
       const responseData = error?.response?.data || {};
+      const allowManualConfirmation = canUseManualMotionConfirmation(error);
       const frameHint = Number.isFinite(Number(responseData?.handFrameCount)) || Number.isFinite(Number(responseData?.faceFrameCount))
         ? ` Hand frames: ${responseData?.handFrameCount || 0}. Face frames: ${responseData?.faceFrameCount || 0}.`
         : '';
       setMotionAnalysisMessage(
         responseData?.message ||
           (responseData?.error ? `${responseData.error}${frameHint}` : '') ||
-          error?.message ||
+          (allowManualConfirmation
+            ? 'Rule-based motion analysis could not verify the intake. Try again, or use manual confirmation if caregiver watched the intake.'
+            : error?.message) ||
           'Could not analyze intake motion. Record again from chest level, move the hand to the mouth, swallow, then stop recording.'
       );
+      if (allowManualConfirmation) {
+        Alert.alert(
+          'Motion Check Failed',
+          'The rule-based motion analysis could not verify the intake. If a caregiver watched this intake after the pill check passed, they can confirm it manually.',
+          [
+            { text: 'Try Again', style: 'cancel' },
+            {
+              text: 'Manual Confirm',
+              onPress: () => {
+                setVerificationHandToMouth(true);
+                setMotionAnalysisMessage('Intake motion manually confirmed after the tablet and medicine check passed.');
+              },
+            },
+          ]
+        );
+      }
     } finally {
       setIsAnalyzingMotionVideo(false);
     }
@@ -1570,7 +1635,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     }
 
     if (!verificationHandToMouth) {
-      Alert.alert('Camera Motion Needed', 'Please record the intake motion first. Mark Taken unlocks only after hand-to-mouth motion is detected in the video.');
+      Alert.alert('Motion Check Needed', 'Please record the intake motion first. Mark Taken unlocks only after the rule-based hand-to-mouth and swallowing check passes.');
       return;
     }
 
@@ -1871,9 +1936,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   };
 
   const isEntryInteractionLocked = (entry) => {
-    const entryState = lastSavedStatusByEntry[getEntryStatusKey(entry)];
-    const status = String(entryState?.status || '').toLowerCase();
-    return status === 'taken' || status === 'overdose';
+    return isCompletedIntakeEntry(entry, lastSavedStatusByEntry);
   };
 
   const applyCustomOverdoseCount = async () => {
@@ -1920,7 +1983,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               {isGroupVerification ? 'Verify one-time intake' : 'Verify before marking taken'}
             </Text>
             <Text style={[styles.verificationHeroText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
-              Show all tablets in your palm. The trained AI model checks whether the amount is OK, overdose, or underdose.
+              Show all tablets in your palm. The trained AI model checks whether each medicine is available, overdose, or missing.
             </Text>
           </View>
 
@@ -2009,6 +2072,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                     const needsAttention = item.status === 'overdose'
                       || item.status === 'unexpected'
                       || item.status === 'underdose'
+                      || item.status === 'missing'
                       || item.label === 'Missing'
                       || item.label === 'Overdose';
                     const colorText = item.color || 'unknown';
@@ -2067,9 +2131,9 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           </View>
 
           <View style={styles.verificationStepCard}>
-            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Camera intake motion</Text>
+            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Rule-based intake motion</Text>
             <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
-              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, move it to your mouth, swallow, then stop recording.
+              Record a short video with your face, hand, and mouth visible. The rule checks hand-to-mouth movement, a short mouth pause, and swallowing or moved-away motion.
             </Text>
             <TouchableOpacity
               style={[styles.verificationCameraButton, (!canRecordMotion || isAnalyzingMotionVideo) && styles.verificationCompleteButtonDisabled]}
@@ -2090,11 +2154,11 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <View style={[styles.verificationCheckRow, verificationHandToMouth && styles.verificationCheckRowActive]}>
               <Text style={styles.verificationCheckIcon}>{verificationHandToMouth ? '✓' : '○'}</Text>
               <Text style={[styles.verificationCheckText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
-                Camera detected hand-to-mouth and swallowing
+                Rule detected hand-to-mouth and swallowing
               </Text>
             </View>
             {canRecordMotion && !verificationHandToMouth && !isAnalyzingMotionVideo && (
-              <Text style={styles.verificationReadOnlyCountText}>Mark Taken unlocks after this camera motion check passes.</Text>
+              <Text style={styles.verificationReadOnlyCountText}>Mark Taken unlocks after this rule-based motion check passes.</Text>
             )}
             {!!motionAnalysisMessage && (
               <Text style={[styles.verificationAnalysisMeta, !verificationHandToMouth && styles.verificationCountStatusBad]}>
