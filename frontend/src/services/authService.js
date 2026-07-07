@@ -21,17 +21,31 @@ const isLocalTokenValue = (token) => String(token || '').startsWith('local-token
 
 export const authService = {
   async register(payload) {
-    const response = await authClient.post('/auth/register', payload);
-    await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
-    return response.data;
+    try {
+      const response = await authClient.post('/auth/register', payload);
+      await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
+      return response.data;
+    } catch (error) {
+      if (isBackendUnavailableError(error)) {
+        throw toBackendUnavailableError();
+      }
+      throw error;
+    }
   },
 
   async login(payload) {
-    const response = await authClient.post('/auth/login', payload);
-    await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
-    return response.data;
+    try {
+      const response = await authClient.post('/auth/login', payload);
+      await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
+      return response.data;
+    } catch (error) {
+      if (isBackendUnavailableError(error)) {
+        throw toBackendUnavailableError();
+      }
+      throw error;
+    }
   },
 
   async logout() {

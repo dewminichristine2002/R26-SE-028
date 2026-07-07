@@ -67,6 +67,8 @@ def _smooth_distances(usable: list[dict[str, Any]]) -> list[dict[str, Any]]:
     smoothed: list[dict[str, Any]] = []
     for index, item in enumerate(usable):
         window = usable[max(0, index - 1) : min(len(usable), index + 2)]
+        left_cheek_window = [float(entry["distanceToLeftCheek"]) for entry in window if entry.get("distanceToLeftCheek") is not None]
+        right_cheek_window = [float(entry["distanceToRightCheek"]) for entry in window if entry.get("distanceToRightCheek") is not None]
         next_item = {
             **item,
             "rawDistanceToMouth": item["distanceToMouth"],
@@ -80,6 +82,12 @@ def _smooth_distances(usable: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if mouth_window:
             next_item["rawMouthOpenRatio"] = item.get("mouthOpenRatio")
             next_item["mouthOpenRatio"] = _median(mouth_window)
+        if left_cheek_window:
+            next_item["rawDistanceToLeftCheek"] = item.get("distanceToLeftCheek")
+            next_item["distanceToLeftCheek"] = _median(left_cheek_window)
+        if right_cheek_window:
+            next_item["rawDistanceToRightCheek"] = item.get("distanceToRightCheek")
+            next_item["distanceToRightCheek"] = _median(right_cheek_window)
         smoothed.append(next_item)
     return smoothed
 
@@ -141,15 +149,25 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
             continue
 
         hand_point = min(hand_candidates, key=lambda point: _distance(point, mouth))
+        wrist = _point(frame, ["hand", "wrist"])
 
         face_scale = 0.28
         if face_left and face_right:
             face_scale = max(0.08, _distance(face_left, face_right))
 
+        left_cheek_distance = _distance(hand_point, face_left) / face_scale if face_left else None
+        right_cheek_distance = _distance(hand_point, face_right) / face_scale if face_right else None
+
         usable_frame = {
             "timestampMs": _timestamp(frame, index),
             "distanceToMouth": _distance(hand_point, mouth) / face_scale,
         }
+        if left_cheek_distance is not None:
+            usable_frame["distanceToLeftCheek"] = left_cheek_distance
+        if right_cheek_distance is not None:
+            usable_frame["distanceToRightCheek"] = right_cheek_distance
+        if wrist:
+            usable_frame["wristY"] = wrist["y"]
         if mouth_open_ratio is not None:
             usable_frame["mouthOpenRatio"] = mouth_open_ratio
         usable.append(usable_frame)
@@ -171,6 +189,11 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
 
     usable = _smooth_distances(usable)
     distances = [item["distanceToMouth"] for item in usable]
+    face_gap_values = []
+    for item in usable:
+        cheek_distances = [value for value in [item.get("distanceToLeftCheek"), item.get("distanceToRightCheek")] if value is not None]
+        if cheek_distances:
+            face_gap_values.append(min(cheek_distances) - item["distanceToMouth"])
     first_window = distances[: max(2, len(distances) // 4)]
     last_window = distances[-max(2, len(distances) // 4) :]
     start_distance = sum(first_window) / len(first_window)
@@ -190,9 +213,40 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
     approach_ratio = max(start_distance, farthest_before_closest) / max(closest_distance, 0.001)
     near_frame_count = sum(1 for distance in distances if distance <= near_threshold)
     near_frame_ratio = near_frame_count / len(distances)
+    face_touch_frame_count = sum(
+        1
+        for item in usable
+        if item["distanceToMouth"] <= near_threshold
+        and min(
+            [value for value in [item.get("distanceToLeftCheek"), item.get("distanceToRightCheek")] if value is not None]
+            or [float("inf")]
+        ) - item["distanceToMouth"] < 0.08
+    )
+    face_touch_ratio = face_touch_frame_count / len(distances)
+    face_touch_detected = face_touch_frame_count >= 2 and face_touch_ratio >= 0.18
 
     pause_ms = _longest_near_pause_ms(usable, near_threshold)
     mouth_pause_detected = pause_ms >= 500 or (near_frame_count >= 5 and near_frame_ratio >= 0.22)
+    wrist_items = [item for item in usable if item.get("wristY") is not None]
+    wrist_values = [float(item["wristY"]) for item in wrist_items]
+    wrist_elevation_delta = 0.0
+    longest_wrist_rise_streak = 0
+    if len(wrist_values) >= 3:
+        first_wrist_window = wrist_values[: max(2, len(wrist_values) // 4)]
+        start_wrist_y = sum(first_wrist_window) / len(first_wrist_window)
+        highest_later_wrist_y = min(wrist_values[1:])
+        wrist_elevation_delta = start_wrist_y - highest_later_wrist_y
+        current_streak = 0
+        for previous_y, next_y in zip(wrist_values, wrist_values[1:]):
+            if previous_y - next_y >= 0.012:
+                current_streak += 1
+                longest_wrist_rise_streak = max(longest_wrist_rise_streak, current_streak)
+            else:
+                current_streak = 0
+    wrist_elevation_detected = (
+        wrist_elevation_delta >= 0.06
+        or (wrist_elevation_delta >= 0.035 and longest_wrist_rise_streak >= 2)
+    )
 
     clear_approach = (
         approach_distance >= approach_delta
@@ -205,7 +259,8 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
         and near_frame_count >= 4
         and closest_progress >= 0.05
     )
-    hand_to_mouth_detected = closest_distance <= near_threshold and (clear_approach or near_with_motion)
+    hand_mouth_proximity_detected = closest_distance <= near_threshold
+    hand_to_mouth_detected = hand_mouth_proximity_detected and not face_touch_detected and (clear_approach or near_with_motion or wrist_elevation_detected)
 
     moved_away_after_pause = max(end_distance, farthest_after_closest) - closest_distance >= 0.22
     mouth_landmark_frames = sum(1 for item in usable if item.get("mouthOpenRatio") is not None)
@@ -237,30 +292,35 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
     )
     video_swallow_detected = hand_to_mouth_detected and mouth_pause_detected and mouth_activity_detected
     swallow_detected = bool(swallow_confirmed) or video_swallow_detected
-    motion_available = hand_to_mouth_detected and mouth_pause_detected and swallow_detected
+    motion_available = wrist_elevation_detected and hand_mouth_proximity_detected and mouth_pause_detected
+    if face_touch_detected and not video_swallow_detected:
+        motion_available = False
     completed = motion_available
     confidence_parts = [
-        0.4 if hand_to_mouth_detected else max(0.0, min(0.3, approach_distance / 1.4)),
-        0.25 if mouth_pause_detected else max(0.0, min(0.18, pause_ms / 1800)),
-        0.25 if swallow_detected else max(0.0, min(0.16, mouth_open_span / 0.25)),
-        0.1 if moved_away_after_pause else 0,
+        0.34 if wrist_elevation_detected else max(0.0, min(0.24, wrist_elevation_delta / 0.18)),
+        0.34 if hand_mouth_proximity_detected else max(0.0, min(0.24, approach_distance / 1.4)),
+        0.32 if mouth_pause_detected else max(0.0, min(0.24, pause_ms / 1800)),
     ]
     confidence = round(sum(confidence_parts), 4)
-    if closest_distance > near_threshold:
+    if face_touch_detected and not video_swallow_detected:
+        message = "The hand touched the face, but it did not clearly reach the mouth. Move the hand directly to the mouth and pause there before calling it medicine intake."
+    elif not wrist_elevation_detected:
+        message = "Wrist elevation was not clear. Start with the hand lower, then raise it toward the mouth."
+    elif not hand_mouth_proximity_detected:
         message = "Hand came into view, but it did not get close enough to the mouth. Start lower, move to the mouth, and pause for one second."
-    elif not hand_to_mouth_detected:
-        message = "Hand was near the mouth, but the approach motion was not clear. Record again with the hand starting below the face."
     elif not mouth_pause_detected:
         message = "Hand reached the mouth, but the near-mouth pause was too short. Hold at the mouth for one second."
-    elif not swallow_detected:
-        message = "Hand reached the mouth, but swallowing was not detected. Keep your mouth visible, swallow, then stop recording."
     else:
-        message = "Hand-to-mouth and swallowing motion detected."
+        message = "Intake motion detected: wrist raised, hand reached the mouth, and paused near the mouth."
 
     return {
         "status": "completed" if completed else "needs-confirmation",
         "confidence": confidence,
         "motionAvailable": motion_available,
+        "faceTouchDetected": face_touch_detected,
+        "wristElevationDetected": wrist_elevation_detected,
+        "handMouthProximityDetected": hand_mouth_proximity_detected,
+        "mouthDwellDetected": mouth_pause_detected,
         "handToMouthDetected": hand_to_mouth_detected,
         "mouthPauseDetected": mouth_pause_detected,
         "swallowDetected": swallow_detected,
@@ -281,6 +341,9 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
             "movementSpan": round(movement_span, 4),
             "approachDistance": round(approach_distance, 4),
             "approachRatio": round(approach_ratio, 4),
+            "wristElevationDelta": round(wrist_elevation_delta, 4),
+            "wristRiseStreak": longest_wrist_rise_streak,
+            "wristFrameCount": len(wrist_values),
             "farthestBeforeClosest": round(farthest_before_closest, 4),
             "farthestAfterClosest": round(farthest_after_closest, 4),
             "mouthLandmarkFrames": mouth_landmark_frames,
@@ -288,6 +351,9 @@ def analyze_motion(frames: list[dict[str, Any]], swallow_confirmed: bool = False
             "nearMouthOpenSpan": round(near_mouth_open_span, 4),
             "postMouthOpenSpan": round(post_mouth_open_span, 4),
             "mouthCloseAfterOpen": mouth_close_after_open,
+            "faceTouchFrameCount": face_touch_frame_count,
+            "faceTouchRatio": round(face_touch_ratio, 4),
+            "mouthToFaceGap": round(min(face_gap_values), 4) if face_gap_values else None,
         },
     }
 

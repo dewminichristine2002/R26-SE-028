@@ -1,6 +1,4 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import React, { useMemo, useState } from 'react';
 import { EmotionalSupportProvider } from './context/EmotionalSupportContext';
 import ElderHomeScreen from './screens/ElderHomeScreen';
 import EmotionalTrendScreen from './screens/EmotionalTrendScreen';
@@ -9,21 +7,41 @@ import AdaptiveSupportChatScreen from './screens/AdaptiveSupportChatScreen';
 import SupportMoodCheckInScreen from './screens/SupportMoodCheckInScreen';
 import SupportResultScreen from './screens/SupportResultScreen';
 
-const Stack = createStackNavigator();
+const routes = {
+  ElderHome: ElderHomeScreen,
+  SupportMoodCheckInScreen,
+  AdaptiveSupportChatScreen,
+  SupportResultScreen,
+  ReminiscenceActivityScreen,
+  EmotionalTrendScreen,
+};
 
 export default function EmotionalSupportNavigator() {
+  const [routeStack, setRouteStack] = useState([{ name: 'ElderHome', params: {} }]);
+  const currentRoute = routeStack[routeStack.length - 1];
+  const CurrentScreen = routes[currentRoute.name] || ElderHomeScreen;
+
+  const navigation = useMemo(
+    () => ({
+      navigate: (name, params = {}) => {
+        if (!routes[name]) {
+          return;
+        }
+        setRouteStack((stack) => [...stack, { name, params }]);
+      },
+      goBack: () => {
+        setRouteStack((stack) => (stack.length > 1 ? stack.slice(0, -1) : stack));
+      },
+      popToTop: () => {
+        setRouteStack([{ name: 'ElderHome', params: {} }]);
+      },
+    }),
+    []
+  );
+
   return (
     <EmotionalSupportProvider>
-      <NavigationContainer independent>
-        <Stack.Navigator initialRouteName="ElderHome">
-          <Stack.Screen name="ElderHome" component={ElderHomeScreen} options={{ title: 'Elder Support' }} />
-          <Stack.Screen name="SupportMoodCheckInScreen" component={SupportMoodCheckInScreen} options={{ title: 'Optional Mood Check-In' }} />
-          <Stack.Screen name="AdaptiveSupportChatScreen" component={AdaptiveSupportChatScreen} options={{ title: 'Adaptive Check-In' }} />
-          <Stack.Screen name="SupportResultScreen" component={SupportResultScreen} options={{ title: 'Support Result' }} />
-          <Stack.Screen name="ReminiscenceActivityScreen" component={ReminiscenceActivityScreen} options={{ title: 'Memory Activity' }} />
-          <Stack.Screen name="EmotionalTrendScreen" component={EmotionalTrendScreen} options={{ title: 'Emotional Trends' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <CurrentScreen navigation={navigation} route={{ name: currentRoute.name, params: currentRoute.params }} />
     </EmotionalSupportProvider>
   );
 }
