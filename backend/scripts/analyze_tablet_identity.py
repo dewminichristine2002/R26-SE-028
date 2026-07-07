@@ -31,7 +31,10 @@ COLOR_REFERENCES = {
 
 SHAPE_ALIASES = {
     "circle": "round",
+    "circular": "round",
     "round": "round",
+    "ellipse": "oval",
+    "elliptical": "oval",
     "oval": "oval",
     "capsule": "capsule",
     "oblong": "capsule",
@@ -915,12 +918,17 @@ def _classify_shape(component: dict[str, Any]) -> tuple[str, float]:
         return "triangle", 0.82
     if vertices == 4 and aspect <= 1.35 and fill_ratio < 0.78:
         return "diamond", 0.72
-    if aspect >= 2.15:
+    if aspect >= 2.2:
         return "capsule", round(min(0.94, 0.54 + ((aspect - 2.0) * 0.16) + (solidity * 0.12)), 4)
-    if circularity >= 0.68 and aspect <= 1.28:
-        return "round", round(min(0.94, 0.5 + circularity * 0.46), 4)
-    if aspect >= 1.35:
-        return "oval", round(min(0.9, 0.45 + min(aspect, 2.0) * 0.18 + solidity * 0.08), 4)
+    if aspect >= 1.32:
+        return "oval", round(min(0.92, 0.48 + min(aspect, 2.0) * 0.18 + solidity * 0.08), 4)
+    if aspect >= 1.18 and circularity < 0.82:
+        return "oval", round(min(0.88, 0.42 + min(aspect, 1.5) * 0.2 + solidity * 0.08), 4)
+    if circularity >= 0.66 and aspect <= 1.22:
+        round_confidence = 0.5 + circularity * 0.42 + max(0.0, 1.18 - aspect) * 0.18
+        return "round", round(min(0.94, round_confidence), 4)
+    if aspect >= 1.22:
+        return "oval", round(min(0.86, 0.42 + min(aspect, 1.8) * 0.18 + solidity * 0.08), 4)
     if fill_ratio < 0.52:
         return "triangle", 0.5
     return "square", round(min(0.82, 0.42 + fill_ratio * 0.34 + solidity * 0.08), 4)
@@ -1347,9 +1355,6 @@ def _candidate_score(candidate: dict[str, Any], detected_color: str, detected_sh
         score += 0.36
     elif shape and detected_shape and {shape, detected_shape} <= {"oval", "capsule"}:
         score += 0.18
-    elif shape and detected_shape and {shape, detected_shape} <= {"round", "oval"}:
-        score += 0.14
-
     if not color and not shape:
         score = max(score, 0.05)
 

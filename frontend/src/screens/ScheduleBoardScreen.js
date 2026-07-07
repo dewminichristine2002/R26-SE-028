@@ -435,7 +435,7 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
     : [];
 
   detectedObjects.forEach((object) => {
-    const match = object?.match || (Array.isArray(object?.matches) ? object.matches[0] : null);
+    const match = object?.match || null;
     const key = String(match?.id || '').trim();
     const confidence = Number(match?.confidence ?? object?.confidence) || 0;
     if (!key || confidence <= 0 || map.has(key)) {
@@ -470,23 +470,120 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
   return map;
 };
 
+const normalizeAppearanceValue = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized || ['unknown', 'not specified', 'none', 'n/a'].includes(normalized)) {
+    return '';
+  }
+  return normalized === 'grey' ? 'gray' : normalized;
+};
+
+const getAppearanceMatchScore = (expectedMedicine, detectedAppearance = {}) => {
+  const expectedColor = normalizeAppearanceValue(expectedMedicine?.color);
+  const expectedShape = normalizeAppearanceValue(expectedMedicine?.shape);
+  const detectedColor = normalizeAppearanceValue(detectedAppearance?.color);
+  const detectedShape = normalizeAppearanceValue(detectedAppearance?.shape);
+  let score = 0;
+
+  if (expectedColor && detectedColor && expectedColor === detectedColor) {
+    score += 0.58;
+  } else if (expectedColor && detectedColor && ['gray', 'white'].includes(expectedColor) && ['gray', 'white'].includes(detectedColor)) {
+    score += 0.32;
+  }
+
+  if (expectedShape && detectedShape && expectedShape === detectedShape) {
+    score += 0.36;
+  } else if (expectedShape && detectedShape && ['oval', 'capsule'].includes(expectedShape) && ['oval', 'capsule'].includes(detectedShape)) {
+    score += 0.18;
+  }
+
+  return score;
+};
+
+const getBestEntryIndexByAppearance = ({ entries, scheduledItems, detectedAppearance, onlyMissing = false }) => {
+  let bestIndex = -1;
+  let bestScore = 0;
+  let bestDetectedCount = Number.POSITIVE_INFINITY;
+
+  entries.forEach((entry, index) => {
+    if (onlyMissing && Number(scheduledItems[index]?.missingCount) <= 0) {
+      return;
+    }
+
+    const score = getAppearanceMatchScore(entry, detectedAppearance);
+    const detectedCount = Number(scheduledItems[index]?.detectedCount) || 0;
+    if (score > bestScore || (score > 0 && score === bestScore && detectedCount < bestDetectedCount)) {
+      bestScore = score;
+      bestDetectedCount = detectedCount;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore > 0 ? bestIndex : -1;
+};
+
+const getDetectedObjectAppearance = (object = {}) => {
+  const match = object?.match || null;
+  const firstCandidate = Array.isArray(object?.matches) ? object.matches[0] : null;
+  return {
+    color: object?.detectedColor || match?.color || firstCandidate?.color || '',
+    shape: object?.detectedShape || match?.shape || firstCandidate?.shape || '',
+  };
+};
+
+const hasDetectedAppearance = (appearance = {}) =>
+  Boolean(normalizeAppearanceValue(appearance?.color) || normalizeAppearanceValue(appearance?.shape));
+
+const pushAppearanceUnits = (queue, appearance, count) => {
+  const normalizedCount = Math.max(0, Math.ceil(Number(count) || 0));
+  for (let index = 0; index < normalizedCount; index += 1) {
+    queue.push(appearance);
+  }
+};
+
 const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAnalysis = null }) => {
   const entries = getVerificationEntries(entry);
   const detectedMap = getDetectedMedicineCountMap(identityAnalysis);
+  const detectedObjects = Array.isArray(identityAnalysis?.detectedObjects)
+    ? identityAnalysis.detectedObjects
+    : [];
   const normalizedDetectedCount = Number(detectedCount);
   const photoWasAnalyzed = detectedCount != null && Number.isFinite(normalizedDetectedCount);
 
   const scheduledKeys = new Set(entries.map((item) => getMedicineKey(item)).filter(Boolean));
-  const scheduledItems = entries.map((item) => {
-    const requiredCount = getScheduledTabletCount(item);
-    const detected = detectedMap.get(getMedicineKey(item));
-    const medicineDetectedCount = Number(detected?.count) || 0;
+  const rawDetectedTotal = Array.from(detectedMap.values()).reduce((sum, detected) => sum + (Number(detected?.count) || 0), 0);
+  const unscheduledDetectedTotal = Array.from(detectedMap.entries())
+    .filter(([key]) => key && !scheduledKeys.has(key))
+    .reduce((sum, [, detected]) => sum + (Number(detected?.count) || 0), 0);
+  const unassignedAppearances = [];
 
+  detectedObjects.forEach((object) => {
+    const match = object?.match || null;
+    const key = String(match?.id || '').trim();
+    if (!key || !scheduledKeys.has(key)) {
+      unassignedAppearances.push(getDetectedObjectAppearance(object));
+    }
+  });
+
+  detectedMap.forEach((detected, key) => {
+    if (!scheduledKeys.has(key)) {
+      pushAppearanceUnits(unassignedAppearances, {
+        color: detected?.color || '',
+        shape: detected?.shape || '',
+      }, detected?.count);
+    }
+  });
+
+  let unassignedDetectedCount = unscheduledDetectedTotal
+    + Math.max(0, photoWasAnalyzed ? normalizedDetectedCount - rawDetectedTotal : 0);
+
+  const buildScheduledAvailabilityItem = (item, detected, medicineDetectedCount) => {
+    const requiredCount = getScheduledTabletCount(item);
     let status = photoWasAnalyzed ? 'underdose' : 'unknown';
     let label = 'Missing';
     let reason = 'Medicine was not found in the palm photo or could not be identified';
 
-    if (detected) {
+    if (detected || medicineDetectedCount > 0) {
       if (Math.abs(medicineDetectedCount - requiredCount) <= 0.001) {
         status = 'correct';
         label = 'Available';
@@ -497,7 +594,7 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
         reason = `Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       } else {
         status = 'underdose';
-        label = medicineDetectedCount > 0 ? 'Underdose' : 'Missing';
+        label = 'Missing';
         reason = `Missing ${formatTabletCount(requiredCount - medicineDetectedCount)}. Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       }
     }
@@ -513,35 +610,77 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
       missingCount: Math.max(0, requiredCount - medicineDetectedCount),
       extraCount: Math.max(0, medicineDetectedCount - requiredCount),
       available: status === 'correct',
-      detected: Boolean(detected),
+      detected: Boolean(detected) || medicineDetectedCount > 0,
       confidence: detected ? Number(detected.confidence) || 0 : 0,
       status,
       label,
       reason,
     };
+  };
+
+  const scheduledItems = entries.map((item) => {
+    const detected = detectedMap.get(getMedicineKey(item));
+    const medicineDetectedCount = Number(detected?.count) || 0;
+
+    return buildScheduledAvailabilityItem(item, detected, medicineDetectedCount);
   });
 
-  const extraItems = Array.from(detectedMap.entries())
-    .filter(([key]) => key && !scheduledKeys.has(key))
-    .map(([key, detected]) => ({
-      key: `extra-${key}`,
-      medicineName: detected?.medicineName || 'Medicine',
-      dosageMg: detected?.dosageMg,
-      color: detected?.color || '',
-      shape: detected?.shape || '',
-      requiredCount: 0,
-      detectedCount: Number(detected?.count) || 0,
-      missingCount: 0,
-      extraCount: Number(detected?.count) || 0,
-      available: false,
-      detected: true,
-      confidence: Number(detected?.confidence) || 0,
-      status: 'overdose',
-      label: 'Overdose',
-      reason: 'Detected in palm photo but not scheduled for this intake',
-    }));
+  while (unassignedDetectedCount > 0) {
+    const detectedAppearance = unassignedAppearances.shift() || {};
+    const appearanceMatchedMissingIndex = getBestEntryIndexByAppearance({
+      entries,
+      scheduledItems,
+      detectedAppearance,
+      onlyMissing: true,
+    });
+    const missingIndex = appearanceMatchedMissingIndex >= 0
+      ? appearanceMatchedMissingIndex
+      : hasDetectedAppearance(detectedAppearance)
+      ? -1
+      : scheduledItems.findIndex((item) => Number(item.missingCount) > 0);
+    if (missingIndex < 0) {
+      if (hasDetectedAppearance(detectedAppearance)) {
+        unassignedAppearances.unshift(detectedAppearance);
+      }
+      break;
+    }
+    const entryItem = entries[missingIndex];
+    const detected = detectedMap.get(getMedicineKey(entryItem));
+    const assignCount = Math.min(unassignedDetectedCount, Number(scheduledItems[missingIndex].missingCount) || 0, 1);
+    scheduledItems[missingIndex] = buildScheduledAvailabilityItem(
+      entryItem,
+      detected,
+      Number(scheduledItems[missingIndex].detectedCount) + assignCount,
+    );
+    unassignedDetectedCount -= assignCount;
+  }
 
-  return [...scheduledItems, ...extraItems];
+  while (unassignedDetectedCount > 0 && scheduledItems.length > 0) {
+    const detectedAppearance = unassignedAppearances.shift() || {};
+    const appearanceMatchedIndex = getBestEntryIndexByAppearance({
+      entries,
+      scheduledItems,
+      detectedAppearance,
+      onlyMissing: false,
+    });
+    const overdoseIndex = scheduledItems.findIndex((item) => Number(item.detectedCount) > 0);
+    const targetIndex = appearanceMatchedIndex >= 0
+      ? appearanceMatchedIndex
+      : overdoseIndex >= 0
+      ? overdoseIndex
+      : 0;
+    const entryItem = entries[targetIndex];
+    const detected = detectedMap.get(getMedicineKey(entryItem));
+    const assignCount = Math.min(unassignedDetectedCount, 1);
+    scheduledItems[targetIndex] = buildScheduledAvailabilityItem(
+      entryItem,
+      detected,
+      Number(scheduledItems[targetIndex].detectedCount) + assignCount,
+    );
+    unassignedDetectedCount -= assignCount;
+  }
+
+  return scheduledItems;
 };
 
 const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
@@ -557,10 +696,10 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
     const extraCount = Number(item?.extraCount) || 0;
     const label = status === 'correct'
       ? 'Available'
-    : status === 'overdose' || status === 'unexpected'
+    : status === 'overdose'
       ? 'Overdose'
-      : detectedCount > 0 && missingCount > 0
-      ? 'Underdose'
+    : detectedCount > 0 && missingCount > 0
+      ? 'Missing'
       : detectedCount > 0
       ? 'Available'
       : status === 'underdose'
@@ -568,8 +707,6 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
       : 'Missing';
     const reason = label === 'Overdose'
       ? `Overdose by ${formatTabletCount(extraCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
-      : label === 'Underdose'
-      ? `Missing ${formatTabletCount(missingCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : label === 'Missing'
       ? `Missing ${formatTabletCount(missingCount || requiredCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : item?.message || `Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`;
@@ -621,7 +758,7 @@ const getCountComparisonLabel = (status) => {
     return 'Overdose count';
   }
   if (status === 'underdose') {
-    return 'Underdose count';
+    return 'Missing count';
   }
   return 'Count uncertain';
 };
@@ -638,7 +775,7 @@ const getCountComparisonMessage = (status, count, expectedCount) => {
     return `Possible overdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   if (status === 'underdose') {
-    return `Possible underdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
+    return `Possible missing tablets: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   return `This dose needs ${expectedText} ${expectedUnit}.`;
 };
@@ -1920,7 +2057,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               {isGroupVerification ? 'Verify one-time intake' : 'Verify before marking taken'}
             </Text>
             <Text style={[styles.verificationHeroText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
-              Show all tablets in your palm. The trained AI model checks whether the amount is OK, overdose, or underdose.
+              Show all tablets in your palm. The trained AI model checks scheduled medicine color and shape to find what is available, missing, or overdose.
             </Text>
           </View>
 
@@ -2007,7 +2144,6 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                 <View style={styles.verificationAvailabilityList}>
                   {medicineAvailabilityItems.map((item) => {
                     const needsAttention = item.status === 'overdose'
-                      || item.status === 'unexpected'
                       || item.status === 'underdose'
                       || item.label === 'Missing'
                       || item.label === 'Overdose';

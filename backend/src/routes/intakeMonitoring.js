@@ -222,7 +222,7 @@ const buildDetectedMedicineMap = (identityAnalysis) => {
     : [];
 
   detectedObjects.forEach((object, index) => {
-    const match = object?.match || (Array.isArray(object?.matches) ? object.matches[0] : null);
+    const match = object?.match || null;
     const id = String(match?.id || '').trim();
     const confidence = Number(match?.confidence ?? object?.confidence) || 0;
     if (!id || confidence <= 0 || detectedMap.has(id)) {
@@ -244,6 +244,77 @@ const buildDetectedMedicineMap = (identityAnalysis) => {
   return detectedMap;
 };
 
+const normalizeAppearanceValue = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized || ['unknown', 'not specified', 'none', 'n/a'].includes(normalized)) {
+    return '';
+  }
+  return normalized === 'grey' ? 'gray' : normalized;
+};
+
+const getAppearanceMatchScore = (expectedMedicine, detectedAppearance = {}) => {
+  const expectedColor = normalizeAppearanceValue(expectedMedicine?.color);
+  const expectedShape = normalizeAppearanceValue(expectedMedicine?.shape);
+  const detectedColor = normalizeAppearanceValue(detectedAppearance?.color);
+  const detectedShape = normalizeAppearanceValue(detectedAppearance?.shape);
+  let score = 0;
+
+  if (expectedColor && detectedColor && expectedColor === detectedColor) {
+    score += 0.58;
+  } else if (expectedColor && detectedColor && ['gray', 'white'].includes(expectedColor) && ['gray', 'white'].includes(detectedColor)) {
+    score += 0.32;
+  }
+
+  if (expectedShape && detectedShape && expectedShape === detectedShape) {
+    score += 0.36;
+  } else if (expectedShape && detectedShape && ['oval', 'capsule'].includes(expectedShape) && ['oval', 'capsule'].includes(detectedShape)) {
+    score += 0.18;
+  }
+
+  return score;
+};
+
+const getBestScheduledIndexByAppearance = ({ expected, items, detectedAppearance, onlyMissing = false }) => {
+  let bestIndex = -1;
+  let bestScore = 0;
+  let bestDetectedCount = Number.POSITIVE_INFINITY;
+
+  expected.forEach((expectedMedicine, index) => {
+    if (onlyMissing && Number(items[index]?.missingCount) <= 0) {
+      return;
+    }
+
+    const score = getAppearanceMatchScore(expectedMedicine, detectedAppearance);
+    const detectedCount = Number(items[index]?.detectedCount) || 0;
+    if (score > bestScore || (score > 0 && score === bestScore && detectedCount < bestDetectedCount)) {
+      bestScore = score;
+      bestDetectedCount = detectedCount;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore > 0 ? bestIndex : -1;
+};
+
+const getDetectedObjectAppearance = (object = {}) => {
+  const match = object?.match || null;
+  const firstCandidate = Array.isArray(object?.matches) ? object.matches[0] : null;
+  return {
+    color: object?.detectedColor || match?.color || firstCandidate?.color || '',
+    shape: object?.detectedShape || match?.shape || firstCandidate?.shape || '',
+  };
+};
+
+const hasDetectedAppearance = (appearance = {}) =>
+  Boolean(normalizeAppearanceValue(appearance?.color) || normalizeAppearanceValue(appearance?.shape));
+
+const pushAppearanceUnits = (queue, appearance, count) => {
+  const normalizedCount = Math.max(0, Math.ceil(Number(count) || 0));
+  for (let index = 0; index < normalizedCount; index += 1) {
+    queue.push(appearance);
+  }
+};
+
 const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detectedCount }) => {
   const expected = normalizeExpectedMedicines(expectedMedicines);
   const detectedMap = buildDetectedMedicineMap(identityAnalysis);
@@ -251,30 +322,22 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
   const unknownObjectCount = detectedObjects.filter((item) => !item?.match).length;
   const scheduledIds = new Set(expected.map((item) => item.id));
   const normalizedDetectedCount = toPositiveNumber(detectedCount, 0);
-  const canUseSingleMedicineCountFallback = expected.length === 1
-    && detectedMap.size === 0
-    && normalizedDetectedCount > 0;
 
-  const items = expected.map((item) => {
-    const detected = detectedMap.get(item.id);
-    const usedCountOnlyFallback = !detected && canUseSingleMedicineCountFallback;
-    const detectedMedicineCount = usedCountOnlyFallback
-      ? normalizedDetectedCount
-      : Number(detected?.count) || 0;
+  const buildScheduledItem = ({ item, detected = null, detectedMedicineCount = 0, countOnlyFallback = false }) => {
+    const requiredCount = item.expectedCount;
+    const missingCount = Math.max(0, requiredCount - detectedMedicineCount);
+    const extraCount = Math.max(0, detectedMedicineCount - requiredCount);
     let status = 'underdose';
-    let message = `${item.medicineName}: missed. Detected 0, expected ${item.expectedCount}.`;
+    let message = `${item.medicineName}: missing. Detected ${detectedMedicineCount}, expected ${requiredCount}.`;
 
-    if (detected || usedCountOnlyFallback) {
-      if (Math.abs(detectedMedicineCount - item.expectedCount) <= 0.001) {
-        status = 'correct';
-        message = `${item.medicineName}: available in the correct count (${detectedMedicineCount}).`;
-      } else if (detectedMedicineCount > item.expectedCount) {
-        status = 'overdose';
-        message = `${item.medicineName}: overdose. Detected ${detectedMedicineCount}, expected ${item.expectedCount}.`;
-      } else {
-        status = 'underdose';
-        message = `${item.medicineName}: missing ${item.expectedCount - detectedMedicineCount}. Detected ${detectedMedicineCount}, expected ${item.expectedCount}.`;
-      }
+    if (Math.abs(detectedMedicineCount - requiredCount) <= 0.001 && detectedMedicineCount > 0) {
+      status = 'correct';
+      message = `${item.medicineName}: available in the correct count (${detectedMedicineCount}).`;
+    } else if (detectedMedicineCount > requiredCount) {
+      status = 'overdose';
+      message = `${item.medicineName}: overdose. Detected ${detectedMedicineCount}, expected ${requiredCount}.`;
+    } else if (detectedMedicineCount > 0) {
+      message = `${item.medicineName}: missing ${missingCount}. Detected ${detectedMedicineCount}, expected ${requiredCount}.`;
     }
 
     return {
@@ -284,44 +347,115 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
       dosageMg: item.dosageMg,
       color: item.color,
       shape: item.shape,
-      expectedCount: item.expectedCount,
+      expectedCount: requiredCount,
       detectedCount: detectedMedicineCount,
-      missingCount: Math.max(0, item.expectedCount - detectedMedicineCount),
-      extraCount: Math.max(0, detectedMedicineCount - item.expectedCount),
-      confidence: detected ? Number(detected.confidence) || 0 : usedCountOnlyFallback ? 0 : null,
+      missingCount,
+      extraCount,
+      confidence: detected ? Number(detected.confidence) || 0 : countOnlyFallback ? 0 : null,
       status,
-      countOnlyFallback: usedCountOnlyFallback,
+      countOnlyFallback,
       message,
     };
-  });
+  };
 
-  detectedMap.forEach((detected, id) => {
-    if (scheduledIds.has(id)) {
-      return;
-    }
-
-    items.push({
-      key: `unexpected-${id}`,
-      id,
-      medicineName: detected.medicineName || 'Medicine',
-      dosageMg: detected.dosageMg,
-      color: detected.color,
-      shape: detected.shape,
-      expectedCount: 0,
-      detectedCount: detected.count,
-      missingCount: 0,
-      extraCount: detected.count,
-      confidence: detected.confidence,
-      status: 'unexpected',
-      message: `${detected.medicineName || 'Medicine'}: not scheduled for this intake. Detected ${detected.count}.`,
+  const items = expected.map((item) => {
+    const detected = detectedMap.get(item.id);
+    return buildScheduledItem({
+      item,
+      detected,
+      detectedMedicineCount: Number(detected?.count) || 0,
+      countOnlyFallback: false,
     });
   });
 
-  const totalExpected = expected.reduce((sum, item) => sum + item.expectedCount, 0);
+  const rebuildItemAt = (index, nextDetectedCount, countOnlyFallback = true) => {
+    const expectedItem = expected.find((item) => item.id === items[index]?.id);
+    if (!expectedItem) {
+      return;
+    }
+    items[index] = buildScheduledItem({
+      item: expectedItem,
+      detected: detectedMap.get(expectedItem.id) || null,
+      detectedMedicineCount: nextDetectedCount,
+      countOnlyFallback,
+    });
+  };
+
   const rawTotalIdentified = Array.from(detectedMap.values()).reduce((sum, item) => sum + (Number(item.count) || 0), 0);
-  const totalIdentified = canUseSingleMedicineCountFallback ? normalizedDetectedCount : rawTotalIdentified;
+  const unscheduledDetectedCount = Array.from(detectedMap.entries())
+    .filter(([id]) => !scheduledIds.has(id))
+    .reduce((sum, [, item]) => sum + (Number(item.count) || 0), 0);
+  const unassignedAppearances = [];
+
+  detectedObjects.forEach((object) => {
+    const match = object?.match || null;
+    const id = String(match?.id || '').trim();
+    if (!id || !scheduledIds.has(id)) {
+      unassignedAppearances.push(getDetectedObjectAppearance(object));
+    }
+  });
+
+  detectedMap.forEach((detected, id) => {
+    if (!scheduledIds.has(id)) {
+      pushAppearanceUnits(unassignedAppearances, {
+        color: detected?.color || '',
+        shape: detected?.shape || '',
+      }, detected?.count);
+    }
+  });
+
+  let unassignedCount = unscheduledDetectedCount + Math.max(0, normalizedDetectedCount - rawTotalIdentified);
+  if (unassignedCount <= 0 && normalizedDetectedCount <= 0 && unknownObjectCount > 0) {
+    unassignedCount = unknownObjectCount;
+  }
+
+  while (unassignedCount > 0) {
+    const detectedAppearance = unassignedAppearances.shift() || {};
+    const appearanceMatchedMissingIndex = getBestScheduledIndexByAppearance({
+      expected,
+      items,
+      detectedAppearance,
+      onlyMissing: true,
+    });
+    const missingIndex = appearanceMatchedMissingIndex >= 0
+      ? appearanceMatchedMissingIndex
+      : hasDetectedAppearance(detectedAppearance)
+      ? -1
+      : items.findIndex((item) => Number(item.missingCount) > 0);
+    if (missingIndex < 0) {
+      if (hasDetectedAppearance(detectedAppearance)) {
+        unassignedAppearances.unshift(detectedAppearance);
+      }
+      break;
+    }
+    const assignCount = Math.min(unassignedCount, Number(items[missingIndex].missingCount) || 0, 1);
+    rebuildItemAt(missingIndex, Number(items[missingIndex].detectedCount) + assignCount, true);
+    unassignedCount -= assignCount;
+  }
+
+  while (unassignedCount > 0 && items.length > 0) {
+    const detectedAppearance = unassignedAppearances.shift() || {};
+    const appearanceMatchedIndex = getBestScheduledIndexByAppearance({
+      expected,
+      items,
+      detectedAppearance,
+      onlyMissing: false,
+    });
+    const overdoseIndex = items.findIndex((item) => Number(item.detectedCount) > 0);
+    const targetIndex = appearanceMatchedIndex >= 0
+      ? appearanceMatchedIndex
+      : overdoseIndex >= 0
+      ? overdoseIndex
+      : 0;
+    const assignCount = Math.min(unassignedCount, 1);
+    rebuildItemAt(targetIndex, Number(items[targetIndex].detectedCount) + assignCount, true);
+    unassignedCount -= assignCount;
+  }
+
+  const totalExpected = expected.reduce((sum, item) => sum + item.expectedCount, 0);
+  const totalIdentified = items.reduce((sum, item) => sum + (Number(item.detectedCount) || 0), 0);
   const statuses = new Set(items.map((item) => item.status));
-  const status = statuses.has('overdose') || statuses.has('unexpected')
+  const status = statuses.has('overdose')
     ? 'overdose'
     : statuses.has('underdose')
     ? 'underdose'
@@ -438,10 +572,15 @@ router.post('/analyze-palm', requireAuth, async (req, res) => {
       error: 'Tablet identity analysis was not run.',
     };
 
+    const scheduledMedicineIds = new Set(normalizeExpectedMedicines(expectedMedicines).map((item) => item.id));
+    const identityCandidates = scheduledMedicineIds.size > 0
+      ? candidatesResult.filter((candidate) => scheduledMedicineIds.has(String(candidate?.id || '').trim()))
+      : candidatesResult;
+
     try {
       identityAnalysis = await runTabletIdentityAnalysis({
         imageBase64,
-        candidates: candidatesResult,
+        candidates: identityCandidates,
       });
     } catch (identityError) {
       console.warn('[IntakeMonitoring] tablet identity analysis warning:', identityError?.message || identityError);
@@ -467,7 +606,7 @@ router.post('/analyze-palm', requireAuth, async (req, res) => {
       detectedObjects: Array.isArray(identityAnalysis?.detectedObjects) ? identityAnalysis.detectedObjects : [],
       detectedMedicines: Array.isArray(identityAnalysis?.detectedMedicines) ? identityAnalysis.detectedMedicines : [],
       medicineDoseAnalysis,
-      identityCandidateCount: candidatesResult.length,
+      identityCandidateCount: identityCandidates.length,
     });
   } catch (error) {
     console.error('[IntakeMonitoring] palm analysis error:', error?.message || error);
