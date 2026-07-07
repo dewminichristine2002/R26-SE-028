@@ -250,14 +250,21 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
   const detectedObjects = Array.isArray(identityAnalysis?.detectedObjects) ? identityAnalysis.detectedObjects : [];
   const unknownObjectCount = detectedObjects.filter((item) => !item?.match).length;
   const scheduledIds = new Set(expected.map((item) => item.id));
+  const normalizedDetectedCount = toPositiveNumber(detectedCount, 0);
+  const canUseSingleMedicineCountFallback = expected.length === 1
+    && detectedMap.size === 0
+    && normalizedDetectedCount > 0;
 
   const items = expected.map((item) => {
     const detected = detectedMap.get(item.id);
-    const detectedMedicineCount = Number(detected?.count) || 0;
+    const usedCountOnlyFallback = !detected && canUseSingleMedicineCountFallback;
+    const detectedMedicineCount = usedCountOnlyFallback
+      ? normalizedDetectedCount
+      : Number(detected?.count) || 0;
     let status = 'underdose';
     let message = `${item.medicineName}: missed. Detected 0, expected ${item.expectedCount}.`;
 
-    if (detected) {
+    if (detected || usedCountOnlyFallback) {
       if (Math.abs(detectedMedicineCount - item.expectedCount) <= 0.001) {
         status = 'correct';
         message = `${item.medicineName}: available in the correct count (${detectedMedicineCount}).`;
@@ -281,8 +288,9 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
       detectedCount: detectedMedicineCount,
       missingCount: Math.max(0, item.expectedCount - detectedMedicineCount),
       extraCount: Math.max(0, detectedMedicineCount - item.expectedCount),
-      confidence: detected ? Number(detected.confidence) || 0 : null,
+      confidence: detected ? Number(detected.confidence) || 0 : usedCountOnlyFallback ? 0 : null,
       status,
+      countOnlyFallback: usedCountOnlyFallback,
       message,
     };
   });
@@ -310,7 +318,8 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
   });
 
   const totalExpected = expected.reduce((sum, item) => sum + item.expectedCount, 0);
-  const totalIdentified = Array.from(detectedMap.values()).reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+  const rawTotalIdentified = Array.from(detectedMap.values()).reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+  const totalIdentified = canUseSingleMedicineCountFallback ? normalizedDetectedCount : rawTotalIdentified;
   const statuses = new Set(items.map((item) => item.status));
   const status = statuses.has('overdose') || statuses.has('unexpected')
     ? 'overdose'

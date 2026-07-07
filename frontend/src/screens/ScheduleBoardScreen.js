@@ -89,6 +89,57 @@ const getColorValue = (color) => {
   return colorMap[normalized] || '#d5dde8';
 };
 
+const expandHexColor = (hexColor) => {
+  const hex = String(hexColor || '').replace('#', '');
+  if (hex.length === 3) {
+    return hex.split('').map((char) => `${char}${char}`).join('');
+  }
+  return hex;
+};
+
+const getColorLuminance = (hexColor) => {
+  const expandedHex = expandHexColor(hexColor);
+  if (!/^[0-9a-f]{6}$/i.test(expandedHex)) {
+    return 0.75;
+  }
+
+  const channels = [0, 2, 4].map((offset) => {
+    const value = parseInt(expandedHex.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+
+  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+};
+
+const getPillContrastStyle = (hexColor) => {
+  const luminance = getColorLuminance(hexColor);
+
+  if (luminance > 0.72) {
+    return {
+      borderColor: '#24352f',
+      shadowColor: '#24352f',
+      highlightColor: 'rgba(255,255,255,0.85)',
+      detailColor: 'rgba(36,53,47,0.28)',
+    };
+  }
+
+  if (luminance < 0.24) {
+    return {
+      borderColor: '#ffffff',
+      shadowColor: '#17231f',
+      highlightColor: 'rgba(255,255,255,0.34)',
+      detailColor: 'rgba(255,255,255,0.46)',
+    };
+  }
+
+  return {
+    borderColor: '#24352f',
+    shadowColor: '#24352f',
+    highlightColor: 'rgba(255,255,255,0.48)',
+    detailColor: 'rgba(36,53,47,0.24)',
+  };
+};
+
 const parseRoutineTimeToDate = (timeStr, referenceDate = new Date()) => {
   if (!timeStr || typeof timeStr !== 'string') {
     return null;
@@ -216,8 +267,6 @@ const STATUS_LABELS = {
   speak: 'Voice Mark',
   'not-taken': 'Not Taken',
 };
-
-const COMPLETED_INTAKE_STATUSES = new Set(['taken', 'overdose', 'not-taken']);
 
 const getEntryStatusKey = (entry) => `${entry?.medicationId || 'med'}-${entry?.rowKey || 'slot'}-${entry?.doseNumber || 1}`;
 const getEntryDoseInstanceKey = (entry) => {
@@ -409,12 +458,6 @@ const getExpectedMedicinePayload = (entry) =>
 
 const getMedicineKey = (entry) => String(entry?.medicationId || entry?.id || '').trim();
 
-const isCompletedIntakeEntry = (entry, statusMap = {}) => {
-  const entryState = statusMap[getEntryStatusKey(entry)];
-  const status = String(entryState?.status || '').toLowerCase();
-  return COMPLETED_INTAKE_STATUSES.has(status);
-};
-
 const getDetectedMedicineCountMap = (identityAnalysis) => {
   const map = new Map();
   const detectedMedicines = Array.isArray(identityAnalysis?.detectedMedicines)
@@ -490,7 +533,7 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
     const detected = detectedMap.get(getMedicineKey(item));
     const medicineDetectedCount = Number(detected?.count) || 0;
 
-    let status = photoWasAnalyzed ? 'missing' : 'unknown';
+    let status = photoWasAnalyzed ? 'underdose' : 'unknown';
     let label = 'Missing';
     let reason = 'Medicine was not found in the palm photo or could not be identified';
 
@@ -504,8 +547,8 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
         label = 'Overdose';
         reason = `Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       } else {
-        status = 'missing';
-        label = 'Missing';
+        status = 'underdose';
+        label = medicineDetectedCount > 0 ? 'Underdose' : 'Missing';
         reason = `Missing ${formatTabletCount(requiredCount - medicineDetectedCount)}. Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       }
     }
@@ -559,23 +602,32 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
     const rawDetectedCount = Number(item?.detectedCount) || 0;
     const requiredCount = Number(item?.expectedCount) || 0;
     const confidence = Number(item?.confidence) || 0;
-    const detectedCount = rawDetectedCount > 0 ? rawDetectedCount : 0;
+    const hasMedicinePercentage = confidence > 0;
+    const detectedCount = rawDetectedCount > 0 ? rawDetectedCount : hasMedicinePercentage ? 1 : 0;
     const missingCount = Math.max(0, requiredCount - detectedCount);
     const extraCount = Number(item?.extraCount) || 0;
+    const countOnlyFallback = item?.countOnlyFallback === true;
     const label = status === 'correct'
       ? 'Available'
     : status === 'overdose' || status === 'unexpected'
       ? 'Overdose'
-    : detectedCount > 0
-      ? 'Missing'
-      : status === 'underdose' || status === 'missing'
+      : detectedCount > 0 && missingCount > 0
+      ? 'Underdose'
+      : detectedCount > 0
+      ? 'Available'
+      : status === 'underdose'
       ? 'Missing'
       : 'Missing';
-    const reason = label === 'Overdose'
+    const baseReason = label === 'Overdose'
       ? `Overdose by ${formatTabletCount(extraCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
+      : label === 'Underdose'
+      ? `Missing ${formatTabletCount(missingCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : label === 'Missing'
       ? `Missing ${formatTabletCount(missingCount || requiredCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : item?.message || `Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`;
+    const reason = countOnlyFallback
+      ? `${baseReason}. Medicine identity was uncertain, so this result uses the tablet count.`
+      : baseReason;
 
     return {
       key: item?.key || `${item?.id || 'medicine'}-${index}`,
@@ -590,7 +642,8 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
       available: label === 'Available',
       detected: detectedCount > 0,
       confidence: detectedCount > 0 ? confidence : 0,
-      status: label === 'Missing' ? 'missing' : status,
+      status,
+      countOnlyFallback,
       label,
       reason,
     };
@@ -613,7 +666,7 @@ const getCountComparisonStatus = (count, expectedCount) => {
   if (Math.abs(normalizedCount - normalizedExpected) <= 0.001) {
     return 'okay';
   }
-  return normalizedCount > normalizedExpected ? 'overdose' : 'missing';
+  return normalizedCount > normalizedExpected ? 'overdose' : 'underdose';
 };
 
 const getCountComparisonLabel = (status) => {
@@ -623,8 +676,8 @@ const getCountComparisonLabel = (status) => {
   if (status === 'overdose') {
     return 'Overdose count';
   }
-  if (status === 'underdose' || status === 'missing') {
-    return 'Missing count';
+  if (status === 'underdose') {
+    return 'Underdose count';
   }
   return 'Count uncertain';
 };
@@ -640,8 +693,8 @@ const getCountComparisonMessage = (status, count, expectedCount) => {
   if (status === 'overdose') {
     return `Possible overdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
-  if (status === 'underdose' || status === 'missing') {
-    return `Possible missing tablets: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
+  if (status === 'underdose') {
+    return `Possible underdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   return `This dose needs ${expectedText} ${expectedUnit}.`;
 };
@@ -651,41 +704,6 @@ const getIntakeAmountText = (entry) => {
   const formattedCount = formatTabletCount(tabletCount);
   const unit = tabletCount === 1 ? 'tablet' : 'tablets';
   return `💊 Take ${formattedCount} ${unit} for this intake`;
-};
-
-const ensureImagePickerCacheDirectory = async () => {
-  if (!FileSystem.cacheDirectory) {
-    return;
-  }
-
-  try {
-    await FileSystem.makeDirectoryAsync(`${FileSystem.cacheDirectory}ImagePicker`, {
-      intermediates: true,
-    });
-  } catch (error) {
-    console.log('[ScheduleBoard] ImagePicker cache directory unavailable:', error?.message || error);
-  }
-};
-
-const isImagePickerVideoWriteError = (error) => {
-  const message = String(error?.message || error || '');
-  return /failed to write a file|ImagePicker\/.+\.mp4|launchCameraAsync/i.test(message);
-};
-
-const canUseManualMotionConfirmation = (error) => {
-  const responseData = error?.response?.data || {};
-  const message = [
-    responseData?.error,
-    responseData?.message,
-    responseData?.detail,
-    error?.message,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  return Boolean(responseData?.manualConfirmationAllowed) ||
-    isImagePickerVideoWriteError(error) ||
-    /mediapipe|opencv|landmark|motion video|face and hand/i.test(message);
 };
 
 const isExpectedVoiceAbort = (event) => {
@@ -743,6 +761,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   const renderAppearanceIcon = (shape, color, isLarge = false) => {
     const normalizedShape = String(shape || '').trim().toLowerCase();
     const resolvedColor = getColorValue(color);
+    const contrastStyle = getPillContrastStyle(resolvedColor);
     const isTriangle = normalizedShape === 'triangle';
     const shapeStyle = [
       styles.pillShape,
@@ -752,15 +771,33 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       ['capsule', 'oblong'].includes(normalizedShape) && styles.pillShapeCapsule,
       ['tablet', 'square'].includes(normalizedShape) && styles.pillShapeSquare,
       normalizedShape === 'diamond' && styles.pillShapeDiamond,
-      { backgroundColor: resolvedColor },
+      {
+        backgroundColor: resolvedColor,
+        borderColor: contrastStyle.borderColor,
+        shadowColor: contrastStyle.shadowColor,
+      },
     ];
 
     return (
       <View style={[styles.appearanceIconFrame, isLarge && styles.appearanceIconFrameLarge]}>
         {isTriangle ? (
-          <Text style={[styles.pillShapeTriangle, isLarge && styles.pillShapeTriangleLarge, { color: resolvedColor }]}>▲</Text>
+          <Text
+            style={[
+              styles.pillShapeTriangle,
+              isLarge && styles.pillShapeTriangleLarge,
+              {
+                color: resolvedColor,
+                textShadowColor: contrastStyle.borderColor,
+              },
+            ]}
+          >
+            ▲
+          </Text>
         ) : (
-          <View style={shapeStyle} />
+          <View style={shapeStyle}>
+            <View style={[styles.pillShapeHighlight, { backgroundColor: contrastStyle.highlightColor }]} />
+            <View style={[styles.pillShapeDivider, { backgroundColor: contrastStyle.detailColor }]} />
+          </View>
         )}
       </View>
     );
@@ -947,13 +984,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       .filter((item) => !!item.nextDate)
       .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
 
-    const visibleCandidates = withFutureMarker.filter((entry) => {
-      if (hiddenNextDoseEntries[getEntryDoseInstanceKey(entry)]) {
-        return false;
-      }
-
-      return !isCompletedIntakeEntry(entry, lastSavedStatusByEntry);
-    });
+    const visibleCandidates = withFutureMarker.filter((entry) => !hiddenNextDoseEntries[getEntryDoseInstanceKey(entry)]);
 
     if (!visibleCandidates.length) {
       return [];
@@ -961,7 +992,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
 
     const firstTime = visibleCandidates[0].nextDate.getTime();
     return visibleCandidates.filter((item) => item.nextDate.getTime() === firstTime);
-  }, [flatSchedule, currentTime, hiddenNextDoseEntries, lastSavedStatusByEntry]);
+  }, [flatSchedule, currentTime, hiddenNextDoseEntries]);
 
   const nextDoseDisplayTime = useMemo(() => {
     const firstNextDose = nextDoseGroup[0];
@@ -1407,7 +1438,6 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         return;
       }
 
-      await ensureImagePickerCacheDirectory();
       const pickerResult = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.75,
@@ -1485,7 +1515,6 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         return;
       }
 
-      await ensureImagePickerCacheDirectory();
       const pickerResult = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         cameraType: ImagePicker.CameraType?.front || 'front',
@@ -1525,7 +1554,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
         : '';
       if (motionAvailable) {
-        setMotionAnalysisMessage(`Rule-based motion analysis detected hand-to-mouth and swallowing motion${confidenceText}.`);
+        setMotionAnalysisMessage(`Camera detected hand-to-mouth and swallowing motion${confidenceText}.`);
       } else {
         const frameHint = Number.isFinite(Number(analysis?.handFrameCount)) || Number.isFinite(Number(analysis?.faceFrameCount))
           ? ` Hand frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
@@ -1533,40 +1562,21 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setMotionAnalysisMessage(
           analysis?.message ||
             analysis?.error ||
-            `Rule-based motion analysis could not confirm the intake${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, pause, swallow, then move the hand away.`
+            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, swallow, then stop recording.`
         );
       }
     } catch (error) {
       setVerificationHandToMouth(false);
       const responseData = error?.response?.data || {};
-      const allowManualConfirmation = canUseManualMotionConfirmation(error);
       const frameHint = Number.isFinite(Number(responseData?.handFrameCount)) || Number.isFinite(Number(responseData?.faceFrameCount))
         ? ` Hand frames: ${responseData?.handFrameCount || 0}. Face frames: ${responseData?.faceFrameCount || 0}.`
         : '';
       setMotionAnalysisMessage(
         responseData?.message ||
           (responseData?.error ? `${responseData.error}${frameHint}` : '') ||
-          (allowManualConfirmation
-            ? 'Rule-based motion analysis could not verify the intake. Try again, or use manual confirmation if caregiver watched the intake.'
-            : error?.message) ||
+          error?.message ||
           'Could not analyze intake motion. Record again from chest level, move the hand to the mouth, swallow, then stop recording.'
       );
-      if (allowManualConfirmation) {
-        Alert.alert(
-          'Motion Check Failed',
-          'The rule-based motion analysis could not verify the intake. If a caregiver watched this intake after the pill check passed, they can confirm it manually.',
-          [
-            { text: 'Try Again', style: 'cancel' },
-            {
-              text: 'Manual Confirm',
-              onPress: () => {
-                setVerificationHandToMouth(true);
-                setMotionAnalysisMessage('Intake motion manually confirmed after the tablet and medicine check passed.');
-              },
-            },
-          ]
-        );
-      }
     } finally {
       setIsAnalyzingMotionVideo(false);
     }
@@ -1635,7 +1645,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     }
 
     if (!verificationHandToMouth) {
-      Alert.alert('Motion Check Needed', 'Please record the intake motion first. Mark Taken unlocks only after the rule-based hand-to-mouth and swallowing check passes.');
+      Alert.alert('Camera Motion Needed', 'Please record the intake motion first. Mark Taken unlocks only after hand-to-mouth motion is detected in the video.');
       return;
     }
 
@@ -1936,7 +1946,9 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
   };
 
   const isEntryInteractionLocked = (entry) => {
-    return isCompletedIntakeEntry(entry, lastSavedStatusByEntry);
+    const entryState = lastSavedStatusByEntry[getEntryStatusKey(entry)];
+    const status = String(entryState?.status || '').toLowerCase();
+    return status === 'taken' || status === 'overdose';
   };
 
   const applyCustomOverdoseCount = async () => {
@@ -1983,7 +1995,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               {isGroupVerification ? 'Verify one-time intake' : 'Verify before marking taken'}
             </Text>
             <Text style={[styles.verificationHeroText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
-              Show all tablets in your palm. The trained AI model checks whether each medicine is available, overdose, or missing.
+              Show all tablets in your palm. The trained AI model checks whether the amount is OK, overdose, or underdose.
             </Text>
           </View>
 
@@ -2072,7 +2084,6 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
                     const needsAttention = item.status === 'overdose'
                       || item.status === 'unexpected'
                       || item.status === 'underdose'
-                      || item.status === 'missing'
                       || item.label === 'Missing'
                       || item.label === 'Overdose';
                     const colorText = item.color || 'unknown';
@@ -2131,9 +2142,9 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           </View>
 
           <View style={styles.verificationStepCard}>
-            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Rule-based intake motion</Text>
+            <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Camera intake motion</Text>
             <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
-              Record a short video with your face, hand, and mouth visible. The rule checks hand-to-mouth movement, a short mouth pause, and swallowing or moved-away motion.
+              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, move it to your mouth, swallow, then stop recording.
             </Text>
             <TouchableOpacity
               style={[styles.verificationCameraButton, (!canRecordMotion || isAnalyzingMotionVideo) && styles.verificationCompleteButtonDisabled]}
@@ -2154,11 +2165,11 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <View style={[styles.verificationCheckRow, verificationHandToMouth && styles.verificationCheckRowActive]}>
               <Text style={styles.verificationCheckIcon}>{verificationHandToMouth ? '✓' : '○'}</Text>
               <Text style={[styles.verificationCheckText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
-                Rule detected hand-to-mouth and swallowing
+                Camera detected hand-to-mouth and swallowing
               </Text>
             </View>
             {canRecordMotion && !verificationHandToMouth && !isAnalyzingMotionVideo && (
-              <Text style={styles.verificationReadOnlyCountText}>Mark Taken unlocks after this rule-based motion check passes.</Text>
+              <Text style={styles.verificationReadOnlyCountText}>Mark Taken unlocks after this camera motion check passes.</Text>
             )}
             {!!motionAnalysisMessage && (
               <Text style={[styles.verificationAnalysisMeta, !verificationHandToMouth && styles.verificationCountStatusBad]}>
@@ -3132,11 +3143,16 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 14,
-    backgroundColor: '#f7efe4',
-    borderWidth: 1,
-    borderColor: '#d8c9b7',
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#24352f',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#17231f',
+    shadowOpacity: 0.16,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   appearanceIconFrameLarge: {
     width: 46,
@@ -3149,6 +3165,28 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     borderWidth: 2,
     borderColor: 'rgba(36,53,47,0.22)',
+    overflow: 'hidden',
+    shadowOpacity: 0.22,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  pillShapeHighlight: {
+    position: 'absolute',
+    top: 3,
+    left: 5,
+    right: 5,
+    height: 4,
+    borderRadius: 99,
+  },
+  pillShapeDivider: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -1,
+    left: 4,
+    right: 4,
+    height: 2,
+    borderRadius: 99,
   },
   pillShapeLarge: {
     width: 36,
@@ -3185,8 +3223,10 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     fontWeight: '900',
     textShadowColor: 'rgba(36,53,47,0.22)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 3,
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   pillShapeTriangleLarge: {
     fontSize: 36,
