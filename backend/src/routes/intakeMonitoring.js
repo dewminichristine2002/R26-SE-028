@@ -14,6 +14,34 @@ const projectPythonFallbackPath = path.resolve(__dirname, '..', '..', 'ml', '.ve
 
 const firstExistingPath = (...candidates) => candidates.find((candidate) => candidate && candidate !== 'python' && fs.existsSync(candidate));
 
+const toPositiveEnvNumber = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const toPositiveEnvInteger = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const createScriptTimeoutError = (scriptName) => {
+  const error = new Error(`${scriptName} timed out.`);
+  error.code = 'ETIMEDOUT';
+  error.scriptName = scriptName;
+  return error;
+};
+
+const isScriptTimeoutError = (error) => error?.code === 'ETIMEDOUT' || /timed out/i.test(String(error?.message || ''));
+
+const getErrorMessage = (error) => String(error?.message || error || 'Unknown error').trim();
+
+const MOTION_VIDEO_FRAME_STEP = toPositiveEnvInteger(process.env.INTAKE_MOTION_VIDEO_FRAME_STEP, 2);
+const MOTION_VIDEO_MAX_SAMPLED_FRAMES = toPositiveEnvInteger(process.env.INTAKE_MOTION_VIDEO_MAX_SAMPLED_FRAMES, 90);
+const MOTION_VIDEO_MAX_SECONDS = toPositiveEnvNumber(process.env.INTAKE_MOTION_VIDEO_MAX_SECONDS, 12);
+const MOTION_VIDEO_MAX_WIDTH = toPositiveEnvInteger(process.env.INTAKE_MOTION_VIDEO_MAX_WIDTH, 640);
+const MOTION_VIDEO_PRIMARY_TIMEOUT_MS = toPositiveEnvInteger(process.env.INTAKE_MOTION_MEDIAPIPE_TIMEOUT_MS, 45000);
+const MOTION_VIDEO_FALLBACK_TIMEOUT_MS = toPositiveEnvInteger(process.env.INTAKE_MOTION_OPENCV_TIMEOUT_MS, 60000);
+
 const getPythonCommand = (purpose) => {
   const projectPython = firstExistingPath(projectPythonPath, projectPythonFallbackPath);
 
@@ -44,9 +72,11 @@ const runPythonJsonScript = (scriptName, payload, timeoutMs = 20000, purpose = '
 
     let stdout = '';
     let stderr = '';
+    let didTimeout = false;
     const timeout = setTimeout(() => {
+      didTimeout = true;
       child.kill();
-      reject(new Error(`${scriptName} timed out.`));
+      reject(createScriptTimeoutError(scriptName));
     }, timeoutMs);
 
     child.stdout.on('data', (data) => {
@@ -59,11 +89,17 @@ const runPythonJsonScript = (scriptName, payload, timeoutMs = 20000, purpose = '
 
     child.on('error', (error) => {
       clearTimeout(timeout);
+      if (didTimeout) {
+        return;
+      }
       reject(error);
     });
 
     child.on('close', (code) => {
       clearTimeout(timeout);
+      if (didTimeout) {
+        return;
+      }
       try {
         const parsed = JSON.parse(stdout || '{}');
         if (code !== 0 && parsed?.error) {
@@ -498,9 +534,11 @@ const runPythonArgsScript = (scriptName, args, timeoutMs = 30000, envOverrides =
 
     let stdout = '';
     let stderr = '';
+    let didTimeout = false;
     const timeout = setTimeout(() => {
+      didTimeout = true;
       child.kill();
-      reject(new Error(`${scriptName} timed out.`));
+      reject(createScriptTimeoutError(scriptName));
     }, timeoutMs);
 
     child.stdout.on('data', (data) => {
@@ -513,11 +551,17 @@ const runPythonArgsScript = (scriptName, args, timeoutMs = 30000, envOverrides =
 
     child.on('error', (error) => {
       clearTimeout(timeout);
+      if (didTimeout) {
+        return;
+      }
       reject(error);
     });
 
     child.on('close', (code) => {
       clearTimeout(timeout);
+      if (didTimeout) {
+        return;
+      }
       if (code !== 0) {
         reject(new Error(stderr || stdout || `${scriptName} failed.`));
         return;
@@ -532,39 +576,76 @@ const extractMotionFramesFromVideo = async ({ videoBase64, extension = 'mp4' }) 
   const videoPath = path.join(tempDir, `intake-motion.${safeExtension}`);
   const outputPath = path.join(tempDir, 'landmarks.json');
   const fallbackOutputPath = path.join(tempDir, 'landmarks-fallback.json');
+  const extractorArgs = (targetOutputPath) => [
+    '--video',
+    videoPath,
+    '--output',
+    targetOutputPath,
+    '--frame-step',
+    String(MOTION_VIDEO_FRAME_STEP),
+    '--max-sampled-frames',
+    String(MOTION_VIDEO_MAX_SAMPLED_FRAMES),
+    '--max-seconds',
+    String(MOTION_VIDEO_MAX_SECONDS),
+    '--max-width',
+    String(MOTION_VIDEO_MAX_WIDTH),
+  ];
 
   try {
     const cleanBase64 = String(videoBase64 || '').includes(',')
       ? String(videoBase64).split(',', 2)[1]
       : String(videoBase64 || '');
     await fsp.writeFile(videoPath, Buffer.from(cleanBase64, 'base64'));
-    await runPythonArgsScript(
-      'extract_mediapipe_motion_landmarks.py',
-      ['--video', videoPath, '--output', outputPath, '--frame-step', '2'],
-      60000
-    );
-    let parsed = JSON.parse(await fsp.readFile(outputPath, 'utf8'));
-    const needsFallback = parsed?.extractionMode !== 'opencv-motion-fallback'
-      && ((Number(parsed?.handFrameCount) || 0) < 6 || (Number(parsed?.faceFrameCount) || 0) < 3);
-    if (needsFallback) {
+    let parsed = null;
+    let primaryError = null;
+    try {
       await runPythonArgsScript(
         'extract_mediapipe_motion_landmarks.py',
-        ['--video', videoPath, '--output', fallbackOutputPath, '--frame-step', '2'],
-        60000,
-        { ELDERMEDS_FORCE_OPENCV_MOTION: '1' }
+        extractorArgs(outputPath),
+        MOTION_VIDEO_PRIMARY_TIMEOUT_MS
       );
+      parsed = JSON.parse(await fsp.readFile(outputPath, 'utf8'));
+    } catch (error) {
+      primaryError = error;
+      console.warn(
+        `[IntakeMonitoring] MediaPipe motion extraction ${isScriptTimeoutError(error) ? 'timed out' : 'failed'}; trying OpenCV fallback:`,
+        getErrorMessage(error)
+      );
+    }
+
+    const needsFallback = !parsed
+      || (
+        parsed?.extractionMode !== 'opencv-motion-fallback'
+        && ((Number(parsed?.handFrameCount) || 0) < 6 || (Number(parsed?.faceFrameCount) || 0) < 3)
+      );
+    if (needsFallback) {
+      try {
+        await runPythonArgsScript(
+          'extract_mediapipe_motion_landmarks.py',
+          extractorArgs(fallbackOutputPath),
+          MOTION_VIDEO_FALLBACK_TIMEOUT_MS,
+          { ELDERMEDS_FORCE_OPENCV_MOTION: '1' }
+        );
+      } catch (fallbackError) {
+        if (primaryError) {
+          throw new Error(`Motion landmark extraction failed. Primary: ${getErrorMessage(primaryError)} Fallback: ${getErrorMessage(fallbackError)}`);
+        }
+        throw fallbackError;
+      }
       const fallbackParsed = JSON.parse(await fsp.readFile(fallbackOutputPath, 'utf8'));
       parsed = {
         ...fallbackParsed,
         primaryExtractionMode: parsed?.extractionMode || 'mediapipe',
         primaryFaceFrameCount: Number(parsed?.faceFrameCount) || 0,
         primaryHandFrameCount: Number(parsed?.handFrameCount) || 0,
+        primaryExtractionError: primaryError ? getErrorMessage(primaryError) : undefined,
       };
     }
     return {
       frames: Array.isArray(parsed?.frames) ? parsed.frames : [],
       extractionMode: parsed?.extractionMode || 'mediapipe',
       primaryExtractionMode: parsed?.primaryExtractionMode,
+      primaryExtractionError: parsed?.primaryExtractionError,
       primaryFaceFrameCount: Number(parsed?.primaryFaceFrameCount) || 0,
       primaryHandFrameCount: Number(parsed?.primaryHandFrameCount) || 0,
       faceFrameCount: Number(parsed?.faceFrameCount) || 0,
