@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const emotionalSupportRoutes = require('./routes/emotionalSupportRoutes');
 
 dotenv.config();
+
+const emotionalSupportRoutes = require('./routes/emotionalSupportRoutes');
+const { startMlServiceInBackground } = require('./services/mlServiceManager');
 
 const {
   initializeDatabase,
@@ -50,6 +52,7 @@ const startServer = async () => {
     await initializeDatabase();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+      startMlServiceInBackground();
     });
   } catch (error) {
     const details = [

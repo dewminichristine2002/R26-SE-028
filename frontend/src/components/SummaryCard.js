@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 const severityStyles = {
   good: {
@@ -36,7 +36,7 @@ const severityStyles = {
   },
 };
 
-const SummaryCard = ({ card, onAskAssistant }) => {
+const SummaryCard = ({ card }) => {
   if (!card) {
     return null;
   }
@@ -63,18 +63,6 @@ const SummaryCard = ({ card, onAskAssistant }) => {
       <Text style={styles.headline}>{card.headline}</Text>
       {card.detail ? <Text style={styles.detail}>{card.detail}</Text> : null}
 
-      {card.chatPrompt ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Ask assistant: ${card.chatPrompt}`}
-          onPress={() => onAskAssistant?.(card.chatPrompt)}
-          style={({ pressed }) => [styles.askButton, pressed && styles.askButtonPressed]}
-        >
-          <Text style={styles.askButtonIcon}>{'\u{1F4AC}'}</Text>
-          <Text style={styles.askButtonText}>Ask about this</Text>
-          <Text style={styles.askButtonArrow}>{'\u279C'}</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 };
@@ -129,34 +117,6 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginTop: 8,
     lineHeight: 27,
-  },
-  askButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    alignSelf: 'flex-start',
-    minHeight: 58,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#3B82F6',
-  },
-  askButtonPressed: {
-    backgroundColor: '#EFF6FF',
-  },
-  askButtonIcon: { fontSize: 20, marginRight: 8 },
-  askButtonText: {
-    color: '#1D4ED8',
-    fontWeight: '900',
-    fontSize: 17,
-  },
-  askButtonArrow: {
-    color: '#1D4ED8',
-    fontWeight: '800',
-    fontSize: 19,
-    marginLeft: 6,
   },
 });
 

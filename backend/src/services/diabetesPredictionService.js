@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { pool } = require('../config/db');
+const { ensureMlServiceAvailable } = require('./mlServiceManager');
 
 const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
@@ -332,6 +333,7 @@ const prepareDiabetesPredictionPayload = async (userId, incomingValues = {}) => 
 };
 
 const callDiabetesPredictionService = async (payload) => {
+  await ensureMlServiceAvailable();
   const response = await axios.post(
     `${ML_SERVICE_URL}/predict/diabetes`,
     payload,

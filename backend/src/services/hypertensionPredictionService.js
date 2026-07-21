@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { pool } = require('../config/db');
+const { ensureMlServiceAvailable } = require('./mlServiceManager');
 const {
   calculateBMI,
   extractHealthValuesFromMessage,
@@ -154,6 +155,7 @@ const prepareHypertensionPredictionPayload = async (userId, incomingValues = {})
 };
 
 const callHypertensionPredictionService = async (payload) => {
+  await ensureMlServiceAvailable();
   const response = await axios.post(
     `${ML_SERVICE_URL}/predict/hypertension`,
     payload,

@@ -1,8 +1,17 @@
 node_modules/
 .expo/
 .expo-shared/
+.metro-cache/
 dist/
+build/
+coverage/
 npm-debug.*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+*.out
+*.err
 *.jks
 *.p8
 *.p12
@@ -11,7 +20,10 @@ npm-debug.*
 *.orig.*
 web-build/
 android/
+android.local-backup-*/
 .env
+.env.*
+!.env.example
 .env.local
 .DS_Store
 

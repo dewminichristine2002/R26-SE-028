@@ -39,7 +39,7 @@ try {
   console.log('[AssistantChat] expo-modules-core EventEmitter unavailable:', error?.message || error);
 }
 
-const SUGGESTED_PROMPTS = [
+const ELDER_SUGGESTED_PROMPTS = [
   'Check my diabetes risk.',
   'Now my weight is 60kg',
   'Check my stroke risk.',
@@ -47,6 +47,9 @@ const SUGGESTED_PROMPTS = [
   'How can I reduce this risk?',
   'Why is this risk high?',
   'What should my caregiver monitor?',
+  'Is paracetamol risky in my saved allergy checks?',
+  'I feel lonely today.',
+  'I feel confused and need support.',
   'Did I miss any medicine this week?',
   'How has my mood been recently?',
   'Which medicines are running low?',
@@ -54,7 +57,167 @@ const SUGGESTED_PROMPTS = [
   'Show my recent caregiver alerts.',
 ];
 
+const getCareSubject = () => 'my mother';
+
+const getPossessiveSubject = (subject) => {
+  const text = String(subject || '').trim() || 'my mother';
+  if (/^my\b/i.test(text)) {
+    return `${text}'s`;
+  }
+  return text.endsWith('s') ? `${text}'` : `${text}'s`;
+};
+
+const buildCaregiverSuggestedPrompts = (user) => {
+  const subject = getCareSubject();
+  const possessive = getPossessiveSubject(subject);
+
+  return [
+    `How is ${subject} doing today?`,
+    `Did ${subject} miss any medicine this week?`,
+    `Which medicines are running low for ${subject}?`,
+    `Show me ${possessive} recent caregiver alerts.`,
+    `Has ${subject} seemed lonely or confused recently?`,
+    `What emotional concerns should I check today?`,
+    `Show ${possessive} mood trend this week.`,
+    `Are any saved medicines dangerous for ${subject}?`,
+    `Is paracetamol risky in ${possessive} saved allergy checks?`,
+    'Add 20 tablets to Metformin stock.',
+    'Change breakfast routine to 8 AM.',
+    'What should I monitor as a caregiver?',
+  ];
+};
+
+const getAssistantSuggestedPrompts = (user) =>
+  String(user?.role || '').toLowerCase() === 'caregiver'
+    ? buildCaregiverSuggestedPrompts(user)
+    : ELDER_SUGGESTED_PROMPTS;
+
+const adaptCaregiverFollowUp = (question, user) => {
+  const text = String(question || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  const subject = getCareSubject();
+  const possessive = getPossessiveSubject(subject);
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ');
+
+  const replacements = {
+    'check my diabetes risk.': `Check ${possessive} diabetes risk.`,
+    'check my stroke risk.': `Check ${possessive} stroke risk.`,
+    'check my hypertension risk.': `Check ${possessive} hypertension risk.`,
+    'now my weight is 60kg': `${possessive} weight is 60kg.`,
+    'my weight is 60kg': `${possessive} weight is 60kg.`,
+    'my bp is 145 over 90': `${possessive} BP is 145 over 90.`,
+    'my sugar is 150 today': `${possessive} sugar is 150 today.`,
+    'my cholesterol is 240': `${possessive} cholesterol is 240.`,
+    'how can i reduce this risk?': 'How can I help reduce this risk?',
+    'why is this risk high?': `Why is this risk high for ${subject}?`,
+    'what should my caregiver monitor?': 'What should I monitor as a caregiver?',
+    'what cognitive activity should i do next?': `What cognitive activity should ${subject} do next?`,
+    'show my mood trend this week.': `Show ${possessive} mood trend this week.`,
+    'did i miss any medicine this week?': `Did ${subject} miss any medicine this week?`,
+    'how has my mood been recently?': `How has ${possessive} mood been recently?`,
+    'which medicines are running low?': `Which medicines are running low for ${subject}?`,
+    'are any of my saved medicines dangerous for me?': `Are any saved medicines dangerous for ${subject}?`,
+    'is paracetamol risky in my saved allergy checks?': `Is paracetamol risky in ${possessive} saved allergy checks?`,
+    'show my recent caregiver alerts.': `Show me ${possessive} recent caregiver alerts.`,
+    'i feel lonely today.': `Has ${subject} seemed lonely today?`,
+    'i feel confused and need support.': `Has ${subject} seemed confused recently?`,
+  };
+
+  return replacements[normalized] || text;
+};
+
+const getVisibleFollowUps = (followUps, user) => {
+  if (String(user?.role || '').toLowerCase() !== 'caregiver') {
+    return followUps;
+  }
+
+  return (followUps || [])
+    .map((question) => adaptCaregiverFollowUp(question, user))
+    .filter(Boolean);
+};
+
+const ASSISTANT_PROGRESS_STAGES = [
+  'Understanding your question',
+  'Searching relevant information',
+  'Identifying key details',
+  'Preparing the final answer',
+];
+
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const AssistantProgressCard = ({ progressIndex }) => {
+  const safeIndex = Math.max(
+    0,
+    Math.min(Number(progressIndex) || 0, ASSISTANT_PROGRESS_STAGES.length - 1)
+  );
+  const activeStage = ASSISTANT_PROGRESS_STAGES[safeIndex];
+  const progressPercent = `${((safeIndex + 1) / ASSISTANT_PROGRESS_STAGES.length) * 100}%`;
+
+  return (
+    <View
+      style={styles.progressRow}
+      accessibilityRole="progressbar"
+      accessibilityLabel={activeStage}
+      accessibilityValue={{
+        min: 1,
+        max: ASSISTANT_PROGRESS_STAGES.length,
+        now: safeIndex + 1,
+      }}
+    >
+      <View style={styles.progressAvatar}>
+        <Text style={styles.progressAvatarText}>{'\u{1F49A}'}</Text>
+      </View>
+      <View style={styles.progressCard}>
+        <View style={styles.progressHeader}>
+          <ActivityIndicator size="small" color="#2563EB" />
+          <Text style={styles.progressTitle}>{activeStage}</Text>
+        </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: progressPercent }]} />
+        </View>
+        <View style={styles.progressStepList}>
+          {ASSISTANT_PROGRESS_STAGES.map((stage, index) => {
+            const isDone = index < safeIndex;
+            const isActive = index === safeIndex;
+            return (
+              <View key={stage} style={styles.progressStepRow}>
+                <View
+                  style={[
+                    styles.progressStepDot,
+                    isDone && styles.progressStepDotDone,
+                    isActive && styles.progressStepDotActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.progressStepDotText,
+                      (isDone || isActive) && styles.progressStepDotTextActive,
+                    ]}
+                  >
+                    {isDone ? '\u2713' : index + 1}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.progressStepText,
+                    isDone && styles.progressStepTextDone,
+                    isActive && styles.progressStepTextActive,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {stage}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+};
 
 const formatRelativeTime = (isoString) => {
   if (!isoString) {
@@ -101,7 +264,7 @@ const mapServerMessageToBubble = (row) => ({
   followUps: [],
 });
 
-const AssistantChatScreen = ({ initialPrompt, onBack }) => {
+const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState(initialPrompt || '');
   const [conversationId, setConversationId] = useState(null);
@@ -118,15 +281,40 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
   const [followUpsCollapsed, setFollowUpsCollapsed] = useState(true);
+  const [assistantProgressIndex, setAssistantProgressIndex] = useState(0);
   const scrollRef = useRef(null);
   const sentInitial = useRef(false);
   const finalTranscriptRef = useRef('');
+  const isCaregiver = String(user?.role || '').toLowerCase() === 'caregiver';
+  const suggestedPrompts = getAssistantSuggestedPrompts(user);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       scrollRef.current?.scrollToEnd?.({ animated: true });
     }, 50);
   }, []);
+
+  useEffect(() => {
+    if (!sending) {
+      setAssistantProgressIndex(0);
+      return undefined;
+    }
+
+    setAssistantProgressIndex(0);
+    const timer = setInterval(() => {
+      setAssistantProgressIndex((prev) =>
+        Math.min(prev + 1, ASSISTANT_PROGRESS_STAGES.length - 1)
+      );
+    }, 1300);
+
+    return () => clearInterval(timer);
+  }, [sending]);
+
+  useEffect(() => {
+    if (sending) {
+      scrollToBottom();
+    }
+  }, [assistantProgressIndex, scrollToBottom, sending]);
 
   const stopSpeaking = useCallback(() => {
     if (SpeechModule && SpeechModule.stop) {
@@ -335,6 +523,8 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           content: response.answer || '',
           sql: response.sql || '',
           rows: Array.isArray(response.rows) ? response.rows : [],
+          actionResult: response.actionResult || null,
+          pendingAction: response.pendingAction || null,
           sources: Array.isArray(response.sources) ? response.sources : extractSourcesFromRows(response.rows),
           safetyNote: response.safetyNote || '',
           fallback: Boolean(response.fallback),
@@ -344,6 +534,17 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           setFollowUpsCollapsed(true);
         }
         setMessages((prev) => [...prev, assistantBubble]);
+        const navigation = response.actionResult?.navigation
+          || response.navigation
+          || (response.intent === 'routine'
+            ? { screen: 'home', launchIntent: { type: 'routine-setup' } }
+            : null);
+
+        if (navigation && onAgentNavigate) {
+          setTimeout(() => {
+            onAgentNavigate(navigation);
+          }, 900);
+        }
       } catch (err) {
         const errMsg = err.response?.data?.error || err.message || 'Failed to get a reply';
         setError(errMsg);
@@ -361,7 +562,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
         scrollToBottom();
       }
     },
-    [conversationId, scrollToBottom, sending, stopSpeaking]
+    [conversationId, onAgentNavigate, scrollToBottom, sending, stopSpeaking]
   );
 
   useEffect(() => {
@@ -497,6 +698,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
     }
     return [];
   })();
+  const visibleFollowUps = getVisibleFollowUps(lastFollowUps, user);
 
   return (
     <KeyboardAvoidingView
@@ -541,7 +743,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           <Text style={styles.titleEmoji}>{'\u{1F49A}'}</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Your Health Helper</Text>
-            <Text style={styles.subtitle}>Ask me anything about your health.</Text>
+            <Text style={styles.subtitle}>
+              {isCaregiver ? "Ask me anything about the elder's care." : 'Ask me anything about your health.'}
+            </Text>
           </View>
         </View>
       </View>
@@ -556,11 +760,13 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
         {messages.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>{'\u{1F44B}'}</Text>
-            <Text style={styles.emptyTitle}>Hello! How can I help today?</Text>
+            <Text style={styles.emptyTitle}>
+              {isCaregiver ? 'Hello! How can I help with care today?' : 'Hello! How can I help today?'}
+            </Text>
             <Text style={styles.emptyHint}>
               Tap the microphone to talk, or pick a question below.
             </Text>
-            {SUGGESTED_PROMPTS.map((prompt) => (
+            {suggestedPrompts.map((prompt) => (
               <Pressable
                 key={prompt}
                 accessibilityRole="button"
@@ -575,7 +781,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
             <View style={styles.disclaimerCard}>
               <Text style={styles.disclaimerCardIcon}>{'\u2139\uFE0F'}</Text>
               <Text style={styles.disclaimerCardText}>
-                I use your own health records to answer. I am here to help, but I am not a doctor.
+                {isCaregiver
+                  ? "I use the elder's health records to answer caregiver questions. I am here to help, but I am not a doctor."
+                  : 'I use your own health records to answer. I am here to help, but I am not a doctor.'}
               </Text>
             </View>
           </View>
@@ -596,15 +804,10 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           />
         ))}
 
-        {sending ? (
-          <View style={styles.thinkingRow}>
-            <ActivityIndicator size="small" color="#2563EB" />
-            <Text style={styles.thinkingText}>Looking through your records\u2026</Text>
-          </View>
-        ) : null}
+        {sending ? <AssistantProgressCard progressIndex={assistantProgressIndex} /> : null}
       </ScrollView>
 
-      {lastFollowUps.length > 0 && !sending ? (
+      {visibleFollowUps.length > 0 && !sending ? (
         <View style={styles.followUpPanel}>
           <Pressable
             accessibilityRole="button"
@@ -613,7 +816,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
             style={({ pressed }) => [styles.followUpHeader, pressed && styles.followUpHeaderPressed]}
           >
             <Text style={styles.followUpHeaderText}>Suggested questions</Text>
-            <Text style={styles.followUpHeaderCount}>{lastFollowUps.length}</Text>
+            <Text style={styles.followUpHeaderCount}>{visibleFollowUps.length}</Text>
             <Text style={styles.followUpHeaderArrow}>
               {followUpsCollapsed ? '\u25BE' : '\u25B4'}
             </Text>
@@ -621,7 +824,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
 
           {!followUpsCollapsed ? (
             <View style={styles.followUpRow}>
-              {lastFollowUps.map((q) => (
+              {visibleFollowUps.map((q) => (
                 <Pressable
                   key={q}
                   accessibilityRole="button"
@@ -999,13 +1202,110 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '700',
   },
-  thinkingRow: {
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  progressAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 2,
+  },
+  progressAvatarText: { fontSize: 22 },
+  progressCard: {
+    flex: 1,
+    maxWidth: '84%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 18,
+    borderBottomLeftRadius: 6,
+    padding: 14,
+  },
+  progressHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    minHeight: 28,
   },
-  thinkingText: { marginLeft: 10, color: '#4B5563', fontSize: 17, fontWeight: '700' },
+  progressTitle: {
+    flex: 1,
+    marginLeft: 10,
+    color: '#111827',
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '900',
+  },
+  progressTrack: {
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: '#E5E7EB',
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#2563EB',
+  },
+  progressStepList: {
+    marginTop: 12,
+  },
+  progressStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 30,
+    marginTop: 6,
+  },
+  progressStepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginRight: 9,
+  },
+  progressStepDotActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  progressStepDotDone: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  progressStepDotText: {
+    color: '#6B7280',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
+  progressStepDotTextActive: {
+    color: '#FFFFFF',
+  },
+  progressStepText: {
+    flex: 1,
+    color: '#6B7280',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  progressStepTextActive: {
+    color: '#1D4ED8',
+    fontWeight: '900',
+  },
+  progressStepTextDone: {
+    color: '#166534',
+    fontWeight: '800',
+  },
 
   followUpPanel: {
     backgroundColor: '#F3F4F6',

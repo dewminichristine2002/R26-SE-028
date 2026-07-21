@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AgenticGlowCard from '../components/AgenticGlowCard';
+import AgenticScreenFrame from '../components/AgenticScreenFrame';
 import { medicationService } from '../services/medicationService';
 
 const formatShortDate = (value) => {
@@ -38,7 +40,7 @@ const getProgressColor = (item) => {
   return '#2f8fd0';
 };
 
-const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
+const MedicineStockScreen = ({ onBack, reminderTextScale = 1, highlight = null }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [summary, setSummary] = useState({ totalMedications: 0, lowStockCount: 0, totalPills: 0, usedPills: 0 });
   const [inventory, setInventory] = useState([]);
@@ -50,6 +52,11 @@ const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
   const [isRefillNotifying, setIsRefillNotifying] = useState(false);
   const [isRequestingRefill, setIsRequestingRefill] = useState({});
   const textScale = reminderTextScale || 1;
+  const highlightedMedicationName = String(highlight?.value || '').trim().toLowerCase();
+  const hasAgenticFrame = !!highlight?.showScreenFrame;
+  const isHighlightedMedication = (item) =>
+    highlightedMedicationName &&
+    String(item?.medicineName || '').trim().toLowerCase().includes(highlightedMedicationName);
 
   const loadStock = async () => {
     try {
@@ -202,8 +209,17 @@ const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
         </View>
       ) : (
         <View>
-          {sortedInventory.map((item) => (
-            <View key={item.id} style={styles.stockCard}>
+          {sortedInventory.map((item) => {
+            const isHighlighted = isHighlightedMedication(item);
+            return (
+            <AgenticGlowCard
+              key={item.id}
+              active={isHighlighted}
+              pulseKey={highlight?.nonce}
+              style={styles.stockCard}
+              highlightStyle={styles.stockCardHighlighted}
+              borderRadius={22}
+            >
               <View style={styles.stockTopRow}>
                 <View>
                   <Text style={[styles.medName, { fontSize: 19 * textScale }]}>{item.medicineName}</Text>
@@ -257,8 +273,9 @@ const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
-          ))}
+            </AgenticGlowCard>
+            );
+          })}
 
           {!sortedInventory.length && <Text style={[styles.emptyText, { fontSize: 15 * textScale }]}>No medicine stock records yet.</Text>}
         </View>
@@ -317,6 +334,7 @@ const MedicineStockScreen = ({ onBack, reminderTextScale = 1 }) => {
           </View>
         </View>
       )}
+      <AgenticScreenFrame active={hasAgenticFrame} pulseKey={highlight?.nonce} />
     </View>
   );
 };
@@ -462,6 +480,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 2,
+  },
+  stockCardHighlighted: {
+    borderColor: '#22D3EE',
+    backgroundColor: '#eef8ff',
+    shadowColor: '#0891B2',
+    shadowOpacity: 0.18,
+    elevation: 5,
   },
   stockTopRow: {
     flexDirection: 'row',

@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import SummaryCard from '../components/SummaryCard';
-import AssistantFAB from '../components/AssistantFAB';
 import { assistantService } from '../services/assistantService';
 
 const getGreeting = () => {
@@ -92,10 +91,6 @@ const UnifiedDashboardScreen = ({
         'Why is this risk high?',
         'What should my caregiver monitor?',
       ];
-  const overallSummaryPrompt = isCaregiver
-    ? 'Give me a short overall summary of how my elder is doing today.'
-    : 'Give me a short overall summary of how I am doing today.';
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -154,7 +149,7 @@ const UnifiedDashboardScreen = ({
           <>
             <Text style={styles.sectionHeading}>{sectionHeading}</Text>
             {summary.cards.map((card) => (
-              <SummaryCard key={card.id} card={card} onAskAssistant={askWithPrompt} />
+              <SummaryCard key={card.id} card={card} />
             ))}
           </>
         ) : null}
@@ -270,9 +265,6 @@ const UnifiedDashboardScreen = ({
         ) : null}
       </ScrollView>
 
-      <AssistantFAB
-        onPress={() => askWithPrompt(overallSummaryPrompt)}
-      />
     </View>
   );
 };

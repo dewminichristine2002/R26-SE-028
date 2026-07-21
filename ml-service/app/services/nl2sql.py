@@ -50,8 +50,8 @@ _FALLBACK_OUT_OF_SCOPE = Nl2SqlResult(
     intent="out_of_scope",
     fallback=True,
     fallback_message=(
-        "I can only answer questions about your medicines, doses, mood "
-        "check-ins and caregiver alerts."
+        "I can only answer questions about your medicines, doses, allergies, "
+        "mood check-ins, cognitive activities and caregiver alerts."
     ),
     raw_response="",
 )
@@ -77,6 +77,74 @@ def _fallback(message: str, intent: str = "out_of_scope") -> Nl2SqlResult:
         fallback_message=message,
         raw_response="rule_based",
     )
+
+
+def _extract_medicine_lookup_term(question: str) -> str | None:
+    """Best-effort medicine term for saved allergy-card lookup examples."""
+    text = re.sub(r"\s+", " ", question or "").strip().lower()
+    if not text:
+        return None
+
+    quoted = re.search(r"[\"'`]([^\"'`]{2,80})[\"'`]", text)
+    if quoted:
+        text = quoted.group(1)
+
+    stop_words = {
+        "why",
+        "was",
+        "were",
+        "is",
+        "are",
+        "marked",
+        "dangerous",
+        "risky",
+        "safe",
+        "warning",
+        "risk",
+        "allergy",
+        "allergies",
+        "reaction",
+        "reactions",
+        "based",
+        "on",
+        "with",
+        "my",
+        "for",
+        "me",
+        "can",
+        "should",
+        "may",
+        "take",
+        "safely",
+        "okay",
+        "ok",
+        "mother",
+        "mum",
+        "father",
+        "dad",
+        "elder",
+        "patient",
+        "medicine",
+        "medication",
+        "tablet",
+        "pill",
+        "saved",
+        "check",
+        "result",
+        "results",
+        "reason",
+        "reasons",
+        "factor",
+        "factors",
+    }
+    parts = [
+        part
+        for part in re.findall(r"[a-z][a-z0-9-]{1,}", text)
+        if part not in stop_words
+    ]
+    if not parts:
+        return None
+    return " ".join(parts[:3])
 
 
 def _rule_based_sql(question: str) -> Nl2SqlResult | None:
@@ -140,6 +208,162 @@ def _rule_based_sql(question: str) -> Nl2SqlResult | None:
             "FROM user_routines ur "
             "WHERE ur.user_id = $1 LIMIT 1",
             "routine",
+        )
+
+    asks_allergy_profile = re.search(r"\b(allergy|allergies|allergic)\b", normalized) and re.search(
+        r"\b(what|which|known|recorded|profile|have|has|list|show)\b",
+        normalized,
+    )
+    if asks_allergy_profile and not re.search(r"\b(risky|risk|dangerous|safe|warning|why|reason|factor)\b", normalized):
+        return _result(
+            "SELECT has_medicine_allergy, known_allergies_text, reaction_symptoms_text, "
+            "avoided_medicines_text, suspected_medicine_names_text, antibiotic_painkiller_reaction "
+            "FROM user_allergy_profiles WHERE user_id = $1 LIMIT 1",
+            "allergy_profile_lookup",
+        )
+
+    asks_medicine_safety_lookup = re.search(
+        r"\b(allergy|allergies|allergic|reaction|safe|safety|risky|risk|dangerous|warning|can\s+i\s+take|should\s+i\s+take|may\s+i\s+take)\b",
+        normalized,
+    )
+    if asks_medicine_safety_lookup and re.search(r"\b(any|which|saved|current|recent|my)\b.*\b(medicines|medications|tablets|pills)\b", normalized):
+        return _result(
+            "SELECT medicine_name, risk_level, risk_score, explanation, recommendation, updated_at "
+            "FROM allergy_cards "
+            "WHERE user_id = $1 AND risk_level IN ('Warning', 'Dangerous') "
+            "ORDER BY risk_score DESC, updated_at DESC LIMIT 20",
+            "saved_medicine_safety_risks",
+        )
+
+    if asks_medicine_safety_lookup and not re.search(r"\b(why|reason|reasons|factor|factors|marked|made)\b", normalized):
+        medicine_term = _extract_medicine_lookup_term(normalized)
+        safe_medicine_term = medicine_term.replace("'", "''") if medicine_term else ""
+        medicine_filter = (
+            f"AND LOWER(medicine_name) LIKE '%{safe_medicine_term}%' "
+            if medicine_term
+            else ""
+        )
+        return _result(
+            "SELECT medicine_name, risk_level, risk_score, explanation, recommendation, updated_at "
+            "FROM allergy_cards "
+            f"WHERE user_id = $1 {medicine_filter}"
+            "ORDER BY updated_at DESC LIMIT 10",
+            "medicine_safety_lookup",
+        )
+
+    asks_allergy_factor = re.search(r"\b(allergy|allergies|allergic|risk|dangerous|warning)\b", normalized) and re.search(
+        r"\b(why|reason|reasons|factor|factors|marked|made)\b",
+        normalized,
+    )
+    if asks_allergy_factor:
+        medicine_term = _extract_medicine_lookup_term(normalized)
+        safe_medicine_term = medicine_term.replace("'", "''") if medicine_term else ""
+        medicine_filter = (
+            f"AND LOWER(ac.medicine_name) LIKE '%{safe_medicine_term}%' "
+            if medicine_term
+            else ""
+        )
+        return _result(
+            "SELECT ac.medicine_name, ac.risk_level, ac.risk_score, "
+            "acrf.factor_label, acrf.severity, acrf.score "
+            "FROM allergy_cards ac "
+            "JOIN allergy_card_risk_factors acrf ON acrf.allergy_card_id = ac.id "
+            f"WHERE ac.user_id = $1 {medicine_filter}"
+            "ORDER BY ac.updated_at DESC, acrf.score DESC LIMIT 20",
+            "allergy_risk_factors",
+        )
+
+    asks_emotional_alerts = re.search(r"\b(alert|alerts|notification|notifications|warning|warnings)\b", normalized) and re.search(
+        r"\b(mood|emotion|emotional|stress|stressed|lonely|loneliness|cognitive|memory|check[-\s]?ins?)\b",
+        normalized,
+    )
+    if asks_emotional_alerts:
+        return _result(
+            "SELECT title, message, alert_type, severity, status, created_at "
+            "FROM emotional_support_caregiver_alerts "
+            "WHERE elder_user_id = $1 "
+            "ORDER BY created_at DESC LIMIT 20",
+            "emotional_support_alerts",
+        )
+
+    asks_cognitive_activity = re.search(
+        r"\b(cognitive|memory|activity|activities|brain|orientation|breathing|reflection)\b",
+        normalized,
+    )
+    if asks_cognitive_activity and re.search(r"\b(completed|complete|done|attempt|attempted|score|skipped|finished)\b", normalized):
+        return _result(
+            "SELECT eca.title AS activity_title, eca.activity_type, "
+            "esaa.completion_status, esaa.score::float AS score, "
+            "esaa.started_at, esaa.completed_at "
+            "FROM emotional_support_activity_attempts esaa "
+            "LEFT JOIN emotional_support_cognitive_activities eca ON eca.id = esaa.activity_id "
+            "WHERE esaa.elder_user_id = $1 "
+            "ORDER BY esaa.started_at DESC LIMIT 20",
+            "cognitive_activity_attempts",
+        )
+
+    if asks_cognitive_activity and re.search(r"\b(recommended|recommend|suggested|suggest|given|assigned|last|recent|next)\b", normalized):
+        return _result(
+            "SELECT ess.detected_emotion, ess.risk_level, "
+            "eca.title AS activity_title, eca.activity_type, eca.difficulty, "
+            "eca.prompt, ess.created_at "
+            "FROM emotional_support_emotion_sessions ess "
+            "LEFT JOIN emotional_support_cognitive_activities eca ON eca.id = ess.activity_id "
+            "WHERE ess.elder_user_id = $1 AND ess.activity_id IS NOT NULL "
+            "ORDER BY ess.created_at DESC LIMIT 10",
+            "recommended_cognitive_activities",
+        )
+
+    asks_support_reply = re.search(r"\b(reply|response|said|support|intervention|follow[-\s]?up)\b", normalized) and re.search(
+        r"\b(mood|emotion|emotional|lonely|sad|anxious|confused|check[-\s]?in)\b",
+        normalized,
+    )
+    if asks_support_reply:
+        return _result(
+            "SELECT ess.detected_emotion, ess.risk_level, esi.response_type, "
+            "esi.response_text, esi.follow_up_prompt, ess.created_at "
+            "FROM emotional_support_emotion_sessions ess "
+            "JOIN emotional_support_interventions esi ON esi.session_id = ess.id "
+            "WHERE ess.elder_user_id = $1 "
+            "ORDER BY ess.created_at DESC LIMIT 5",
+            "latest_emotional_intervention",
+        )
+
+    asks_emotional_interaction_history = re.search(
+        r"\b(interaction|interactions|conversation|conversations|chat|history|support history)\b",
+        normalized,
+    ) and re.search(
+        r"\b(mood|emotion|emotional|stress|lonely|loneliness|sad|sadness|anxious|confused|cognitive|support|elder|mother|father|parent)\b",
+        normalized,
+    )
+    if asks_emotional_interaction_history:
+        return _result(
+            "SELECT ess.detected_emotion, ess.risk_level, "
+            "cl.actor_type, cl.message_type, cl.detected_emotion AS log_detected_emotion, cl.created_at "
+            "FROM chat_logs cl "
+            "JOIN emotional_support_emotion_sessions ess ON ess.id = cl.session_id AND ess.elder_user_id = $1 "
+            "WHERE cl.elder_user_id = $1 "
+            "ORDER BY cl.created_at DESC LIMIT 30",
+            "emotional_interaction_history",
+        )
+
+    asks_repeated_emotional_concerns = re.search(
+        r"\b(repeated|repeat|recurring|pattern|patterns|concern|concerns|changes|changed|trend|trends)\b",
+        normalized,
+    ) and re.search(
+        r"\b(mood|emotion|emotional|stress|lonely|loneliness|sad|sadness|anxious|confused|cognitive|support|elder|mother|father|parent)\b",
+        normalized,
+    )
+    if asks_repeated_emotional_concerns:
+        return _result(
+            "SELECT detected_emotion, COUNT(*)::int AS total, "
+            "MAX(created_at) AS most_recent_at, "
+            "AVG(stress_score)::float AS avg_stress, "
+            "AVG(loneliness_score)::float AS avg_loneliness "
+            "FROM emotional_support_emotion_sessions "
+            "WHERE elder_user_id = $1 AND created_at >= NOW() - INTERVAL '14 days' "
+            "GROUP BY detected_emotion ORDER BY total DESC, most_recent_at DESC LIMIT 20",
+            "repeated_emotional_concerns",
         )
 
     asks_mood = re.search(

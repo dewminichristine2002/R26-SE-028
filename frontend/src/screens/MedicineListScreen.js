@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import AgenticGlowCard from '../components/AgenticGlowCard';
+import AgenticScreenFrame from '../components/AgenticScreenFrame';
 import { intakeMonitoringService } from '../services/intakeMonitoringService';
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
@@ -81,7 +83,7 @@ const getColorValue = (color) => {
   return colorMap[normalized] || '#d9e8f7';
 };
 
-const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
+const MedicineListScreen = ({ onBack, reminderTextScale = 1, highlight = null }) => {
   const scrollRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [medications, setMedications] = useState([]);
@@ -101,6 +103,15 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
     intakeTiming: 'After',
   });
   const textScale = reminderTextScale || 1;
+  const highlightedMedicationName = String(highlight?.value || '').trim().toLowerCase();
+  const hasAgenticFrame = !!highlight?.showScreenFrame;
+
+  const isHighlightedMedication = (item) => {
+    if (!highlightedMedicationName) {
+      return false;
+    }
+    return String(item?.medicine_name || '').trim().toLowerCase().includes(highlightedMedicationName);
+  };
 
   const renderAppearanceIcon = (shape, color, isLarge = false) => {
     const normalizedShape = String(shape || '').trim().toLowerCase();
@@ -144,6 +155,16 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
   useEffect(() => {
     loadMedications();
   }, []);
+
+  useEffect(() => {
+    if (!highlightedMedicationName || !medications.length || selectedMedication) {
+      return;
+    }
+    const match = medications.find((item) => isHighlightedMedication(item));
+    if (match) {
+      applyMedicationToForm(match);
+    }
+  }, [highlightedMedicationName, medications, selectedMedication]);
 
   useEffect(() => {
     if (!selectedMedication) {
@@ -394,8 +415,17 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
                   <View key={`${group.slot}-${timingGroup.key}`} style={styles.timingGroupBlock}>
                     <Text style={[styles.timingGroupTitle, { fontSize: 14 * textScale }]}>{timingGroup.label}</Text>
 
-                    {timingGroup.items.map((item) => (
-                      <View key={`${group.slot}-${timingGroup.key}-${item.id}`} style={styles.card}>
+                    {timingGroup.items.map((item) => {
+                      const isHighlighted = isHighlightedMedication(item);
+                      return (
+                      <AgenticGlowCard
+                        key={`${group.slot}-${timingGroup.key}-${item.id}`}
+                        active={isHighlighted}
+                        pulseKey={highlight?.nonce}
+                        style={styles.card}
+                        highlightStyle={styles.cardHighlighted}
+                        borderRadius={22}
+                      >
                         <View style={styles.cardRow}>
                           <View style={styles.appearanceBadge}>
                             {renderAppearanceIcon(item.medicine_shape, item.medicine_color)}
@@ -417,8 +447,9 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
                             </TouchableOpacity>
                           </View>
                         </View>
-                      </View>
-                    ))}
+                      </AgenticGlowCard>
+                      );
+                    })}
                   </View>
                 ) : null
               )}
@@ -432,7 +463,13 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
 
       {selectedMedication && (
         <View style={styles.detailOverlay}>
-          <View style={styles.detailPanel}>
+          <AgenticGlowCard
+            active={isHighlightedMedication(selectedMedication)}
+            pulseKey={highlight?.nonce}
+            style={styles.detailPanel}
+            highlightStyle={styles.detailPanelHighlighted}
+            borderRadius={24}
+          >
             <View style={styles.detailHeaderRow}>
               <Text style={[styles.detailTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Medicine Details</Text>
               <TouchableOpacity
@@ -626,9 +663,10 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1 }) => {
             <Text style={[styles.deleteButtonText, { fontSize: 15 * textScale }]}>{isSaving ? 'Please wait...' : 'Delete Medicine'}</Text>
           </TouchableOpacity>
             </ScrollView>
-          </View>
+          </AgenticGlowCard>
         </View>
       )}
+      <AgenticScreenFrame active={hasAgenticFrame} pulseKey={highlight?.nonce} />
     </View>
   );
 };
@@ -824,6 +862,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 2,
   },
+  cardHighlighted: {
+    borderColor: '#22D3EE',
+    backgroundColor: '#eef8ff',
+    shadowColor: '#0891B2',
+    shadowOpacity: 0.18,
+    elevation: 5,
+  },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -950,6 +995,14 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#f4cf75',
     padding: 14,
+  },
+  detailPanelHighlighted: {
+    borderColor: '#22D3EE',
+    shadowColor: '#0891B2',
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
   detailOverlay: {
     position: 'absolute',

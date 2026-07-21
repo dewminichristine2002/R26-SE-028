@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AgenticGlowCard from '../components/AgenticGlowCard';
+import AgenticScreenFrame from '../components/AgenticScreenFrame';
 import { routineService } from '../services/routineService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
@@ -68,7 +70,7 @@ const routineRows = [
   },
 ];
 
-const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
+const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1, highlight = null }) => {
   const [mealTimes, setMealTimes] = useState({
     breakfast: '08:00 AM',
     lunch: '01:00 PM',
@@ -85,6 +87,8 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
   const [isListening, setIsListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const textScale = reminderTextScale || 1;
+  const highlightedMealKey = String(highlight?.mealKey || '').trim().toLowerCase();
+  const hasAgenticFrame = !!highlight?.showScreenFrame;
 
   const parseVoiceCommand = (transcript) => {
     if (!transcript || typeof transcript !== 'string') {
@@ -347,6 +351,7 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#2f5d50" />
         <Text style={[styles.loaderText, { fontSize: 15 * textScale }]}>Loading your routine...</Text>
+        <AgenticScreenFrame active={hasAgenticFrame} pulseKey={highlight?.nonce} />
       </View>
     );
   }
@@ -387,9 +392,13 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
           </View>
         )}
 
-        {cards.map((item) => (
-          <View
+        {cards.map((item) => {
+          const isHighlighted = highlightedMealKey === item.key;
+          return (
+          <AgenticGlowCard
             key={item.key}
+            active={isHighlighted}
+            pulseKey={highlight?.nonce}
             style={[
               styles.timeCard,
               {
@@ -397,6 +406,8 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
                 borderColor: item.borderColor,
               },
             ]}
+            highlightStyle={styles.timeCardHighlighted}
+            borderRadius={20}
           >
             <View style={[styles.timeIconWrap, { backgroundColor: item.accentColor }]}>
               <Text style={styles.timeIcon}>{item.icon}</Text>
@@ -415,8 +426,9 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
             >
               <Text style={styles.clockIcon}>🕒</Text>
             </TouchableOpacity>
-          </View>
-        ))}
+          </AgenticGlowCard>
+          );
+        })}
 
         <View style={styles.tipBox}>
           <Text style={styles.tipBullet}>💡</Text>
@@ -540,6 +552,7 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
           </View>
         </View>
       )}
+      <AgenticScreenFrame active={hasAgenticFrame} pulseKey={highlight?.nonce} />
     </View>
   );
 };
@@ -716,6 +729,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
+  },
+  timeCardHighlighted: {
+    borderWidth: 3,
+    borderColor: '#22D3EE',
+    shadowColor: '#0891B2',
+    shadowOpacity: 0.18,
+    elevation: 6,
   },
   timeIconWrap: {
     width: 60,
