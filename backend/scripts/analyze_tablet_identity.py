@@ -31,7 +31,10 @@ COLOR_REFERENCES = {
 
 SHAPE_ALIASES = {
     "circle": "round",
+    "circular": "round",
     "round": "round",
+    "ellipse": "oval",
+    "elliptical": "oval",
     "oval": "oval",
     "capsule": "capsule",
     "oblong": "capsule",
@@ -232,6 +235,7 @@ def _component_from_mask(mask: np.ndarray, source: str, confidence: Any = None) 
     fill_ratio = area / bbox_area
     vertices = 0
     solidity = fill_ratio
+    ellipse_aspect = None
 
     try:
         import cv2
@@ -247,6 +251,9 @@ def _component_from_mask(mask: np.ndarray, source: str, confidence: Any = None) 
             solidity = contour_area / max(1.0, float(cv2.contourArea(hull)))
             approx = cv2.approxPolyDP(contour, 0.035 * perimeter_cv, True)
             vertices = int(len(approx))
+            if len(contour) >= 5:
+                (_, _), (axis_a, axis_b), _ = cv2.fitEllipse(contour)
+                ellipse_aspect = max(axis_a, axis_b) / max(1.0, min(axis_a, axis_b))
     except Exception:
         pass
 
@@ -260,6 +267,7 @@ def _component_from_mask(mask: np.ndarray, source: str, confidence: Any = None) 
         "fillRatio": round(float(fill_ratio), 4),
         "circularity": round(float(circularity), 4),
         "solidity": round(float(solidity), 4),
+        "ellipseAspect": round(float(ellipse_aspect), 4) if ellipse_aspect else None,
         "vertices": vertices,
         "mask": mask,
         "source": source,
@@ -439,9 +447,11 @@ def _object_component_no_background_cv2(arr: np.ndarray, allowed_mask: np.ndarra
                 continue
 
             angle = 0.0
+            ellipse_aspect = None
             if len(contour) >= 5:
-                (_, _), (_, _), raw_angle = cv2.fitEllipse(contour)
+                (_, _), (axis_a, axis_b), raw_angle = cv2.fitEllipse(contour)
                 angle = float(raw_angle)
+                ellipse_aspect = max(axis_a, axis_b) / max(1.0, min(axis_a, axis_b))
 
             best_score = score
             best = {
@@ -454,6 +464,7 @@ def _object_component_no_background_cv2(arr: np.ndarray, allowed_mask: np.ndarra
                 "fillRatio": round(float(fill_ratio), 4),
                 "circularity": round(float(circularity), 4),
                 "solidity": round(float(solidity), 4),
+                "ellipseAspect": round(float(ellipse_aspect), 4) if ellipse_aspect else None,
                 "vertices": int(len(approx)),
                 "angle": round(float(angle), 2),
                 "mask": contour_mask.astype(bool),
@@ -562,9 +573,11 @@ def _object_components_no_background_cv2(arr: np.ndarray, allowed_mask: np.ndarr
             contour_mask = cv2.bitwise_and(contour_mask, allowed_u8)
 
             angle = 0.0
+            ellipse_aspect = None
             if len(contour) >= 5:
-                (_, _), (_, _), raw_angle = cv2.fitEllipse(contour)
+                (_, _), (axis_a, axis_b), raw_angle = cv2.fitEllipse(contour)
                 angle = float(raw_angle)
+                ellipse_aspect = max(axis_a, axis_b) / max(1.0, min(axis_a, axis_b))
 
             score = (
                 min(1.0, area / max(min_area * 16, 1))
@@ -585,6 +598,7 @@ def _object_components_no_background_cv2(arr: np.ndarray, allowed_mask: np.ndarr
                     "fillRatio": round(float(fill_ratio), 4),
                     "circularity": round(float(circularity), 4),
                     "solidity": round(float(solidity), 4),
+                    "ellipseAspect": round(float(ellipse_aspect), 4) if ellipse_aspect else None,
                     "vertices": int(len(approx)),
                     "angle": round(float(angle), 2),
                     "mask": contour_mask.astype(bool),
@@ -669,9 +683,11 @@ def _largest_component_cv2(mask: np.ndarray) -> dict[str, Any] | None:
         cv2.drawContours(component_mask_u8, [contour], -1, 255, thickness=-1)
 
         angle = 0.0
+        ellipse_aspect = None
         if len(contour) >= 5:
-            (_, _), (_, _), raw_angle = cv2.fitEllipse(contour)
+            (_, _), (axis_a, axis_b), raw_angle = cv2.fitEllipse(contour)
             angle = float(raw_angle)
+            ellipse_aspect = max(axis_a, axis_b) / max(1.0, min(axis_a, axis_b))
 
         candidate = {
             "area": int(round(area)),
@@ -683,6 +699,7 @@ def _largest_component_cv2(mask: np.ndarray) -> dict[str, Any] | None:
             "fillRatio": round(float(fill_ratio), 4),
             "circularity": round(float(circularity), 4),
             "solidity": round(float(solidity), 4),
+            "ellipseAspect": round(float(ellipse_aspect), 4) if ellipse_aspect else None,
             "vertices": int(len(approx)),
             "angle": round(float(angle), 2),
             "mask": component_mask_u8.astype(bool),
@@ -906,6 +923,8 @@ def _classify_color(rgb: np.ndarray) -> tuple[str, float]:
 
 def _classify_shape(component: dict[str, Any]) -> tuple[str, float]:
     aspect = float(component.get("aspect") or 1)
+    ellipse_aspect = float(component.get("ellipseAspect") or 0)
+    shape_aspect = max(aspect, ellipse_aspect or 1.0)
     fill_ratio = float(component.get("fillRatio") or 0)
     circularity = float(component.get("circularity") or 0)
     solidity = float(component.get("solidity") or fill_ratio)
@@ -913,16 +932,24 @@ def _classify_shape(component: dict[str, Any]) -> tuple[str, float]:
 
     if vertices == 3:
         return "triangle", 0.82
-    if vertices == 4 and aspect <= 1.35 and fill_ratio < 0.78:
+    if vertices == 4 and shape_aspect <= 1.35 and fill_ratio < 0.78:
         return "diamond", 0.72
-    if aspect >= 2.15:
-        return "capsule", round(min(0.94, 0.54 + ((aspect - 2.0) * 0.16) + (solidity * 0.12)), 4)
-    if circularity >= 0.68 and aspect <= 1.28:
-        return "round", round(min(0.94, 0.5 + circularity * 0.46), 4)
-    if aspect >= 1.35:
-        return "oval", round(min(0.9, 0.45 + min(aspect, 2.0) * 0.18 + solidity * 0.08), 4)
+    if shape_aspect >= 2.2:
+        return "capsule", round(min(0.94, 0.54 + ((shape_aspect - 2.0) * 0.16) + (solidity * 0.12)), 4)
+    if shape_aspect >= 1.34:
+        return "oval", round(min(0.93, 0.48 + min(shape_aspect, 2.0) * 0.18 + solidity * 0.08), 4)
+    if shape_aspect >= 1.18 and circularity < 0.84:
+        return "oval", round(min(0.9, 0.42 + min(shape_aspect, 1.5) * 0.2 + solidity * 0.08), 4)
+    if circularity >= 0.68 and shape_aspect <= 1.18:
+        round_confidence = 0.5 + circularity * 0.42 + max(0.0, 1.16 - shape_aspect) * 0.18
+        return "round", round(min(0.94, round_confidence), 4)
+    if shape_aspect >= 1.2:
+        return "oval", round(min(0.86, 0.42 + min(shape_aspect, 1.8) * 0.18 + solidity * 0.08), 4)
     if fill_ratio < 0.52:
         return "triangle", 0.5
+    if circularity >= 0.62:
+        round_confidence = 0.46 + circularity * 0.36 + max(0.0, 1.12 - shape_aspect) * 0.12
+        return "round", round(min(0.86, round_confidence), 4)
     return "square", round(min(0.82, 0.42 + fill_ratio * 0.34 + solidity * 0.08), 4)
 
 
@@ -1347,9 +1374,6 @@ def _candidate_score(candidate: dict[str, Any], detected_color: str, detected_sh
         score += 0.36
     elif shape and detected_shape and {shape, detected_shape} <= {"oval", "capsule"}:
         score += 0.18
-    elif shape and detected_shape and {shape, detected_shape} <= {"round", "oval"}:
-        score += 0.14
-
     if not color and not shape:
         score = max(score, 0.05)
 

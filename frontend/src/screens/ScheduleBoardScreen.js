@@ -435,7 +435,7 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
     : [];
 
   detectedObjects.forEach((object) => {
-    const match = object?.match || (Array.isArray(object?.matches) ? object.matches[0] : null);
+    const match = object?.match || null;
     const key = String(match?.id || '').trim();
     const confidence = Number(match?.confidence ?? object?.confidence) || 0;
     if (!key || confidence <= 0 || map.has(key)) {
@@ -470,23 +470,120 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
   return map;
 };
 
+const normalizeAppearanceValue = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized || ['unknown', 'not specified', 'none', 'n/a'].includes(normalized)) {
+    return '';
+  }
+  return normalized === 'grey' ? 'gray' : normalized;
+};
+
+const getAppearanceMatchScore = (expectedMedicine, detectedAppearance = {}) => {
+  const expectedColor = normalizeAppearanceValue(expectedMedicine?.color);
+  const expectedShape = normalizeAppearanceValue(expectedMedicine?.shape);
+  const detectedColor = normalizeAppearanceValue(detectedAppearance?.color);
+  const detectedShape = normalizeAppearanceValue(detectedAppearance?.shape);
+  let score = 0;
+
+  if (expectedColor && detectedColor && expectedColor === detectedColor) {
+    score += 0.58;
+  } else if (expectedColor && detectedColor && ['gray', 'white'].includes(expectedColor) && ['gray', 'white'].includes(detectedColor)) {
+    score += 0.32;
+  }
+
+  if (expectedShape && detectedShape && expectedShape === detectedShape) {
+    score += 0.36;
+  } else if (expectedShape && detectedShape && ['oval', 'capsule'].includes(expectedShape) && ['oval', 'capsule'].includes(detectedShape)) {
+    score += 0.18;
+  }
+
+  return score;
+};
+
+const getBestEntryIndexByAppearance = ({ entries, scheduledItems, detectedAppearance, onlyMissing = false }) => {
+  let bestIndex = -1;
+  let bestScore = 0;
+  let bestDetectedCount = Number.POSITIVE_INFINITY;
+
+  entries.forEach((entry, index) => {
+    if (onlyMissing && Number(scheduledItems[index]?.missingCount) <= 0) {
+      return;
+    }
+
+    const score = getAppearanceMatchScore(entry, detectedAppearance);
+    const detectedCount = Number(scheduledItems[index]?.detectedCount) || 0;
+    if (score > bestScore || (score > 0 && score === bestScore && detectedCount < bestDetectedCount)) {
+      bestScore = score;
+      bestDetectedCount = detectedCount;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore > 0 ? bestIndex : -1;
+};
+
+const getDetectedObjectAppearance = (object = {}) => {
+  const match = object?.match || null;
+  const firstCandidate = Array.isArray(object?.matches) ? object.matches[0] : null;
+  return {
+    color: object?.detectedColor || match?.color || firstCandidate?.color || '',
+    shape: object?.detectedShape || match?.shape || firstCandidate?.shape || '',
+  };
+};
+
+const hasDetectedAppearance = (appearance = {}) =>
+  Boolean(normalizeAppearanceValue(appearance?.color) || normalizeAppearanceValue(appearance?.shape));
+
+const pushAppearanceUnits = (queue, appearance, count) => {
+  const normalizedCount = Math.max(0, Math.ceil(Number(count) || 0));
+  for (let index = 0; index < normalizedCount; index += 1) {
+    queue.push(appearance);
+  }
+};
+
 const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAnalysis = null }) => {
   const entries = getVerificationEntries(entry);
   const detectedMap = getDetectedMedicineCountMap(identityAnalysis);
+  const detectedObjects = Array.isArray(identityAnalysis?.detectedObjects)
+    ? identityAnalysis.detectedObjects
+    : [];
   const normalizedDetectedCount = Number(detectedCount);
   const photoWasAnalyzed = detectedCount != null && Number.isFinite(normalizedDetectedCount);
 
   const scheduledKeys = new Set(entries.map((item) => getMedicineKey(item)).filter(Boolean));
-  const scheduledItems = entries.map((item) => {
-    const requiredCount = getScheduledTabletCount(item);
-    const detected = detectedMap.get(getMedicineKey(item));
-    const medicineDetectedCount = Number(detected?.count) || 0;
+  const rawDetectedTotal = Array.from(detectedMap.values()).reduce((sum, detected) => sum + (Number(detected?.count) || 0), 0);
+  const unscheduledDetectedTotal = Array.from(detectedMap.entries())
+    .filter(([key]) => key && !scheduledKeys.has(key))
+    .reduce((sum, [, detected]) => sum + (Number(detected?.count) || 0), 0);
+  const unassignedAppearances = [];
 
+  detectedObjects.forEach((object) => {
+    const match = object?.match || null;
+    const key = String(match?.id || '').trim();
+    if (!key || !scheduledKeys.has(key)) {
+      unassignedAppearances.push(getDetectedObjectAppearance(object));
+    }
+  });
+
+  detectedMap.forEach((detected, key) => {
+    if (!scheduledKeys.has(key)) {
+      pushAppearanceUnits(unassignedAppearances, {
+        color: detected?.color || '',
+        shape: detected?.shape || '',
+      }, detected?.count);
+    }
+  });
+
+  let unassignedDetectedCount = unscheduledDetectedTotal
+    + Math.max(0, photoWasAnalyzed ? normalizedDetectedCount - rawDetectedTotal : 0);
+
+  const buildScheduledAvailabilityItem = (item, detected, medicineDetectedCount) => {
+    const requiredCount = getScheduledTabletCount(item);
     let status = photoWasAnalyzed ? 'underdose' : 'unknown';
     let label = 'Missing';
     let reason = 'Medicine was not found in the palm photo or could not be identified';
 
-    if (detected) {
+    if (detected || medicineDetectedCount > 0) {
       if (Math.abs(medicineDetectedCount - requiredCount) <= 0.001) {
         status = 'correct';
         label = 'Available';
@@ -497,7 +594,7 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
         reason = `Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       } else {
         status = 'underdose';
-        label = medicineDetectedCount > 0 ? 'Underdose' : 'Missing';
+        label = 'Missing';
         reason = `Missing ${formatTabletCount(requiredCount - medicineDetectedCount)}. Detected ${formatTabletCount(medicineDetectedCount)}, expected ${formatTabletCount(requiredCount)}`;
       }
     }
@@ -513,35 +610,77 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
       missingCount: Math.max(0, requiredCount - medicineDetectedCount),
       extraCount: Math.max(0, medicineDetectedCount - requiredCount),
       available: status === 'correct',
-      detected: Boolean(detected),
+      detected: Boolean(detected) || medicineDetectedCount > 0,
       confidence: detected ? Number(detected.confidence) || 0 : 0,
       status,
       label,
       reason,
     };
+  };
+
+  const scheduledItems = entries.map((item) => {
+    const detected = detectedMap.get(getMedicineKey(item));
+    const medicineDetectedCount = Number(detected?.count) || 0;
+
+    return buildScheduledAvailabilityItem(item, detected, medicineDetectedCount);
   });
 
-  const extraItems = Array.from(detectedMap.entries())
-    .filter(([key]) => key && !scheduledKeys.has(key))
-    .map(([key, detected]) => ({
-      key: `extra-${key}`,
-      medicineName: detected?.medicineName || 'Medicine',
-      dosageMg: detected?.dosageMg,
-      color: detected?.color || '',
-      shape: detected?.shape || '',
-      requiredCount: 0,
-      detectedCount: Number(detected?.count) || 0,
-      missingCount: 0,
-      extraCount: Number(detected?.count) || 0,
-      available: false,
-      detected: true,
-      confidence: Number(detected?.confidence) || 0,
-      status: 'overdose',
-      label: 'Overdose',
-      reason: 'Detected in palm photo but not scheduled for this intake',
-    }));
+  while (unassignedDetectedCount > 0) {
+    const detectedAppearance = unassignedAppearances.shift() || {};
+    const appearanceMatchedMissingIndex = getBestEntryIndexByAppearance({
+      entries,
+      scheduledItems,
+      detectedAppearance,
+      onlyMissing: true,
+    });
+    const missingIndex = appearanceMatchedMissingIndex >= 0
+      ? appearanceMatchedMissingIndex
+      : hasDetectedAppearance(detectedAppearance)
+      ? -1
+      : scheduledItems.findIndex((item) => Number(item.missingCount) > 0);
+    if (missingIndex < 0) {
+      if (hasDetectedAppearance(detectedAppearance)) {
+        unassignedAppearances.unshift(detectedAppearance);
+      }
+      break;
+    }
+    const entryItem = entries[missingIndex];
+    const detected = detectedMap.get(getMedicineKey(entryItem));
+    const assignCount = Math.min(unassignedDetectedCount, Number(scheduledItems[missingIndex].missingCount) || 0, 1);
+    scheduledItems[missingIndex] = buildScheduledAvailabilityItem(
+      entryItem,
+      detected,
+      Number(scheduledItems[missingIndex].detectedCount) + assignCount,
+    );
+    unassignedDetectedCount -= assignCount;
+  }
 
-  return [...scheduledItems, ...extraItems];
+  while (unassignedDetectedCount > 0 && scheduledItems.length > 0) {
+    const detectedAppearance = unassignedAppearances.shift() || {};
+    const appearanceMatchedIndex = getBestEntryIndexByAppearance({
+      entries,
+      scheduledItems,
+      detectedAppearance,
+      onlyMissing: false,
+    });
+    const overdoseIndex = scheduledItems.findIndex((item) => Number(item.detectedCount) > 0);
+    const targetIndex = appearanceMatchedIndex >= 0
+      ? appearanceMatchedIndex
+      : overdoseIndex >= 0
+      ? overdoseIndex
+      : 0;
+    const entryItem = entries[targetIndex];
+    const detected = detectedMap.get(getMedicineKey(entryItem));
+    const assignCount = Math.min(unassignedDetectedCount, 1);
+    scheduledItems[targetIndex] = buildScheduledAvailabilityItem(
+      entryItem,
+      detected,
+      Number(scheduledItems[targetIndex].detectedCount) + assignCount,
+    );
+    unassignedDetectedCount -= assignCount;
+  }
+
+  return scheduledItems;
 };
 
 const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
@@ -557,10 +696,10 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
     const extraCount = Number(item?.extraCount) || 0;
     const label = status === 'correct'
       ? 'Available'
-    : status === 'overdose' || status === 'unexpected'
+    : status === 'overdose'
       ? 'Overdose'
-      : detectedCount > 0 && missingCount > 0
-      ? 'Underdose'
+    : detectedCount > 0 && missingCount > 0
+      ? 'Missing'
       : detectedCount > 0
       ? 'Available'
       : status === 'underdose'
@@ -568,8 +707,6 @@ const getMedicineAvailabilityItemsFromDoseAnalysis = (medicineDoseAnalysis) => {
       : 'Missing';
     const reason = label === 'Overdose'
       ? `Overdose by ${formatTabletCount(extraCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
-      : label === 'Underdose'
-      ? `Missing ${formatTabletCount(missingCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : label === 'Missing'
       ? `Missing ${formatTabletCount(missingCount || requiredCount)}. Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`
       : item?.message || `Detected ${formatTabletCount(detectedCount)}, expected ${formatTabletCount(requiredCount)}`;
@@ -621,7 +758,7 @@ const getCountComparisonLabel = (status) => {
     return 'Overdose count';
   }
   if (status === 'underdose') {
-    return 'Underdose count';
+    return 'Missing count';
   }
   return 'Count uncertain';
 };
@@ -638,9 +775,39 @@ const getCountComparisonMessage = (status, count, expectedCount) => {
     return `Possible overdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   if (status === 'underdose') {
-    return `Possible underdose: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
+    return `Possible missing tablets: AI detected ${countText} ${countUnit}, but this dose needs ${expectedText} ${expectedUnit}.`;
   }
   return `This dose needs ${expectedText} ${expectedUnit}.`;
+};
+
+const getTabletVoiceCountText = (count) => {
+  const normalized = Number(count);
+  const unit = Math.abs(normalized - 1) <= 0.001 ? 'tablet' : 'tablets';
+  return Math.abs(normalized - 1) <= 0.001 ? `one ${unit}` : `${formatTabletCount(normalized)} ${unit}`;
+};
+
+const buildTabletVerificationVoiceMessage = ({ comparisonStatus, detectedCount, expectedCount, medicinesAvailable }) => {
+  const normalizedDetected = Number(detectedCount);
+  const normalizedExpected = Number(expectedCount);
+  if (!Number.isFinite(normalizedDetected) || !Number.isFinite(normalizedExpected) || normalizedExpected <= 0) {
+    return '';
+  }
+
+  if (comparisonStatus === 'overdose') {
+    const extraCount = Math.max(0, normalizedDetected - normalizedExpected);
+    return `Extra ${getTabletVoiceCountText(extraCount || 1)}.`;
+  }
+
+  if (comparisonStatus === 'underdose') {
+    const missingCount = Math.max(0, normalizedExpected - normalizedDetected);
+    return `Missed ${getTabletVoiceCountText(missingCount || normalizedExpected)}.`;
+  }
+
+  if ((comparisonStatus === 'okay' || comparisonStatus === 'correct') && medicinesAvailable) {
+    return 'Correct tablets available.';
+  }
+
+  return '';
 };
 
 const getIntakeAmountText = (entry) => {
@@ -1058,6 +1225,23 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     });
   };
 
+  const speakTabletVerificationVoiceMessage = (message) => {
+    if (!message || !SpeechModule) {
+      return;
+    }
+
+    try {
+      SpeechModule.stop?.();
+      SpeechModule.speak(message, {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.95,
+      });
+    } catch (speechError) {
+      console.log('[ScheduleBoard] intake verification speech unavailable:', speechError?.message || speechError);
+    }
+  };
+
   const buildVoiceMarkMessage = (statusKey, entry) => {
     const medicineName = entry?.medicineName ? `: ${entry.medicineName}.` : '.';
 
@@ -1309,8 +1493,9 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         const doseItems = analysis?.medicineDoseAnalysis
           ? getMedicineAvailabilityItemsFromDoseAnalysis(analysis.medicineDoseAnalysis)
           : getMedicineAvailabilityItems({ entry, detectedCount: count, identityAnalysis });
+        const allScheduledMedicinesAvailable = areAllScheduledMedicinesAvailable(doseItems);
         setMedicineAvailabilityItems(doseItems);
-        setMedicineDoseMatches(areAllScheduledMedicinesAvailable(doseItems));
+        setMedicineDoseMatches(allScheduledMedicinesAvailable);
         const confidenceText = Number.isFinite(Number(analysis?.confidence))
           ? ` Confidence: ${Math.round(Number(analysis.confidence) * 100)}%.`
           : '';
@@ -1333,6 +1518,12 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setTabletCountAnalysisMessage(
           `${getCountComparisonMessage(comparisonStatus, count, expectedCount)}${confidenceText}${modelText}${sourceText}`
         );
+        speakTabletVerificationVoiceMessage(buildTabletVerificationVoiceMessage({
+          comparisonStatus,
+          detectedCount: count,
+          expectedCount,
+          medicinesAvailable: allScheduledMedicinesAvailable,
+        }));
       } else {
         setDetectedTabletCount(0);
         setTabletCountConfidence(null);
@@ -1342,6 +1533,14 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setMedicineAvailabilityItems(doseItems);
         setMedicineDoseMatches(false);
         setTabletCountAnalysisMessage(analysis?.error || 'Could not clearly count tablets. Retake the palm photo with all tablets separated.');
+        if (Number.isFinite(count)) {
+          speakTabletVerificationVoiceMessage(buildTabletVerificationVoiceMessage({
+            comparisonStatus: 'underdose',
+            detectedCount: 0,
+            expectedCount,
+            medicinesAvailable: false,
+          }));
+        }
       }
     } catch (error) {
       setDetectedTabletCount(null);
@@ -1420,6 +1619,27 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     return match?.[1]?.toLowerCase() || 'mp4';
   };
 
+  const getMotionVideoBase64 = async (asset) => {
+    const directBase64 = String(asset?.base64 || '').trim();
+    if (directBase64) {
+      return directBase64;
+    }
+
+    const uri = String(asset?.uri || '').trim();
+    if (!uri) {
+      return '';
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      return '';
+    }
+
+    return FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  };
+
   const recordAndAnalyzeIntakeMotion = async () => {
     const expectedCount = getExpectedTabletCount(intakeVerificationEntry);
     const countMatches = Math.abs(Number(verifiedTabletCount) - expectedCount) <= 0.001;
@@ -1445,6 +1665,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         cameraType: ImagePicker.CameraType?.front || 'front',
         videoMaxDuration: 10,
         quality: 0.8,
+        base64: true,
       });
 
       if (pickerResult.canceled || !pickerResult.assets?.length) {
@@ -1462,24 +1683,29 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
       }
 
       setMotionVideoUri(uri);
-      setMotionAnalysisMessage('Analyzing hand-to-mouth motion...');
-      const videoBase64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      setMotionAnalysisMessage('Analyzing wrist lift, hand-to-mouth proximity, and mouth-area pause...');
+      const videoBase64 = await getMotionVideoBase64(asset);
+      if (!videoBase64) {
+        setVerificationHandToMouth(false);
+        setMotionAnalysisMessage('The recorded video file was not available long enough to analyze. Please record again and keep the face and hand visible until the video finishes saving.');
+        return;
+      }
       const analysis = await intakeMonitoringService.analyzeMotionVideo({
         videoBase64,
         extension: getFileExtensionFromUri(uri),
         swallowConfirmed: verificationSwallowComplete,
       });
 
-      const motionAvailable = analysis?.motionAvailable ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected && !!analysis?.swallowDetected);
+      const motionAvailable = analysis?.motionAvailable
+        ?? (!!analysis?.wristElevationDetected && !!analysis?.handMouthProximityDetected && !!analysis?.mouthDwellDetected)
+        ?? (!!analysis?.handToMouthDetected && !!analysis?.mouthPauseDetected);
       setVerificationHandToMouth(!!motionAvailable);
 
       const confidenceText = Number.isFinite(Number(analysis?.confidence))
         ? ` (${Math.round(Number(analysis.confidence) * 100)}% confidence)`
         : '';
       if (motionAvailable) {
-        setMotionAnalysisMessage(`Camera detected hand-to-mouth and swallowing motion${confidenceText}.`);
+        setMotionAnalysisMessage(`Camera detected intake motion${confidenceText}: wrist raised, hand reached the mouth, and paused near the mouth.`);
       } else {
         const frameHint = Number.isFinite(Number(analysis?.handFrameCount)) || Number.isFinite(Number(analysis?.faceFrameCount))
           ? ` Hand frames: ${analysis?.handFrameCount || 0}. Face frames: ${analysis?.faceFrameCount || 0}.`
@@ -1487,7 +1713,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         setMotionAnalysisMessage(
           analysis?.message ||
             analysis?.error ||
-            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, move the hand to the mouth, swallow, then stop recording.`
+            `Motion not clear${confidenceText}.${frameHint} Record again from chest level, raise the hand to the mouth, pause for one second, then stop recording.`
         );
       }
     } catch (error) {
@@ -1500,7 +1726,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
         responseData?.message ||
           (responseData?.error ? `${responseData.error}${frameHint}` : '') ||
           error?.message ||
-          'Could not analyze intake motion. Record again from chest level, move the hand to the mouth, swallow, then stop recording.'
+          'Could not analyze intake motion. Record again from chest level, raise the hand to the mouth, pause for one second, then stop recording.'
       );
     } finally {
       setIsAnalyzingMotionVideo(false);
@@ -1901,6 +2127,32 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
     const canRecordMotion = countReady && countMatches && medicineDoseMatches;
     const motionDetected = !!verificationHandToMouth && !isAnalyzingMotionVideo;
     const canMarkTaken = !!intakeVerificationPhotoUri && countMatches && medicineDoseMatches && motionDetected;
+    const availabilitySections = [
+      {
+        key: 'available',
+        title: 'Available tablets',
+        items: medicineAvailabilityItems.filter((item) => item.label === 'Available' && item.status !== 'overdose'),
+        sectionStyle: styles.verificationAvailabilitySectionAvailable,
+        headerStyle: styles.verificationAvailabilityHeaderAvailable,
+        badgeStyle: styles.verificationAvailabilityBadgeAvailable,
+      },
+      {
+        key: 'missing',
+        title: 'Missing tablets',
+        items: medicineAvailabilityItems.filter((item) => item.label === 'Missing' || item.status === 'underdose'),
+        sectionStyle: styles.verificationAvailabilitySectionMissing,
+        headerStyle: styles.verificationAvailabilityHeaderMissing,
+        badgeStyle: styles.verificationAvailabilityBadgeMissing,
+      },
+      {
+        key: 'overdose',
+        title: 'Overdose tablets',
+        items: medicineAvailabilityItems.filter((item) => item.label === 'Overdose' || item.status === 'overdose'),
+        sectionStyle: styles.verificationAvailabilitySectionOverdose,
+        headerStyle: styles.verificationAvailabilityHeaderOverdose,
+        badgeStyle: styles.verificationAvailabilityBadgeOverdose,
+      },
+    ].filter((section) => section.items.length > 0);
 
     return (
       <View style={styles.page}>
@@ -1920,7 +2172,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               {isGroupVerification ? 'Verify one-time intake' : 'Verify before marking taken'}
             </Text>
             <Text style={[styles.verificationHeroText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
-              Show all tablets in your palm. The trained AI model checks whether the amount is OK, overdose, or underdose.
+              Show all tablets in your palm. The trained AI model checks scheduled medicine color and shape to find what is available, missing, or overdose.
             </Text>
           </View>
 
@@ -2005,51 +2257,46 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
               )}
               {medicineAvailabilityItems.length > 0 && (
                 <View style={styles.verificationAvailabilityList}>
-                  {medicineAvailabilityItems.map((item) => {
-                    const needsAttention = item.status === 'overdose'
-                      || item.status === 'unexpected'
-                      || item.status === 'underdose'
-                      || item.label === 'Missing'
-                      || item.label === 'Overdose';
-                    const colorText = item.color || 'unknown';
-                    const shapeText = item.shape || 'unknown';
-
-                    return (
-                      <View key={item.key} style={styles.verificationAvailabilityRow}>
-                        {needsAttention ? (
-                          <View style={styles.verificationAvailabilityAppearanceWrap}>
-                            {renderAppearanceIcon(item.shape, item.color)}
-                          </View>
-                        ) : (
-                          <View
-                            style={[
-                              styles.verificationAvailabilityDot,
-                              item.available
-                                ? styles.verificationAvailabilityDotGood
-                                : styles.verificationAvailabilityDotBad,
-                            ]}
-                          />
-                        )}
-                        <View style={styles.verificationAvailabilityTextWrap}>
-                          <Text style={styles.verificationAvailabilityName}>
-                            {item.medicineName} - {item.label}
-                          </Text>
-                          {needsAttention ? (
-                            <Text style={styles.verificationAvailabilityAppearanceText}>
-                              Color: {colorText} - Shape: {shapeText}
-                            </Text>
-                          ) : null}
-                          <Text style={styles.verificationAvailabilityMeta}>
-                            Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
-                            {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
-                            {item.missingCount > 0 ? ` - missing ${formatTabletCount(item.missingCount)}` : ''}
-                            {item.extraCount > 0 ? ` - extra ${formatTabletCount(item.extraCount)}` : ''}
-                            {item.reason ? ` - ${item.reason}` : ''}
-                          </Text>
-                        </View>
+                  {availabilitySections.map((section) => (
+                    <View key={section.key} style={[styles.verificationAvailabilitySection, section.sectionStyle]}>
+                      <View style={[styles.verificationAvailabilitySectionHeader, section.headerStyle]}>
+                        <Text style={styles.verificationAvailabilitySectionTitle}>{section.title}</Text>
+                        <Text style={styles.verificationAvailabilitySectionCount}>{section.items.length}</Text>
                       </View>
-                    );
-                  })}
+                      {section.items.map((item) => {
+                        const colorText = item.color || 'unknown';
+                        const shapeText = item.shape || 'unknown';
+
+                        return (
+                          <View key={item.key} style={styles.verificationAvailabilityRow}>
+                            <View style={styles.verificationAvailabilityAppearanceWrap}>
+                              {renderAppearanceIcon(item.shape, item.color)}
+                            </View>
+                            <View style={styles.verificationAvailabilityTextWrap}>
+                              <View style={styles.verificationAvailabilityTitleRow}>
+                                <Text style={styles.verificationAvailabilityName}>
+                                  {item.medicineName}
+                                </Text>
+                                <Text style={[styles.verificationAvailabilityBadge, section.badgeStyle]}>
+                                  {item.label}
+                                </Text>
+                              </View>
+                              <Text style={styles.verificationAvailabilityAppearanceText}>
+                                Color: {colorText} - Shape: {shapeText}
+                              </Text>
+                              <Text style={styles.verificationAvailabilityMeta}>
+                                Detected {formatTabletCount(item.detectedCount)}, expected {formatTabletCount(item.requiredCount)}
+                                {item.detected && item.confidence > 0 ? ` - match ${Math.round(Math.min(1, item.confidence) * 100)}%` : ''}
+                                {item.missingCount > 0 ? ` - missing ${formatTabletCount(item.missingCount)}` : ''}
+                                {item.extraCount > 0 ? ` - extra ${formatTabletCount(item.extraCount)}` : ''}
+                                {item.reason ? ` - ${item.reason}` : ''}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))}
                 </View>
               )}
             </View>
@@ -2069,7 +2316,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           <View style={styles.verificationStepCard}>
             <Text style={[styles.verificationStepTitle, { fontSize: 17 * textScale }]}>3. Camera intake motion</Text>
             <Text style={[styles.verificationStepText, { fontSize: 14 * textScale, lineHeight: 20 * textScale }]}>
-              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, move it to your mouth, swallow, then stop recording.
+              Record a short video with your face, hand, and mouth visible. Start with the hand below your face, raise it to your mouth, pause there for one second, then stop recording.
             </Text>
             <TouchableOpacity
               style={[styles.verificationCameraButton, (!canRecordMotion || isAnalyzingMotionVideo) && styles.verificationCompleteButtonDisabled]}
@@ -2090,7 +2337,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <View style={[styles.verificationCheckRow, verificationHandToMouth && styles.verificationCheckRowActive]}>
               <Text style={styles.verificationCheckIcon}>{verificationHandToMouth ? '✓' : '○'}</Text>
               <Text style={[styles.verificationCheckText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>
-                Camera detected hand-to-mouth and swallowing
+                Camera detected wrist lift, hand-to-mouth, and mouth-area pause
               </Text>
             </View>
             {canRecordMotion && !verificationHandToMouth && !isAnalyzingMotionVideo && (
@@ -2593,11 +2840,68 @@ const styles = StyleSheet.create({
     borderTopColor: '#eadcca',
     paddingTop: 8,
   },
+  verificationAvailabilitySection: {
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  verificationAvailabilitySectionAvailable: {
+    backgroundColor: '#e9f7f1',
+    borderColor: '#a8dbc8',
+  },
+  verificationAvailabilitySectionMissing: {
+    backgroundColor: '#fff7dc',
+    borderColor: '#f0d27a',
+  },
+  verificationAvailabilitySectionOverdose: {
+    backgroundColor: '#fff0f2',
+    borderColor: '#edbdc4',
+  },
+  verificationAvailabilitySectionHeader: {
+    minHeight: 34,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  verificationAvailabilityHeaderAvailable: {
+    backgroundColor: '#1e6f5c',
+  },
+  verificationAvailabilityHeaderMissing: {
+    backgroundColor: '#8a641c',
+  },
+  verificationAvailabilityHeaderOverdose: {
+    backgroundColor: '#9b3d47',
+  },
+  verificationAvailabilitySectionTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '900',
+  },
+  verificationAvailabilitySectionCount: {
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    color: '#ffffff',
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   verificationAvailabilityRow: {
     minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(45,36,29,0.08)',
   },
   verificationAvailabilityDot: {
     width: 11,
@@ -2617,11 +2921,37 @@ const styles = StyleSheet.create({
   verificationAvailabilityTextWrap: {
     flex: 1,
   },
+  verificationAvailabilityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   verificationAvailabilityName: {
     color: '#2d241d',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
+    marginRight: 6,
+  },
+  verificationAvailabilityBadge: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    color: '#ffffff',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '900',
+  },
+  verificationAvailabilityBadgeAvailable: {
+    backgroundColor: '#1e6f5c',
+  },
+  verificationAvailabilityBadgeMissing: {
+    backgroundColor: '#8a641c',
+  },
+  verificationAvailabilityBadgeOverdose: {
+    backgroundColor: '#9b3d47',
   },
   verificationAvailabilityAppearanceText: {
     color: '#2f5d50',
