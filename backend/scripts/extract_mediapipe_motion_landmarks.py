@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+
+import numpy as np
 
 
 def main() -> None:
@@ -10,6 +13,9 @@ def main() -> None:
     parser.add_argument("--video", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--frame-step", type=int, default=3)
+    parser.add_argument("--max-sampled-frames", type=int, default=0)
+    parser.add_argument("--max-seconds", type=float, default=0)
+    parser.add_argument("--max-width", type=int, default=0)
     args = parser.parse_args()
 
     try:
@@ -17,11 +23,16 @@ def main() -> None:
     except Exception as error:
         raise RuntimeError("Install OpenCV first: pip install opencv-contrib-python") from error
 
-    try:
-        import mediapipe as mp
-    except Exception:
-        mp = None
-    if mp is not None and not hasattr(mp, "solutions"):
+    force_opencv_motion = os.environ.get("ELDERMEDS_FORCE_OPENCV_MOTION", "").strip() == "1"
+    mp = None
+    if not force_opencv_motion:
+        try:
+            import mediapipe as mp
+        except Exception:
+            mp = None
+        if mp is not None and not hasattr(mp, "solutions"):
+            mp = None
+    if force_opencv_motion:
         mp = None
 
     if not args.video.exists():
@@ -31,6 +42,22 @@ def main() -> None:
     fps = capture.get(cv2.CAP_PROP_FPS) or 30
     frames = []
     frame_index = 0
+    max_sampled_frames = max(0, int(args.max_sampled_frames or 0))
+    max_seconds = max(0.0, float(args.max_seconds or 0))
+    max_width = max(0, int(args.max_width or 0))
+    frame_step = max(1, args.frame_step)
+
+    def _should_stop_for_duration(current_frame_index):
+        return max_seconds > 0 and (current_frame_index / fps) > max_seconds
+
+    def _resize_for_processing(frame):
+        if max_width <= 0:
+            return frame
+        height, width = frame.shape[:2]
+        if width <= max_width:
+            return frame
+        scale = max_width / float(width)
+        return cv2.resize(frame, (max_width, max(1, int(height * scale))), interpolation=cv2.INTER_AREA)
 
     if mp is None:
         previous_gray = None
@@ -69,9 +96,12 @@ def main() -> None:
                 ok, frame = capture.read()
                 if not ok:
                     break
-                if frame_index % max(1, args.frame_step) != 0:
+                if _should_stop_for_duration(frame_index):
+                    break
+                if frame_index % frame_step != 0:
                     frame_index += 1
                     continue
+                frame = _resize_for_processing(frame)
 
                 height, width = frame.shape[:2]
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -88,6 +118,23 @@ def main() -> None:
                 output_frame["face"] = _face_landmarks(active_face_box, width, height)
 
                 if previous_gray is not None:
+                    flow = cv2.calcOpticalFlowFarneback(
+                        previous_gray,
+                        gray,
+                        None,
+                        0.5,
+                        3,
+                        15,
+                        3,
+                        5,
+                        1.2,
+                        0,
+                    )
+                    magnitude, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+                    upper_height = max(1, int(height * 0.75))
+                    upper_magnitude = magnitude[:upper_height, :]
+                    output_frame["fallbackMotionMagnitude"] = float(upper_magnitude.mean())
+
                     delta = cv2.absdiff(previous_gray, gray)
                     _, threshold = cv2.threshold(delta, 22, 255, cv2.THRESH_BINARY)
                     threshold = cv2.dilate(threshold, None, iterations=2)
@@ -139,10 +186,22 @@ def main() -> None:
                                 "wrist": {"x": cx / width, "y": cy / height},
                             }
                             hand_frame_count += 1
+                    elif output_frame["fallbackMotionMagnitude"] >= 0.45:
+                        motion_mask = (upper_magnitude >= max(0.35, float(np.percentile(upper_magnitude, 92)))).astype("uint8")
+                        moments = cv2.moments(motion_mask)
+                        if moments["m00"]:
+                            cx = moments["m10"] / moments["m00"]
+                            cy = moments["m01"] / moments["m00"]
+                            output_frame["hand"] = {
+                                "wrist": {"x": cx / width, "y": cy / height},
+                            }
+                            hand_frame_count += 1
 
                 previous_gray = gray
                 frames.append(output_frame)
                 frame_index += 1
+                if max_sampled_frames > 0 and len(frames) >= max_sampled_frames:
+                    break
         finally:
             capture.release()
 
@@ -182,9 +241,12 @@ def main() -> None:
             ok, frame = capture.read()
             if not ok:
                 break
-            if frame_index % max(1, args.frame_step) != 0:
+            if _should_stop_for_duration(frame_index):
+                break
+            if frame_index % frame_step != 0:
                 frame_index += 1
                 continue
+            frame = _resize_for_processing(frame)
 
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             hand_result = hands.process(rgb)
@@ -227,6 +289,8 @@ def main() -> None:
 
             frames.append(output_frame)
             frame_index += 1
+            if max_sampled_frames > 0 and len(frames) >= max_sampled_frames:
+                break
     finally:
         capture.release()
         hands.close()

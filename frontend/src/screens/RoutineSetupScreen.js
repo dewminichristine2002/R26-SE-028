@@ -525,16 +525,16 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1 }) => {
 
             <View style={styles.pickerButtonRow}>
               <TouchableOpacity
-                style={styles.pickerCancelButton}
-                onPress={() => setShowTimePicker(false)}
-              >
-                <Text style={[styles.pickerCancelText, { fontSize: 20 * textScale }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={styles.pickerConfirmButton}
                 onPress={saveTimeFromPicker}
               >
                 <Text style={[styles.pickerConfirmText, { fontSize: 20 * textScale }]}>Set</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pickerCancelButton}
+                onPress={() => setShowTimePicker(false)}
+              >
+                <Text style={[styles.pickerCancelText, { fontSize: 20 * textScale }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>

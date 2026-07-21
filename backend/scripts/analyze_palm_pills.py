@@ -141,6 +141,137 @@ def _find_components(mask: np.ndarray, image_width: int, image_height: int) -> l
     return components[:12]
 
 
+def _component_iou(first: dict[str, Any], second: dict[str, Any]) -> float:
+    ax1 = float(first.get("x") or 0)
+    ay1 = float(first.get("y") or 0)
+    ax2 = ax1 + float(first.get("width") or 0)
+    ay2 = ay1 + float(first.get("height") or 0)
+    bx1 = float(second.get("x") or 0)
+    by1 = float(second.get("y") or 0)
+    bx2 = bx1 + float(second.get("width") or 0)
+    by2 = by1 + float(second.get("height") or 0)
+
+    intersection_width = max(0.0, min(ax2, bx2) - max(ax1, bx1))
+    intersection_height = max(0.0, min(ay2, by2) - max(ay1, by1))
+    intersection = intersection_width * intersection_height
+    first_area = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    second_area = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = first_area + second_area - intersection
+    return intersection / union if union > 0 else 0.0
+
+
+def _find_components_cv2(arr: np.ndarray) -> list[dict[str, Any]]:
+    try:
+        import cv2
+    except Exception:
+        return []
+
+    height, width, _ = arr.shape
+    image_area = max(1, width * height)
+    min_area = max(35, int(image_area * 0.00035))
+    max_area = max(min_area + 1, int(image_area * 0.08))
+
+    rgb_u8 = np.clip(arr, 0, 255).astype(np.uint8)
+    gray = cv2.cvtColor(rgb_u8, cv2.COLOR_RGB2GRAY)
+    hsv = cv2.cvtColor(rgb_u8, cv2.COLOR_RGB2HSV)
+    saturation = hsv[:, :, 1]
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    masks = []
+    _, otsu = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    masks.extend([otsu, cv2.bitwise_not(otsu)])
+
+    adaptive = cv2.adaptiveThreshold(
+        blurred,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        3,
+    )
+    masks.extend([adaptive, cv2.bitwise_not(adaptive)])
+
+    sat_threshold = max(22, int(np.percentile(saturation, 68)))
+    masks.append((saturation > sat_threshold).astype(np.uint8) * 255)
+
+    median_gray = float(np.median(blurred))
+    lower = int(max(0, 0.66 * median_gray))
+    upper = int(min(255, 1.33 * median_gray + 20))
+    edges = cv2.Canny(blurred, lower, upper)
+    masks.append(cv2.dilate(edges, np.ones((5, 5), np.uint8), iterations=1))
+
+    morph_kernel = np.ones((5, 5), np.uint8)
+    candidates: list[dict[str, Any]] = []
+    for raw_mask in masks:
+        mask_u8 = cv2.morphologyEx(raw_mask, cv2.MORPH_OPEN, morph_kernel)
+        mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_CLOSE, morph_kernel)
+        contours, _ = cv2.findContours(mask_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for contour in contours:
+            area = float(cv2.contourArea(contour))
+            if area < min_area or area > max_area:
+                continue
+
+            x, y, box_width, box_height = cv2.boundingRect(contour)
+            if box_width < 6 or box_height < 6:
+                continue
+            if x <= 1 or y <= 1 or x + box_width >= width - 1 or y + box_height >= height - 1:
+                continue
+
+            bbox_area = max(1, box_width * box_height)
+            fill_ratio = area / bbox_area
+            aspect = max(box_width / max(1, box_height), box_height / max(1, box_width))
+            if fill_ratio < 0.12 or aspect > 6.5:
+                continue
+
+            perimeter = max(1.0, float(cv2.arcLength(contour, True)))
+            circularity = (4.0 * np.pi * area) / max(1.0, perimeter * perimeter)
+            hull = cv2.convexHull(contour)
+            hull_area = max(1.0, float(cv2.contourArea(hull)))
+            solidity = area / hull_area
+            if solidity < 0.42:
+                continue
+
+            score = (
+                min(1.0, area / max(min_area * 16, 1))
+                + min(1.0, fill_ratio)
+                + min(1.0, solidity)
+                + min(1.0, circularity)
+                - max(0.0, aspect - 3.5) * 0.12
+            )
+            confidence = round(float(max(0.35, min(1.0, score / 4.0))), 4)
+
+            candidates.append(
+                {
+                    "x": round(x / width, 4),
+                    "y": round(y / height, 4),
+                    "width": round(box_width / width, 4),
+                    "height": round(box_height / height, 4),
+                    "pixelArea": int(round(area)),
+                    "boxPixelWidth": int(box_width),
+                    "boxPixelHeight": int(box_height),
+                    "areaRatio": round(float(area / image_area), 4),
+                    "fillRatio": round(float(fill_ratio), 4),
+                    "aspect": round(float(aspect), 4),
+                    "circularity": round(float(circularity), 4),
+                    "solidity": round(float(solidity), 4),
+                    "confidence": confidence,
+                    "source": "background-independent-contour",
+                }
+            )
+
+    candidates.sort(key=lambda item: float(item.get("confidence") or 0), reverse=True)
+    selected: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if any(_component_iou(candidate, existing) > 0.35 for existing in selected):
+            continue
+        selected.append(candidate)
+        if len(selected) >= 12:
+            break
+
+    return selected
+
+
 def _component_count_estimate(
     components: list[dict[str, Any]],
     image_area: int,
@@ -430,14 +561,47 @@ def _fuse_counts(
     if detector_prediction and detector_prediction.get("available"):
         detector_count = int(detector_prediction.get("count") or 0)
         detector_confidence = float(detector_prediction.get("confidence") or 0)
-        return {
-            "count": detector_count,
-            "confidence": detector_confidence,
-            "countSource": "pill-detector",
-            "modelAccepted": False,
-            "modelAgreement": None,
-            "modelConfidenceThreshold": model_confidence_threshold,
-        }
+        if detector_count > 0:
+            model_count = int(model_prediction.get("count") or 0)
+            model_confidence = float(model_prediction.get("confidence") or 0)
+            model_is_confident = bool(model_prediction.get("available")) and model_confidence >= model_confidence_threshold
+            if (
+                image_count > 0
+                and image_count != detector_count
+                and model_is_confident
+                and model_count == image_count
+            ):
+                return {
+                    "count": image_count,
+                    "confidence": round(float((image_confidence + model_confidence) / 2), 4),
+                    "countSource": "hybrid-agreement-detector-disagreement",
+                    "modelAccepted": True,
+                    "modelAgreement": True,
+                    "modelConfidenceThreshold": model_confidence_threshold,
+                    "detectorAccepted": False,
+                    "detectorMissed": False,
+                }
+            if image_count > 0 and image_count != detector_count and detector_confidence < 0.6 and image_confidence >= 0.35:
+                return {
+                    "count": image_count,
+                    "confidence": image_confidence,
+                    "countSource": "image-processing-detector-disagreement",
+                    "modelAccepted": False,
+                    "modelAgreement": None,
+                    "modelConfidenceThreshold": model_confidence_threshold,
+                    "detectorAccepted": False,
+                    "detectorMissed": False,
+                }
+            return {
+                "count": detector_count,
+                "confidence": detector_confidence,
+                "countSource": "pill-detector",
+                "modelAccepted": False,
+                "modelAgreement": None,
+                "modelConfidenceThreshold": model_confidence_threshold,
+                "detectorAccepted": True,
+                "detectorMissed": False,
+            }
 
     if not model_prediction.get("available"):
         return {
@@ -447,11 +611,24 @@ def _fuse_counts(
             "modelAccepted": False,
             "modelAgreement": None,
             "modelConfidenceThreshold": model_confidence_threshold,
+            "detectorAccepted": False,
+            "detectorMissed": bool(detector_prediction and detector_prediction.get("available")),
         }
 
     model_count = int(model_prediction.get("count") or 0)
     model_confidence = float(model_prediction.get("confidence") or 0)
     model_agrees = model_count == image_count
+    if model_confidence < model_confidence_threshold:
+        return {
+            "count": image_count,
+            "confidence": image_confidence,
+            "countSource": "image-processing-model-low-confidence",
+            "modelAccepted": False,
+            "modelAgreement": model_agrees,
+            "modelConfidenceThreshold": model_confidence_threshold,
+            "detectorAccepted": False,
+            "detectorMissed": bool(detector_prediction and detector_prediction.get("available")),
+        }
 
     if model_agrees:
         return {
@@ -461,6 +638,8 @@ def _fuse_counts(
             "modelAccepted": True,
             "modelAgreement": True,
             "modelConfidenceThreshold": model_confidence_threshold,
+            "detectorAccepted": False,
+            "detectorMissed": bool(detector_prediction and detector_prediction.get("available")),
         }
 
     return {
@@ -470,6 +649,8 @@ def _fuse_counts(
         "modelAccepted": True,
         "modelAgreement": False,
         "modelConfidenceThreshold": model_confidence_threshold,
+        "detectorAccepted": False,
+        "detectorMissed": bool(detector_prediction and detector_prediction.get("available")),
     }
 
 
@@ -527,7 +708,15 @@ def analyze(image_base64: str, expected_count: float | None = None) -> dict[str,
     mask = mask & usable_area
 
     mask = _clean_mask(mask)
-    components = _find_components(mask, width, height)
+    legacy_components = _find_components(mask, width, height)
+    contour_components = _find_components_cv2(arr)
+    components = []
+    for component in [*legacy_components, *contour_components]:
+        if any(_component_iou(component, existing) > 0.35 for existing in components):
+            continue
+        components.append(component)
+    components.sort(key=lambda item: float(item.get("confidence") or 0), reverse=True)
+    components = components[:12]
     image_processing_count, estimated_components, image_processing_confidence = _component_count_estimate(
         components,
         width * height,
@@ -545,6 +734,8 @@ def analyze(image_base64: str, expected_count: float | None = None) -> dict[str,
         "imageProcessing": {
             "detectedCount": image_processing_count,
             "rawComponentCount": len(components),
+            "legacyComponentCount": len(legacy_components),
+            "contourComponentCount": len(contour_components),
             "confidence": image_processing_confidence,
             "maskCoverage": round(float(mask.mean()), 4),
             "backgroundRgb": [int(round(value)) for value in background.tolist()],
@@ -560,7 +751,11 @@ def analyze(image_base64: str, expected_count: float | None = None) -> dict[str,
             "agreement": fused_count["modelAgreement"],
             "confidenceThreshold": fused_count["modelConfidenceThreshold"],
         },
-        "detectorAnalysis": detector_prediction,
+        "detectorAnalysis": {
+            **detector_prediction,
+            "accepted": fused_count.get("detectorAccepted", False),
+            "missed": fused_count.get("detectorMissed", False),
+        },
     }
     result.update(_build_count_status(fused_count["count"], expected_count))
 
