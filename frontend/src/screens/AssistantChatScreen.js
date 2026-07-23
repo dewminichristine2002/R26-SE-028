@@ -172,7 +172,7 @@ const AssistantProgressCard = ({ progressIndex }) => {
       </View>
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
-          <ActivityIndicator size="small" color="#2563EB" />
+          <ActivityIndicator size="small" color="#2f6654" />
           <Text style={styles.progressTitle}>{activeStage}</Text>
         </View>
         <View style={styles.progressTrack}>
@@ -867,7 +867,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
         <TextInput
           style={styles.textInput}
           placeholder={isListening ? 'I am listening\u2026' : 'Type your question here\u2026'}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#9b8a76"
           value={input}
           onChangeText={setInput}
           editable={!sending}
@@ -924,7 +924,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
 
             {loadingHistory ? (
               <View style={styles.historyLoading}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color="#2f6654" />
                 <Text style={styles.historyLoadingText}>Loading your chats\u2026</Text>
               </View>
             ) : null}
@@ -986,7 +986,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
                         </Text>
                       </View>
                       {isLoading ? (
-                        <ActivityIndicator size="small" color="#2563EB" />
+                        <ActivityIndicator size="small" color="#2f6654" />
                       ) : null}
                     </Pressable>
 
@@ -1046,7 +1046,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
               value={renameValue}
               onChangeText={setRenameValue}
               placeholder="e.g. Weekly adherence review"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#9b8a76"
               autoFocus
               maxLength={80}
               editable={!renameSaving}
@@ -1092,14 +1092,14 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: '#f7efe4' },
   header: {
     paddingTop: 34,
     paddingHorizontal: 18,
-    paddingBottom: 14,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: '#eadfcd',
+    backgroundColor: '#f7efe4',
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -1118,42 +1118,78 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#fffdf8',
     marginLeft: 8,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: '#c6ddce',
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   headerPillIcon: { fontSize: 16, marginRight: 6 },
   headerPillText: {
-    color: '#1E3A8A',
+    color: '#2f6654',
     fontWeight: '900',
     fontSize: 16,
   },
-  backButton: { minHeight: 46, justifyContent: 'center', paddingVertical: 6, paddingRight: 8 },
-  backButtonText: { color: '#2563EB', fontWeight: '900', fontSize: 18 },
+  backButton: {
+    minHeight: 46,
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#fffdf8',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
+  },
+  backButtonText: { color: '#2f6654', fontWeight: '900', fontSize: 18 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 14,
+    minHeight: 126,
+    borderRadius: 22,
+    backgroundColor: '#2f6654',
+    borderWidth: 2,
+    borderColor: '#e5c44f',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    shadowColor: '#725e25',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
-  titleEmoji: { fontSize: 36, marginRight: 10 },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#111827' },
-  subtitle: { fontSize: 18, color: '#4B5563', marginTop: 2, lineHeight: 25 },
+  titleEmoji: {
+    width: 66,
+    height: 66,
+    borderRadius: 20,
+    backgroundColor: '#fff4b8',
+    fontSize: 34,
+    lineHeight: 66,
+    marginRight: 14,
+    textAlign: 'center',
+    overflow: 'hidden',
+  },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#FFFFFF' },
+  subtitle: { fontSize: 18, color: '#ecfff6', marginTop: 4, lineHeight: 25, fontWeight: '700' },
 
-  scroll: { flex: 1, backgroundColor: '#F9FAFB' },
-  scrollContent: { paddingVertical: 14, paddingBottom: 24 },
+  scroll: { flex: 1, backgroundColor: '#f7efe4' },
+  scrollContent: { paddingVertical: 16, paddingBottom: 26 },
   emptyState: { padding: 20 },
   emptyEmoji: { fontSize: 48, textAlign: 'center', marginBottom: 6 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
     textAlign: 'center',
     marginBottom: 8,
   },
   emptyHint: {
     fontSize: 18,
-    color: '#4B5563',
+    color: '#5e5143',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 27,
@@ -1164,22 +1200,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 64,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: '#fffdf8',
+    borderRadius: 18,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderColor: '#cfe9dd',
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  suggestionPressed: { backgroundColor: '#EFF6FF' },
+  suggestionPressed: { backgroundColor: '#e3f8ee' },
   suggestionEmoji: { fontSize: 22, marginRight: 12 },
   suggestionText: {
     flex: 1,
-    color: '#111827',
+    color: '#18352f',
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '800',
@@ -1189,16 +1225,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginTop: 18,
     padding: 14,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#fff7db',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#f1d572',
   },
   disclaimerCardIcon: { fontSize: 20, marginRight: 10 },
   disclaimerCardText: {
     flex: 1,
     fontSize: 16,
-    color: '#92400E',
+    color: '#725319',
     lineHeight: 24,
     fontWeight: '700',
   },
@@ -1212,7 +1248,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#e3f8ee',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -1222,9 +1258,9 @@ const styles = StyleSheet.create({
   progressCard: {
     flex: 1,
     maxWidth: '84%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#b8ead6',
     borderRadius: 18,
     borderBottomLeftRadius: 6,
     padding: 14,
@@ -1237,7 +1273,7 @@ const styles = StyleSheet.create({
   progressTitle: {
     flex: 1,
     marginLeft: 10,
-    color: '#111827',
+    color: '#18352f',
     fontSize: 17,
     lineHeight: 23,
     fontWeight: '900',
@@ -1245,14 +1281,14 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 7,
     borderRadius: 999,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#eadfcd',
     marginTop: 12,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#2f6654',
   },
   progressStepList: {
     marginTop: 12,
@@ -1269,18 +1305,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fff8eb',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#eadfcd',
     marginRight: 9,
   },
   progressStepDotActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
+    backgroundColor: '#2f6654',
+    borderColor: '#2f6654',
   },
   progressStepDotDone: {
-    backgroundColor: '#16A34A',
-    borderColor: '#16A34A',
+    backgroundColor: '#168464',
+    borderColor: '#168464',
   },
   progressStepDotText: {
     color: '#6B7280',
@@ -1299,18 +1335,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressStepTextActive: {
-    color: '#1D4ED8',
+    color: '#2f6654',
     fontWeight: '900',
   },
   progressStepTextDone: {
-    color: '#166534',
+    color: '#168464',
     fontWeight: '800',
   },
 
   followUpPanel: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fffdf8',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#eadfcd',
   },
   followUpHeader: {
     minHeight: 48,
@@ -1319,10 +1355,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  followUpHeaderPressed: { backgroundColor: '#E5E7EB' },
+  followUpHeaderPressed: { backgroundColor: '#f0e4d4' },
   followUpHeaderText: {
     flex: 1,
-    color: '#1F2937',
+    color: '#18352f',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1331,8 +1367,8 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: 10,
-    backgroundColor: '#DBEAFE',
-    color: '#1D4ED8',
+    backgroundColor: '#e3f8ee',
+    color: '#2f6654',
     textAlign: 'center',
     textAlignVertical: 'center',
     fontSize: 15,
@@ -1340,7 +1376,7 @@ const styles = StyleSheet.create({
     paddingTop: 3,
   },
   followUpHeaderArrow: {
-    color: '#1D4ED8',
+    color: '#2f6654',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1354,16 +1390,16 @@ const styles = StyleSheet.create({
   followUpChip: {
     flexShrink: 1,
     maxWidth: '48%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderWidth: 1.5,
-    borderColor: '#3B82F6',
+    borderColor: '#2f6654',
     paddingHorizontal: 14,
     minHeight: 52,
     paddingVertical: 12,
     borderRadius: 22,
   },
-  followUpChipPressed: { backgroundColor: '#EFF6FF' },
-  followUpText: { color: '#1D4ED8', fontWeight: '900', fontSize: 16, lineHeight: 21 },
+  followUpChipPressed: { backgroundColor: '#e3f8ee' },
+  followUpText: { color: '#2f6654', fontWeight: '900', fontSize: 16, lineHeight: 21 },
 
   errorBar: {
     backgroundColor: '#FEE2E2',
@@ -1380,20 +1416,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#eadfcd',
   },
   micButton: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#e3f8ee',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
     borderWidth: 2,
-    borderColor: '#22C55E',
+    borderColor: '#2f6654',
   },
   micButtonActive: {
     backgroundColor: '#FEE2E2',
@@ -1403,9 +1439,9 @@ const styles = StyleSheet.create({
   micLabel: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#166534',
+    color: '#2f6654',
     marginTop: 2,
-    letterSpacing: 0.4,
+    letterSpacing: 0,
   },
   micLabelActive: { color: '#991B1B' },
   textInput: {
@@ -1414,17 +1450,19 @@ const styles = StyleSheet.create({
     minHeight: 60,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fff8eb',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
     borderRadius: 28,
     fontSize: 18,
-    color: '#111827',
+    color: '#27231f',
     lineHeight: 25,
   },
   sendButton: {
     marginLeft: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#2f6654',
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1432,17 +1470,17 @@ const styles = StyleSheet.create({
     minHeight: 60,
     flexDirection: 'row',
   },
-  sendButtonDisabled: { backgroundColor: '#9CA3AF' },
+  sendButtonDisabled: { backgroundColor: '#a5aa9c' },
   sendButtonIcon: { color: '#FFFFFF', fontSize: 16, marginRight: 6 },
   sendButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 17 },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(47, 38, 27, 0.58)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
@@ -1456,28 +1494,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  modalTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
-  modalSubtitle: { fontSize: 16, lineHeight: 22, color: '#6B7280', marginTop: 2 },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: '#27231f' },
+  modalSubtitle: { fontSize: 16, lineHeight: 22, color: '#6b5a49', marginTop: 2 },
   modalCloseButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#f0e4d4',
     borderRadius: 999,
   },
-  modalCloseText: { color: '#374151', fontWeight: '900', fontSize: 16 },
+  modalCloseText: { color: '#2f6654', fontWeight: '900', fontSize: 16 },
 
   newChatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#e3f8ee',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#b8ead6',
   },
-  newChatIcon: { fontSize: 20, color: '#1D4ED8', marginRight: 12 },
-  newChatText: { color: '#1D4ED8', fontWeight: '800', fontSize: 17 },
+  newChatIcon: { fontSize: 20, color: '#2f6654', marginRight: 12 },
+  newChatText: { color: '#2f6654', fontWeight: '800', fontSize: 17 },
 
   historyLoading: {
     flexDirection: 'row',
@@ -1485,7 +1523,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
   },
-  historyLoadingText: { marginLeft: 10, color: '#4B5563', fontSize: 16, fontWeight: '700' },
+  historyLoadingText: { marginLeft: 10, color: '#5e5143', fontSize: 16, fontWeight: '700' },
   historyErrorText: {
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -1503,11 +1541,11 @@ const styles = StyleSheet.create({
   historyEmptyTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
     marginBottom: 4,
   },
   historyEmptyText: {
-    color: '#6B7280',
+    color: '#6b5a49',
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
@@ -1516,15 +1554,15 @@ const styles = StyleSheet.create({
   historyList: { paddingHorizontal: 14, paddingBottom: 16, paddingTop: 4 },
   historyRow: {
     borderRadius: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff8eb',
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#eadfcd',
     overflow: 'hidden',
   },
   historyRowCurrent: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#A5B4FC',
+    backgroundColor: '#e3f8ee',
+    borderColor: '#2f6654',
     borderWidth: 2,
   },
   historyRowTop: {
@@ -1539,25 +1577,25 @@ const styles = StyleSheet.create({
   historyRowTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
   },
   historyRowSnippet: {
     fontSize: 16,
-    color: '#4B5563',
+    color: '#5e5143',
     marginTop: 4,
     lineHeight: 23,
   },
   historyRowTime: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#7d6b59',
     marginTop: 6,
     fontWeight: '600',
   },
   historyActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: '#eadfcd',
+    backgroundColor: '#fffdf8',
   },
   historyActionBtn: {
     flex: 1,
@@ -1568,20 +1606,20 @@ const styles = StyleSheet.create({
   },
   historyRenameBtn: {
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    borderRightColor: '#eadfcd',
   },
   historyDeleteBtn: {},
   historyActionIcon: { fontSize: 16, marginRight: 6 },
   historyActionText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#2f6654',
   },
   historyDeleteText: { color: '#B91C1C' },
 
   renameOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(47, 38, 27, 0.58)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -1589,10 +1627,10 @@ const styles = StyleSheet.create({
   renameDialog: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderRadius: 20,
     padding: 22,
-    shadowColor: '#000',
+    shadowColor: '#4e3f31',
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -1602,12 +1640,12 @@ const styles = StyleSheet.create({
   renameTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: '#27231f',
     textAlign: 'center',
   },
   renameSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: '#6b5a49',
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 16,
@@ -1615,13 +1653,13 @@ const styles = StyleSheet.create({
   },
   renameInput: {
     borderWidth: 2,
-    borderColor: '#C7D2FE',
+    borderColor: '#b8ead6',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 17,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
+    color: '#27231f',
+    backgroundColor: '#fff8eb',
   },
   renameButtonRow: {
     flexDirection: 'row',
@@ -1638,15 +1676,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   renameCancelButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#f0e4d4',
     marginRight: 8,
   },
-  renameCancelText: { color: '#374151', fontWeight: '700', fontSize: 16 },
+  renameCancelText: { color: '#5e5143', fontWeight: '700', fontSize: 16 },
   renameSaveButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#2f6654',
     marginLeft: 8,
   },
-  renameSaveButtonDisabled: { backgroundColor: '#93C5FD' },
+  renameSaveButtonDisabled: { backgroundColor: '#a5aa9c' },
   renameSaveText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
 });
 

@@ -27,12 +27,12 @@ const severityStyles = {
     cardBg: '#FEF2F2',
   },
   default: {
-    border: '#3B82F6',
-    badge: '#DBEAFE',
-    badgeText: '#1E3A8A',
+    border: '#2f6654',
+    badge: '#e3f8ee',
+    badgeText: '#2f6654',
     label: 'Update',
     icon: '\u{1F4AC}',
-    cardBg: '#FFFFFF',
+    cardBg: '#fffdf8',
   },
 };
 
@@ -70,15 +70,21 @@ const SummaryCard = ({ card }) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 20,
     paddingHorizontal: 20,
     marginBottom: 16,
     borderLeftWidth: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderTopColor: '#eadfcd',
+    borderRightColor: '#eadfcd',
+    borderBottomColor: '#eadfcd',
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.1,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
   headerRow: {
@@ -91,7 +97,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '900',
-    color: '#374151',
+    color: '#18352f',
     flex: 1,
   },
   badge: {
@@ -108,13 +114,13 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 25,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
     marginTop: 4,
     lineHeight: 31,
   },
   detail: {
     fontSize: 18,
-    color: '#374151',
+    color: '#5e5143',
     marginTop: 8,
     lineHeight: 27,
   },

@@ -48,21 +48,109 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
   };
 
   const menuItems = [
-    { id: 1, label: 'Reminder', icon: '\u{1F514}' },
-    { id: 2, label: 'Allergy', icon: '\u26A0\uFE0F' },
-    { id: 3, label: 'Emotions', icon: '\u{1F60A}' },
-    { id: 4, label: 'Dashboard', icon: '\u{1F4CA}' },
+    {
+      id: 1,
+      label: 'Reminder',
+      icon: '\u{1F514}',
+      cardColor: '#e3f8ee',
+      borderColor: '#b8ead6',
+      iconBg: '#168464',
+      arrowColor: '#168464',
+    },
+    {
+      id: 2,
+      label: 'Allergy',
+      icon: '\u26A0\uFE0F',
+      cardColor: '#fff7ed',
+      borderColor: '#f3dcbf',
+      iconBg: '#985111',
+      arrowColor: '#985111',
+    },
+    {
+      id: 3,
+      label: 'Emotions',
+      icon: '\u{1F60A}',
+      cardColor: '#f3edff',
+      borderColor: '#dccff6',
+      iconBg: '#5b3ca4',
+      arrowColor: '#5b3ca4',
+    },
+    {
+      id: 4,
+      label: 'Dashboard',
+      icon: '\u{1F4CA}',
+      cardColor: '#eaf7ff',
+      borderColor: '#cae3f2',
+      iconBg: '#2576a6',
+      arrowColor: '#2576a6',
+    },
   ];
 
   const reminderMenuItems = [
-    { title: 'Routine Setup', subtitle: 'Set daily medication schedules', icon: '\u{1F4C5}' },
-    { title: 'Add Medicine', subtitle: 'Add a new medicine to track', icon: '\u2795' },
-    { title: 'Scan Pharmacy Receipt', subtitle: 'Extract medicine details from a receipt', icon: '\u{1F4F7}' },
-    { title: 'Medicine List', subtitle: 'View all saved medicines', icon: '\u{1F4DA}' },
-    { title: 'Medicine Stock', subtitle: 'Check remaining medicine stock', icon: '\u{1F4E6}' },
-    { title: 'Tablet Identifier', subtitle: 'Identify a tablet by photo', icon: '\u{1F50D}' },
-    { title: 'Schedule Board', subtitle: 'See the current reminder board', icon: '\u{1F4CB}' },
-    { title: 'Safety Center', subtitle: 'Review warnings and safety tips', icon: '\u26A0\uFE0F' },
+    {
+      title: 'Schedule Board',
+      subtitle: 'See today medicines',
+      icon: '\u{1F5D3}\uFE0F',
+      cardColor: '#e3f8ee',
+      borderColor: '#b8ead6',
+      iconBg: '#168464',
+      arrowColor: '#168464',
+    },
+    {
+      title: 'Routine Setup',
+      subtitle: 'Set meal times',
+      icon: '\u23F0',
+      cardColor: '#eaf6ff',
+      borderColor: '#cae1f5',
+      iconBg: '#256da7',
+      arrowColor: '#256da7',
+    },
+    {
+      title: 'Add Medicine',
+      subtitle: 'Add new medicine',
+      icon: '\u{1F48A}',
+      cardColor: '#fff7ed',
+      borderColor: '#f3dcbf',
+      iconBg: '#985111',
+      arrowColor: '#985111',
+    },
+    {
+      title: 'Medicine List',
+      subtitle: 'View medicines',
+      icon: '\u{1F4CB}',
+      cardColor: '#f3edff',
+      borderColor: '#dccff6',
+      iconBg: '#5b3ca4',
+      arrowColor: '#5b3ca4',
+    },
+    {
+      title: 'Medicine Stock',
+      subtitle: 'Check medicine amount',
+      icon: '\u{1F4E6}',
+      cardColor: '#e7f8fb',
+      borderColor: '#bee9ee',
+      iconBg: '#117785',
+      arrowColor: '#117785',
+    },
+    {
+      title: 'Tablet Identifier',
+      subtitle: 'Take photo to find name',
+      icon: 'ID',
+      cardColor: '#eaf7ff',
+      borderColor: '#cae3f2',
+      iconBg: '#2576a6',
+      arrowColor: '#2576a6',
+      isTextIcon: true,
+    },
+    {
+      title: 'Safety Center',
+      subtitle: 'See safety alerts',
+      icon: '\u{1F6E1}\uFE0F',
+      cardColor: '#fff1f4',
+      borderColor: '#efccd3',
+      iconBg: '#a93447',
+      arrowColor: '#a93447',
+    },
   ];
 
   const handleButtonPress = (item) => {
@@ -846,21 +934,63 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
     }
 
     return (
-      <ScrollView contentContainerStyle={styles.reminderContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.backgroundBlobTop} />
-        <View style={styles.backgroundBlobBottom} />
+      <ScrollView
+        style={styles.reminderScroll}
+        contentContainerStyle={styles.reminderContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.reminderTopBar}>
+          <View style={styles.reminderLogoPill}>
+            <Image source={elderMedsLogo} style={styles.reminderLogo} resizeMode="contain" />
+          </View>
 
-        <View style={styles.reminderHeaderCard}>
-          <Text style={styles.reminderEyebrow}>ElderMeds Planner</Text>
-          <Text style={[styles.reminderTitle, { fontSize: 36 * textScale, lineHeight: 42 * textScale }]}>
-            Intelligent{`\n`}Medication Reminder
-          </Text>
-          <Text style={styles.reminderSubtitle}>
-            Keep routines simple. Pick an action below to manage reminders.
-          </Text>
+          <View style={styles.reminderTopActions}>
+            <TouchableOpacity
+              style={[styles.reminderTopIconButton, styles.reminderProfileButton]}
+              onPress={() => onOpenProfile?.()}
+              activeOpacity={0.86}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
+              accessibilityHint="Opens your ElderMeds profile"
+            >
+              <Text style={styles.reminderTopIcon}>{'\u{1F464}'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reminderTopIconButton, styles.reminderHomeButton]}
+              onPress={() => {
+                setShowReminderMenu(false);
+                setActiveReminderView('menu');
+              }}
+              activeOpacity={0.86}
+              accessibilityRole="button"
+              accessibilityLabel="Back to home"
+              accessibilityHint="Returns to the main home menu"
+            >
+              <Text style={styles.reminderTopIcon}>{'\u{1F3E0}'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
+        <Text style={styles.reminderMenuHeading}>Reminder Menu</Text>
+
+        <View style={styles.reminderHeroBanner}>
+          <View style={styles.reminderHeroIconTile}>
+            <Text style={styles.reminderHeroIcon}>{'\u{1F514}'}</Text>
+          </View>
+          <Text
+            style={[styles.reminderTitle, { fontSize: 34 * textScale, lineHeight: 42 * textScale }]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            Medicine{`\n`}Reminder
+          </Text>
+        </View>
+
+        <View style={styles.reminderActionHeader}>
+          <Text style={styles.reminderInfoText}>Choose Action</Text>
           <View style={styles.textModeRow}>
-            <Text style={styles.textModeLabel}>Text Size</Text>
+            <Text style={styles.textModeLabel}>Text</Text>
             <TouchableOpacity
               style={[styles.textModeButton, !largeTextMode && styles.textModeButtonActive]}
               onPress={() => setLargeTextMode(false)}
@@ -882,46 +1012,52 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
           </View>
         </View>
 
-        <View style={styles.reminderInfoStrip}>
-          <Text style={styles.reminderInfoText}>Quick Actions</Text>
-          <Text style={styles.reminderInfoBadge}>{reminderMenuItems.length} options</Text>
-        </View>
-
         <View style={styles.reminderButtonList}>
           {availableReminderMenuItems.map((item) => (
             <TouchableOpacity
               key={item.title}
-              style={styles.reminderButton}
+              style={[
+                styles.reminderButton,
+                {
+                  backgroundColor: item.cardColor,
+                  borderColor: item.borderColor,
+                },
+              ]}
               activeOpacity={0.86}
               onPress={() => handleReminderMenuPress(item.title)}
               accessibilityRole="button"
               accessibilityLabel={item.title}
               accessibilityHint={item.subtitle}
             >
-              <View style={styles.reminderButtonIconWrap}>
-                <Text style={styles.reminderButtonIcon}>{item.icon}</Text>
+              <View style={[styles.reminderButtonIconWrap, { backgroundColor: item.iconBg }]}>
+                <Text style={[styles.reminderButtonIcon, item.isTextIcon && styles.reminderButtonTextIcon]}>
+                  {item.icon}
+                </Text>
               </View>
               <View style={styles.reminderButtonTextWrap}>
-                <Text style={[styles.reminderButtonText, { fontSize: 20 * textScale }]}>{item.title}</Text>
-                <Text style={[styles.reminderButtonSubText, { fontSize: 13 * textScale }]}>{item.subtitle}</Text>
+                <Text
+                  style={[styles.reminderButtonText, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  style={[styles.reminderButtonSubText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
+                  {item.subtitle}
+                </Text>
               </View>
-              <Text style={styles.reminderButtonArrow}>›</Text>
+              <View style={[styles.reminderButtonArrowWrap, { borderColor: item.borderColor }]}>
+                <Text style={[styles.reminderButtonArrow, { color: item.arrowColor }]}>{'\u203A'}</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
-
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            setShowReminderMenu(false);
-            setActiveReminderView('menu');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Back to home"
-          accessibilityHint="Returns to the main home menu"
-        >
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
       </ScrollView>
     );
   }
@@ -936,7 +1072,9 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
   return (
     <ScrollView style={styles.homeScroll} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.homeTopBar}>
-        <Image source={elderMedsLogo} style={styles.homeBrandLogo} resizeMode="contain" />
+        <View style={styles.homeLogoPill}>
+          <Image source={elderMedsLogo} style={styles.homeBrandLogo} resizeMode="contain" />
+        </View>
         <View style={styles.homeTopActions}>
           <TouchableOpacity
             style={styles.homeTopProfileButton}
@@ -966,7 +1104,14 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
       <View style={styles.homeHeroCard}>
         <View style={styles.homeHeroTextWrap}>
           <Text style={styles.homeDateText}>{todayLabel}</Text>
-          <Text style={styles.homeHeroTitle}>Good day, {firstName}</Text>
+          <Text
+            style={styles.homeHeroTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            Good day, {firstName}
+          </Text>
           <Text style={styles.homeHeroSubtitle}>Your medicine care is ready when you are.</Text>
         </View>
         <View style={styles.homeHeroBadge}>
@@ -997,8 +1142,15 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
         </View>
         <View style={styles.homePrimaryTextWrap}>
           <Text style={styles.homePrimaryEyebrow}>Main action</Text>
-          <Text style={styles.homePrimaryTitle}>Medicine Reminder</Text>
-          <Text style={styles.homePrimarySubtitle}>Open today schedule and medicine tools.</Text>
+          <Text
+            style={styles.homePrimaryTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            Medicine Reminder
+          </Text>
+          <Text style={styles.homePrimarySubtitle} numberOfLines={2}>Open today schedule and medicine tools.</Text>
         </View>
         <View style={styles.homePrimaryArrowWrap}>
           <Text style={styles.homePrimaryArrow}>›</Text>
@@ -1016,21 +1168,36 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
         {menuItems.slice(1).map((item) => (
           <TouchableOpacity
             key={item.id}
-            style={[styles.homeActionCard, { backgroundColor: '#f4f9ff', borderColor: '#b9d9f2' }]}
+            style={[
+              styles.homeActionCard,
+              {
+                backgroundColor: item.cardColor,
+                borderColor: item.borderColor,
+              },
+            ]}
             activeOpacity={0.88}
             onPress={() => handleButtonPress(item)}
             accessibilityRole="button"
             accessibilityLabel={item.label}
             accessibilityHint="Medicine care option"
           >
-            <View style={[styles.homeActionIconWrap, { backgroundColor: '#1f6894' }]}>
+            <View style={[styles.homeActionIconWrap, { backgroundColor: item.iconBg }]}>
               <Text style={styles.homeActionIcon}>{item.icon}</Text>
             </View>
             <View style={styles.homeActionTextWrap}>
-              <Text style={styles.homeActionTitle}>{item.label}</Text>
-              <Text style={styles.homeActionSubtitle}>Care option</Text>
+              <Text
+                style={styles.homeActionTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {item.label}
+              </Text>
+              <Text style={styles.homeActionSubtitle} numberOfLines={1}>Care option</Text>
             </View>
-            <Text style={[styles.homeActionHelper, { color: '#1f6894' }]}>Soon</Text>
+            <View style={[styles.homeActionArrowWrap, { borderColor: item.borderColor }]}>
+              <Text style={[styles.homeActionHelper, { color: item.arrowColor }]}>{'\u203A'}</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -1046,43 +1213,61 @@ const styles = StyleSheet.create({
   },
   homeScroll: {
     flex: 1,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#f7efe4',
   },
   homeContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 30,
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 28 : 22,
+    paddingBottom: 128,
   },
   homeTopBar: {
-    minHeight: 56,
+    minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
+  homeLogoPill: {
+    width: '44%',
+    minWidth: 132,
+    maxWidth: 172,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fffdf7',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#8d7355',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
   homeBrandLogo: {
-    width: 132,
-    height: 40,
+    width: 82,
+    height: 34,
     flexShrink: 1,
   },
   homeTopActions: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 8,
+    flexShrink: 0,
   },
   homeTopProfileButton: {
     width: 50,
     height: 50,
     borderRadius: 18,
-    backgroundColor: '#fbfdff',
+    backgroundColor: '#fffdf8',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#ace1ce',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.12,
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.14,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
@@ -1095,15 +1280,15 @@ const styles = StyleSheet.create({
     minWidth: 104,
     minHeight: 50,
     borderRadius: 18,
-    backgroundColor: '#fbfdff',
+    backgroundColor: '#fffdf8',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#f2d47a',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.12,
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.14,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
@@ -1123,36 +1308,36 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 3,
     borderWidth: 2,
-    borderColor: '#1f6894',
+    borderColor: '#2f6654',
     borderRightWidth: 0,
   },
   homeTopLogoutArrow: {
     position: 'absolute',
     right: 0,
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 19,
     lineHeight: 23,
     fontWeight: '900',
   },
   homeTopLogoutText: {
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '900',
   },
   homeHeroCard: {
-    minHeight: 150,
+    minHeight: 154,
     borderRadius: 24,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#2f6654',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#e5c44f',
     paddingHorizontal: 18,
     paddingVertical: 18,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.2,
+    shadowColor: '#725e25',
+    shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
     elevation: 5,
@@ -1162,7 +1347,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   homeDateText: {
-    color: '#eaf5ff',
+    color: '#fff4b8',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '900',
@@ -1176,7 +1361,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   homeHeroSubtitle: {
-    color: '#f3f9ff',
+    color: '#ecfff6',
     fontSize: 17,
     lineHeight: 24,
     fontWeight: '700',
@@ -1185,46 +1370,46 @@ const styles = StyleSheet.create({
     width: 78,
     minHeight: 92,
     borderRadius: 24,
-    backgroundColor: '#fbfdff',
+    backgroundColor: '#fff4b8',
     borderWidth: 2,
-    borderColor: '#d5eafa',
+    borderColor: '#fff9d8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homeHeroBadgeIcon: {
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 28,
     lineHeight: 32,
     fontWeight: '900',
   },
   homeHeroBadgeText: {
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 13,
     fontWeight: '900',
     marginTop: 4,
   },
   homePrimaryAction: {
     minHeight: 118,
-    borderRadius: 22,
-    backgroundColor: '#fbfdff',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#e3f8ee',
+    borderWidth: 1,
+    borderColor: '#b8ead6',
+    paddingHorizontal: 18,
     paddingVertical: 14,
     marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
   },
   homePrimaryIconWrap: {
     width: 66,
     height: 66,
-    borderRadius: 22,
-    backgroundColor: '#1f6894',
+    borderRadius: 20,
+    backgroundColor: '#168464',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -1235,23 +1420,24 @@ const styles = StyleSheet.create({
   },
   homePrimaryTextWrap: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 8,
   },
   homePrimaryEyebrow: {
-    color: '#4c6d82',
+    color: '#2f6654',
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   homePrimaryTitle: {
-    color: '#12354d',
+    color: '#18352f',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   homePrimarySubtitle: {
-    color: '#4c6d82',
+    color: '#3d3833',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -1261,14 +1447,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#fffefa',
     borderWidth: 1,
-    borderColor: '#b9d9f2',
+    borderColor: '#b8ead6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homePrimaryArrow: {
-    color: '#1f6894',
+    color: '#168464',
     fontSize: 32,
     lineHeight: 36,
     fontWeight: '900',
@@ -1277,13 +1463,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   homeSectionTitle: {
-    color: '#12354d',
+    color: '#27231f',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   homeSectionSubtitle: {
-    color: '#4c6d82',
+    color: '#5e5143',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -1293,14 +1479,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   homeActionCard: {
-    minHeight: 102,
+    minHeight: 106,
     borderRadius: 20,
-    borderWidth: 2,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    marginBottom: 13,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.1,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   homeActionIconWrap: {
     width: 58,
@@ -1311,31 +1502,42 @@ const styles = StyleSheet.create({
     marginRight: 13,
   },
   homeActionIcon: {
+    color: '#ffffff',
     fontSize: 28,
     lineHeight: 32,
   },
   homeActionTextWrap: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 8,
   },
   homeActionTitle: {
-    color: '#12354d',
+    color: '#18352f',
     fontSize: 20,
     lineHeight: 26,
     fontWeight: '900',
   },
   homeActionSubtitle: {
-    color: '#4c6d82',
+    color: '#3d3833',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '700',
     marginTop: 4,
   },
   homeActionHelper: {
-    minWidth: 46,
-    textAlign: 'right',
-    fontSize: 13,
+    fontSize: 34,
+    lineHeight: 36,
     fontWeight: '900',
+  },
+  homeActionArrowWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffefa',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   localModeBanner: {
     backgroundColor: '#fff6da',
@@ -1433,11 +1635,10 @@ const styles = StyleSheet.create({
   },
   reminderContainer: {
     flexGrow: 1,
-    backgroundColor: '#edf4fb',
-    paddingTop: 28,
-    paddingBottom: 32,
-    paddingHorizontal: 18,
-    position: 'relative',
+    backgroundColor: '#f7efe4',
+    paddingTop: Platform.OS === 'android' ? 28 : 22,
+    paddingBottom: 118,
+    paddingHorizontal: 22,
   },
   caregiverPage: {
     flex: 1,
@@ -1913,185 +2114,232 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  backgroundBlobTop: {
-    position: 'absolute',
-    top: -110,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: '#bfe9ff',
+  reminderScroll: {
+    flex: 1,
+    backgroundColor: '#f7efe4',
   },
-  backgroundBlobBottom: {
-    position: 'absolute',
-    bottom: -120,
-    left: -95,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: '#cde4ff',
-  },
-  reminderHeaderCard: {
-    width: '100%',
-    borderRadius: 24,
-    backgroundColor: '#ffffff',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    marginBottom: 18,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
-  },
-  reminderEyebrow: {
-    fontSize: 13,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: '#2c79a9',
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  reminderTitle: {
-    fontSize: 36,
-    fontWeight: '700',
-    lineHeight: 42,
-    color: '#0a4b70',
-  },
-  reminderSubtitle: {
-    marginTop: 10,
-    fontSize: 15,
-    lineHeight: 21,
-    color: '#4c6d82',
-  },
-  textModeRow: {
-    marginTop: 12,
+  reminderTopBar: {
+    minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  textModeLabel: {
-    marginRight: 10,
-    color: '#355f7a',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  textModeButton: {
-    minWidth: 42,
-    height: 34,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: '#eef6fc',
+  reminderLogoPill: {
+    width: '44%',
+    minWidth: 132,
+    maxWidth: 172,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fffdf7',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    shadowColor: '#8d7355',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
+  reminderLogo: {
+    width: 82,
+    height: 34,
+  },
+  reminderTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+  reminderTopIconButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#fffdf8',
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
+  },
+  reminderProfileButton: {
+    borderColor: '#ace1ce',
+  },
+  reminderHomeButton: {
+    borderColor: '#f2d47a',
+  },
+  reminderTopIcon: {
+    fontSize: 27,
+    lineHeight: 31,
+  },
+  reminderMenuHeading: {
+    color: '#27231f',
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: '900',
+    marginBottom: 20,
+  },
+  reminderHeroBanner: {
+    minHeight: 156,
+    borderRadius: 24,
+    backgroundColor: '#2f6654',
+    borderWidth: 2,
+    borderColor: '#e5c44f',
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#725e25',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
+  },
+  reminderHeroIconTile: {
+    width: 82,
+    height: 82,
+    borderRadius: 24,
+    backgroundColor: '#fee48a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 22,
     borderWidth: 1,
-    borderColor: '#d5e9f9',
+    borderColor: '#fff5be',
+  },
+  reminderHeroIcon: {
+    fontSize: 46,
+    lineHeight: 50,
+  },
+  reminderTitle: {
+    flex: 1,
+    color: '#ffffff',
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  reminderActionHeader: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  reminderInfoText: {
+    flexShrink: 1,
+    color: '#28231f',
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: '900',
+  },
+  textModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    marginLeft: 10,
+  },
+  textModeLabel: {
+    marginRight: 8,
+    color: '#493f35',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  textModeButton: {
+    minWidth: 50,
+    height: 50,
+    paddingHorizontal: 11,
+    borderRadius: 13,
+    backgroundColor: '#fffdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 7,
+    borderWidth: 1,
+    borderColor: '#e3d6c3',
   },
   textModeButtonActive: {
-    backgroundColor: '#1f6894',
-    borderColor: '#1f6894',
+    backgroundColor: '#2f6654',
+    borderColor: '#2f6654',
   },
   textModeButtonText: {
-    color: '#3e637b',
-    fontWeight: '700',
-    fontSize: 13,
+    color: '#42372e',
+    fontWeight: '900',
+    fontSize: 17,
+    lineHeight: 22,
   },
   textModeButtonTextActive: {
     color: '#ffffff',
-  },
-  reminderInfoStrip: {
-    marginBottom: 12,
-    borderRadius: 14,
-    backgroundColor: '#d8edff',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  reminderInfoText: {
-    fontSize: 13,
-    color: '#2f5f80',
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  reminderInfoBadge: {
-    fontSize: 12,
-    color: '#16486a',
-    fontWeight: '700',
-    backgroundColor: '#eef7ff',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   reminderButtonList: {
     width: '100%',
   },
   reminderButton: {
-    backgroundColor: '#8ad0f7',
+    minHeight: 108,
     borderRadius: 20,
-    minHeight: 88,
-    marginBottom: 14,
-    paddingHorizontal: 12,
+    marginBottom: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#a8dcfb',
-    shadowColor: '#175b8d',
-    shadowOpacity: 0.16,
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.12,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   reminderButtonIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#edf8ff',
+    width: 68,
+    height: 68,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 18,
   },
   reminderButtonIcon: {
-    fontSize: 20,
+    color: '#ffffff',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '900',
+  },
+  reminderButtonTextIcon: {
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: 0,
   },
   reminderButtonTextWrap: {
     flex: 1,
-    paddingRight: 6,
+    minWidth: 0,
+    paddingRight: 12,
   },
   reminderButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#083350',
+    color: '#18352f',
+    fontWeight: '900',
+    letterSpacing: 0,
   },
   reminderButtonSubText: {
-    marginTop: 2,
-    fontSize: 13,
-    color: '#255574',
+    marginTop: 5,
+    color: '#3d3833',
+    fontWeight: '800',
+  },
+  reminderButtonArrowWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fffefa',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   reminderButtonArrow: {
-    fontSize: 28,
-    color: '#1b5f88',
-    marginLeft: 10,
-    marginBottom: 2,
-  },
-  backButton: {
-    marginTop: 10,
-    alignSelf: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
-    shadowColor: '#175b8d',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#1e4f72',
-    fontWeight: '600',
+    fontSize: 40,
+    lineHeight: 42,
+    fontWeight: '900',
   },
   addMedicineContainer: {
     flexGrow: 1,
