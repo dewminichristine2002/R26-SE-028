@@ -1,4 +1,7 @@
 const { createMoodCheckin: insertMoodCheckin } = require('../repositories/moodCheckinRepository');
+const { getProfileByElderId } = require('../repositories/profileRepository');
+const { createAlertsForCaregivers } = require('../repositories/alertRepository');
+const { evaluateAlertNeed } = require('../services/alertService');
 
 function validateMoodCheckinPayload(body) {
   const errors = [];
@@ -48,13 +51,46 @@ async function createMoodCheckin(req, res) {
       });
     }
 
-    // Store only the lightweight daily mood check-in for the new Component 4 flow.
     const created = await insertMoodCheckin(validation.value);
+    const isNegativeMood =
+      validation.value.moodScore <= 2 ||
+      /\b(terrible|bad|sad|lonely|alone|anxious|angry|upset|down)\b/i.test(validation.value.moodLabel);
+    let alertsCreated = 0;
+
+    if (isNegativeMood) {
+      const detectedEmotion = /\b(lonely|alone)\b/i.test(validation.value.moodLabel) ? 'lonely' : 'sad';
+      const alertPayload = evaluateAlertNeed({
+        elderId: validation.value.userId,
+        caregiverId: null,
+        detectedEmotion,
+        riskLevel: validation.value.moodScore <= 1 ? 'high' : 'medium',
+        negativeMoodCount7d: 0,
+      });
+
+      if (alertPayload) {
+        const profile = await getProfileByElderId(validation.value.userId).catch(() => null);
+        const createdAlerts = await createAlertsForCaregivers({
+          elderId: validation.value.userId,
+          caregiverIds: profile?.caregiverIds || [],
+          sessionId: null,
+          alertPayload,
+          explanation: {
+            source: 'mood_checkin',
+            moodLabel: validation.value.moodLabel,
+            moodScore: validation.value.moodScore,
+            detectedEmotion,
+            concernSummary: alertPayload.concernSummary || null,
+          },
+        });
+        alertsCreated = createdAlerts.length;
+      }
+    }
 
     return res.status(201).json({
       success: true,
       message: 'Mood check-in saved successfully',
       data: created,
+      alertsCreated,
     });
   } catch (error) {
     return res.status(500).json({

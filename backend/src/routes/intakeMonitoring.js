@@ -73,10 +73,30 @@ const runPythonJsonScript = (scriptName, payload, timeoutMs = 20000, purpose = '
     let stdout = '';
     let stderr = '';
     let didTimeout = false;
+    let settled = false;
+
+    const rejectOnce = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    };
+
+    const resolveOnce = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      resolve(value);
+    };
+
     const timeout = setTimeout(() => {
       didTimeout = true;
       child.kill();
-      reject(createScriptTimeoutError(scriptName));
+      rejectOnce(createScriptTimeoutError(scriptName));
     }, timeoutMs);
 
     child.stdout.on('data', (data) => {
@@ -88,36 +108,45 @@ const runPythonJsonScript = (scriptName, payload, timeoutMs = 20000, purpose = '
     });
 
     child.on('error', (error) => {
-      clearTimeout(timeout);
       if (didTimeout) {
         return;
       }
-      reject(error);
+      rejectOnce(error);
+    });
+
+    child.stdin.on('error', (error) => {
+      if (didTimeout) {
+        return;
+      }
+      const details = [stderr.trim(), error.message].filter(Boolean).join(' ');
+      rejectOnce(new Error(details || `${scriptName} closed before it could read the request payload.`));
     });
 
     child.on('close', (code) => {
-      clearTimeout(timeout);
-      if (didTimeout) {
+      if (didTimeout || settled) {
         return;
       }
       try {
         const parsed = JSON.parse(stdout || '{}');
         if (code !== 0 && parsed?.error) {
-          reject(new Error(parsed.error));
+          rejectOnce(new Error(parsed.error));
           return;
         }
         if (code !== 0) {
-          reject(new Error(stderr || 'Palm photo analysis failed.'));
+          rejectOnce(new Error(stderr || `${scriptName} failed.`));
           return;
         }
-        resolve(parsed);
+        resolveOnce(parsed);
       } catch (error) {
-        reject(new Error(stderr || error.message || 'Invalid palm photo analysis response.'));
+        rejectOnce(new Error(stderr || error.message || 'Invalid palm photo analysis response.'));
       }
     });
 
-    child.stdin.write(JSON.stringify(payload));
-    child.stdin.end();
+    try {
+      child.stdin.end(JSON.stringify(payload));
+    } catch (error) {
+      rejectOnce(error);
+    }
   });
 
 const runPalmAnalysis = (payload) => runPythonJsonScript('analyze_palm_pills.py', payload, 60000, 'ml');
