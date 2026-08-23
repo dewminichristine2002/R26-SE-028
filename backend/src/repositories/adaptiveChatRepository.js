@@ -12,6 +12,12 @@ function mapSession(row) {
     turnCount: Number(row.turnCount || 0),
     isComplete: Boolean(row.isComplete),
     finalEmotionalState: row.finalEmotionalState,
+    currentQuestionId: row.currentQuestionId == null ? null : Number(row.currentQuestionId),
+    finalConfidence: row.finalConfidence == null ? null : Number(row.finalConfidence),
+    conversationEngagement: row.conversationEngagement,
+    recommendedActivity: row.recommendedActivity,
+    caregiverNotificationRequired: Boolean(row.caregiverNotificationRequired),
+    completedAt: row.completedAt,
     riskLevel: row.riskLevel,
     supportDirective: row.supportDirective,
     createdAt: row.createdAt,
@@ -31,12 +37,22 @@ function mapTurn(row) {
     userAnswer: row.userAnswer,
     detectedState: row.detectedState,
     confidenceScore: row.confidenceScore == null ? null : Number(row.confidenceScore),
+    questionNumber: row.questionNumber == null ? null : Number(row.questionNumber),
+    questionCode: row.questionCode,
+    questionText: row.questionText,
+    answerPolarity: row.answerPolarity,
+    riskIndicator: row.riskIndicator,
+    detectionSource: row.detectionSource,
+    modelVersion: row.modelVersion,
+    analysisMetadata: row.analysisMetadata,
+    selectionMetadata: row.selectionMetadata,
     createdAt: row.createdAt,
   };
 }
 
-async function getAdaptiveChatSessionById(sessionId) {
-  const result = await query(
+async function getAdaptiveChatSessionById(sessionId, client = null, { forUpdate = false } = {}) {
+  const executor = client || { query };
+  const result = await executor.query(
     `
       SELECT
         session_id AS "sessionId",
@@ -45,6 +61,12 @@ async function getAdaptiveChatSessionById(sessionId) {
         turn_count AS "turnCount",
         is_complete AS "isComplete",
         final_emotional_state AS "finalEmotionalState",
+        current_question_id AS "currentQuestionId",
+        final_confidence AS "finalConfidence",
+        conversation_engagement AS "conversationEngagement",
+        recommended_activity AS "recommendedActivity",
+        caregiver_notification_required AS "caregiverNotificationRequired",
+        completed_at AS "completedAt",
         risk_level AS "riskLevel",
         support_directive AS "supportDirective",
         created_at AS "createdAt",
@@ -52,6 +74,7 @@ async function getAdaptiveChatSessionById(sessionId) {
       FROM adaptive_chat_sessions
       WHERE session_id = $1
       LIMIT 1
+      ${forUpdate ? 'FOR UPDATE' : ''}
     `,
     [sessionId]
   );
@@ -59,16 +82,17 @@ async function getAdaptiveChatSessionById(sessionId) {
   return mapSession(result.rows[0]);
 }
 
-async function startAdaptiveChatSession(userId, initialState = 'neutral') {
+async function startAdaptiveChatSession(userId, initialState = 'neutral', currentQuestionId = null) {
   const result = await query(
     `
       INSERT INTO adaptive_chat_sessions (
         user_id,
         current_state,
         turn_count,
-        is_complete
+        is_complete,
+        current_question_id
       )
-      VALUES ($1, $2, 0, FALSE)
+      VALUES ($1, $2, 0, FALSE, $3)
       RETURNING
         session_id AS "sessionId",
         user_id AS "userId",
@@ -76,15 +100,69 @@ async function startAdaptiveChatSession(userId, initialState = 'neutral') {
         turn_count AS "turnCount",
         is_complete AS "isComplete",
         final_emotional_state AS "finalEmotionalState",
+        current_question_id AS "currentQuestionId",
+        final_confidence AS "finalConfidence",
+        conversation_engagement AS "conversationEngagement",
+        recommended_activity AS "recommendedActivity",
+        caregiver_notification_required AS "caregiverNotificationRequired",
+        completed_at AS "completedAt",
         risk_level AS "riskLevel",
         support_directive AS "supportDirective",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
     `,
-    [userId, initialState]
+    [userId, initialState, currentQuestionId]
   );
 
   return mapSession(result.rows[0]);
+}
+
+async function getRecentCompletedAdaptiveEmotionHistory(userId, days = 7, limit = 10, client = null) {
+  const executor = client || { query };
+  const result = await executor.query(
+    `SELECT final_emotional_state AS "detectedEmotionalState",
+            final_confidence AS "confidenceScore", risk_level AS "riskLevel",
+            completed_at AS "completedAt"
+     FROM adaptive_chat_sessions
+     WHERE user_id = $1 AND is_complete = TRUE AND completed_at IS NOT NULL
+       AND final_emotional_state IS NOT NULL
+       AND completed_at >= NOW() - ($2::TEXT || ' days')::INTERVAL
+     ORDER BY completed_at DESC
+     LIMIT $3`,
+    [userId, String(days), limit]
+  );
+  return result.rows;
+}
+
+async function getAdaptiveChatTurns(sessionId, client = null) {
+  const executor = client || { query };
+  const result = await executor.query(
+    `SELECT
+       turn.turn_id AS "turnId",
+       turn.session_id AS "sessionId",
+       turn.question_id AS "questionId",
+       turn.user_answer AS "userAnswer",
+       turn.detected_state AS "detectedState",
+       turn.confidence_score AS "confidenceScore",
+       turn.question_number AS "questionNumber",
+       turn.question_code AS "questionCode",
+       turn.question_text AS "questionText",
+       turn.answer_polarity AS "answerPolarity",
+       turn.risk_indicator AS "riskIndicator",
+       turn.detection_source AS "detectionSource",
+       turn.model_version AS "modelVersion",
+       turn.analysis_metadata AS "analysisMetadata",
+       turn.selection_metadata AS "selectionMetadata",
+       turn.created_at AS "createdAt",
+       bank.assessment_dimension AS "assessmentDimension"
+     FROM adaptive_chat_turns turn
+     LEFT JOIN adaptive_question_bank bank ON bank.question_id = turn.question_id
+     WHERE turn.session_id = $1
+     ORDER BY turn.question_number ASC NULLS LAST, turn.created_at ASC, turn.turn_id ASC`,
+    [sessionId]
+  );
+
+  return result.rows.map((row) => ({ ...mapTurn(row), assessmentDimension: row.assessmentDimension }));
 }
 
 async function getUsedQuestionIds(sessionId, client = null) {
@@ -109,6 +187,15 @@ async function insertAdaptiveChatTurn(client, {
   userAnswer,
   detectedState,
   confidenceScore,
+  questionNumber,
+  questionCode,
+  questionText,
+  answerPolarity,
+  riskIndicator,
+  detectionSource,
+  modelVersion,
+  analysisMetadata,
+  selectionMetadata,
 }) {
   const result = await client.query(
     `
@@ -117,9 +204,18 @@ async function insertAdaptiveChatTurn(client, {
         question_id,
         user_answer,
         detected_state,
-        confidence_score
+        confidence_score,
+        question_number,
+        question_code,
+        question_text,
+        answer_polarity,
+        risk_indicator,
+        detection_source,
+        model_version,
+        analysis_metadata,
+        selection_metadata
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)
       RETURNING
         turn_id AS "turnId",
         session_id AS "sessionId",
@@ -127,9 +223,24 @@ async function insertAdaptiveChatTurn(client, {
         user_answer AS "userAnswer",
         detected_state AS "detectedState",
         confidence_score AS "confidenceScore",
+        question_number AS "questionNumber",
+        question_code AS "questionCode",
+        question_text AS "questionText",
+        answer_polarity AS "answerPolarity",
+        risk_indicator AS "riskIndicator",
+        detection_source AS "detectionSource",
+        model_version AS "modelVersion",
+        analysis_metadata AS "analysisMetadata",
+        selection_metadata AS "selectionMetadata",
         created_at AS "createdAt"
     `,
-    [sessionId, questionId, userAnswer, detectedState, confidenceScore]
+    [
+      sessionId, questionId, userAnswer, detectedState, confidenceScore,
+      questionNumber, questionCode, questionText, answerPolarity, riskIndicator,
+      detectionSource, modelVersion,
+      analysisMetadata ? JSON.stringify(analysisMetadata) : null,
+      selectionMetadata ? JSON.stringify(selectionMetadata) : null,
+    ]
   );
 
   return mapTurn(result.rows[0]);
@@ -146,6 +257,12 @@ async function updateAdaptiveChatSession(client, sessionId, fields) {
     finalEmotionalState: 'final_emotional_state',
     riskLevel: 'risk_level',
     supportDirective: 'support_directive',
+    currentQuestionId: 'current_question_id',
+    finalConfidence: 'final_confidence',
+    conversationEngagement: 'conversation_engagement',
+    recommendedActivity: 'recommended_activity',
+    caregiverNotificationRequired: 'caregiver_notification_required',
+    completedAt: 'completed_at',
   };
 
   Object.entries(fieldMap).forEach(([inputKey, columnName]) => {
@@ -172,6 +289,12 @@ async function updateAdaptiveChatSession(client, sessionId, fields) {
         turn_count AS "turnCount",
         is_complete AS "isComplete",
         final_emotional_state AS "finalEmotionalState",
+        current_question_id AS "currentQuestionId",
+        final_confidence AS "finalConfidence",
+        conversation_engagement AS "conversationEngagement",
+        recommended_activity AS "recommendedActivity",
+        caregiver_notification_required AS "caregiverNotificationRequired",
+        completed_at AS "completedAt",
         risk_level AS "riskLevel",
         support_directive AS "supportDirective",
         created_at AS "createdAt",
@@ -243,48 +366,17 @@ async function saveAdaptiveNarrativeLog(client, {
   return result.rows[0];
 }
 
-async function saveAdaptiveCaregiverAlert(client, {
-  userId,
-  alertType,
-  alertMessage,
-  triggerReason,
-  severity,
-}) {
-  const result = await client.query(
-    `
-      INSERT INTO emotional_caregiver_alerts (
-        user_id,
-        alert_type,
-        alert_message,
-        trigger_reason,
-        severity
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING
-        alert_id AS "alertId",
-        user_id AS "userId",
-        alert_type AS "alertType",
-        alert_message AS "alertMessage",
-        trigger_reason AS "triggerReason",
-        severity,
-        created_at AS "createdAt"
-    `,
-    [userId, alertType, alertMessage, triggerReason, severity]
-  );
-
-  return result.rows[0];
-}
-
 async function runAdaptiveChatTransaction(callback) {
   return withTransaction(callback);
 }
 
 module.exports = {
   getAdaptiveChatSessionById,
+  getAdaptiveChatTurns,
+  getRecentCompletedAdaptiveEmotionHistory,
   getUsedQuestionIds,
   insertAdaptiveChatTurn,
   runAdaptiveChatTransaction,
-  saveAdaptiveCaregiverAlert,
   saveAdaptiveNarrativeLog,
   startAdaptiveChatSession,
   updateAdaptiveChatSession,

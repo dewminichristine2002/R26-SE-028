@@ -6,199 +6,236 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from sklearn.base import clone
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import FeatureUnion
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report, f1_score, precision_score, recall_score
+from sklearn.metrics import (
+    accuracy_score, classification_report, confusion_matrix, f1_score,
+    precision_score, recall_score,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 from sklearn.svm import LinearSVC
 
 
-PROJECT_LABELS = {
-    "happiness",
-    "sadness",
-    "loneliness",
-    "anxiety",
-    "anger",
-    "cognitive_fog",
-    "neutral",
-}
-
-MODULE_DIR = Path(__file__).resolve().parent
-DEFAULT_MAPPING_PATH = MODULE_DIR / "label_mapping.json"
+SEED = 42
+PROJECT_LABELS = [
+    "happiness", "sadness", "loneliness", "anxiety", "anger",
+    "cognitive_fog", "neutral",
+]
+MODEL_PREFERENCE = {"logistic_regression": 0, "linear_svm_calibrated": 1, "multinomial_naive_bayes": 2}
 
 
 def clean_text(text):
-    text = "" if pd.isna(text) else str(text)
-    text = text.lower()
+    text = "" if pd.isna(text) else str(text).lower()
     text = text.translate(str.maketrans("", "", string.punctuation))
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 
-def normalize_label(label):
-    label = "" if pd.isna(label) else str(label)
-    label = label.lower().strip()
-    label = re.sub(r"[\s-]+", "_", label)
-    label = re.sub(r"[^a-z0-9_]", "", label)
-    label = re.sub(r"_+", "_", label).strip("_")
-    return label
+def load_dataset(path):
+    data = pd.read_csv(path)
+    required = {"text", "label", "source"}
+    if not required.issubset(data.columns):
+        raise ValueError(f"Dataset must contain {sorted(required)}")
+    data = data[list(required)].copy()
+    data["text"] = data["text"].map(clean_text)
+    data = data[(data["text"] != "") & data["label"].isin(PROJECT_LABELS)]
+    if data["text"].duplicated().any():
+        raise ValueError("Exact duplicate texts must be resolved before splitting.")
+    missing = set(PROJECT_LABELS).difference(data["label"].unique())
+    if missing:
+        raise ValueError(f"Missing project labels: {sorted(missing)}")
+    return data.reset_index(drop=True)
 
 
-def load_label_mapping(mapping_path):
-    with open(mapping_path, "r", encoding="utf-8") as mapping_file:
-        raw_mapping = json.load(mapping_file)
+def split_dataset(data):
+    train_validation, test = train_test_split(
+        data, test_size=0.20, random_state=SEED, stratify=data["label"]
+    )
+    train, validation = train_test_split(
+        train_validation,
+        test_size=0.20,
+        random_state=SEED,
+        stratify=train_validation["label"],
+    )
+    train_texts, validation_texts, test_texts = map(set, [train["text"], validation["text"], test["text"]])
+    if train_texts & validation_texts or train_texts & test_texts or validation_texts & test_texts:
+        raise ValueError("Exact-text leakage detected across train/validation/test splits.")
+    return train, validation, test
 
+
+def build_estimators():
     return {
-        normalize_label(raw_label): normalize_label(project_label)
-        for raw_label, project_label in raw_mapping.items()
-        if normalize_label(project_label) in PROJECT_LABELS
-    }
-
-
-def load_dataset(dataset_path, label_mapping):
-    data = pd.read_csv(dataset_path)
-    required_columns = {"text", "label"}
-    missing_columns = required_columns.difference(data.columns)
-    if missing_columns:
-        missing = ", ".join(sorted(missing_columns))
-        raise ValueError(f"Dataset is missing required column(s): {missing}")
-
-    data = data[["text", "label"]].copy()
-    data["text"] = data["text"].apply(clean_text)
-    data["raw_label"] = data["label"].apply(normalize_label)
-    data["label"] = data["raw_label"].map(label_mapping)
-    data = data.dropna(subset=["label"])
-    data = data[data["text"] != ""]
-
-    if data.empty:
-        raise ValueError("No usable rows remain after cleaning and label mapping.")
-
-    if data["label"].nunique() < 2:
-        raise ValueError("At least two mapped emotion labels are required for training.")
-
-    return data[["text", "label"]]
-
-
-def build_models():
-    return {
-        "logistic_regression": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42),
-        "linear_svm": LinearSVC(class_weight="balanced", random_state=42),
+        "logistic_regression": LogisticRegression(
+            max_iter=1500, class_weight="balanced", random_state=SEED
+        ),
+        "linear_svm_calibrated": CalibratedClassifierCV(
+            LinearSVC(class_weight="balanced", random_state=SEED),
+            method="sigmoid",
+            cv=5,
+        ),
         "multinomial_naive_bayes": MultinomialNB(),
     }
 
 
-def evaluate_model(name, model, vectorizer, train_texts, test_texts, train_labels, test_labels):
-    pipeline = Pipeline(
-        [
-            ("tfidf", vectorizer),
-            ("model", model),
-        ]
-    )
-    pipeline.fit(train_texts, train_labels)
-    predictions = pipeline.predict(test_texts)
+def build_pipeline(estimator):
+    return Pipeline([
+        ("tfidf", FeatureUnion([
+            ("word", TfidfVectorizer(ngram_range=(1, 2), max_features=6000, sublinear_tf=True)),
+            ("character", TfidfVectorizer(
+                analyzer="char_wb", ngram_range=(3, 5), max_features=5000, sublinear_tf=True
+            )),
+        ])),
+        ("model", estimator),
+    ])
 
-    labels = sorted(PROJECT_LABELS)
+
+def evaluate(pipeline, data):
+    predicted = pipeline.predict(data["text"])
     report = classification_report(
-        test_labels,
-        predictions,
-        labels=labels,
-        output_dict=True,
-        zero_division=0,
+        data["label"], predicted, labels=PROJECT_LABELS, output_dict=True, zero_division=0
     )
-
-    metrics = {
-        "accuracy": accuracy_score(test_labels, predictions),
-        "precision_macro": precision_score(test_labels, predictions, average="macro", zero_division=0),
-        "recall_macro": recall_score(test_labels, predictions, average="macro", zero_division=0),
-        "f1_macro": f1_score(test_labels, predictions, average="macro", zero_division=0),
-        "classification_report": report,
-    }
-
     return {
-        "name": name,
-        "pipeline": pipeline,
-        "metrics": metrics,
+        "accuracy": accuracy_score(data["label"], predicted),
+        "macro_precision": precision_score(data["label"], predicted, labels=PROJECT_LABELS, average="macro", zero_division=0),
+        "macro_recall": recall_score(data["label"], predicted, labels=PROJECT_LABELS, average="macro", zero_division=0),
+        "macro_f1": f1_score(data["label"], predicted, labels=PROJECT_LABELS, average="macro", zero_division=0),
+        "weighted_f1": f1_score(data["label"], predicted, labels=PROJECT_LABELS, average="weighted", zero_division=0),
+        "classification_report": report,
+        "confusion_matrix": confusion_matrix(data["label"], predicted, labels=PROJECT_LABELS),
+        "predicted": predicted,
     }
 
 
-def split_dataset(data):
-    label_counts = data["label"].value_counts()
-    stratify_labels = data["label"] if label_counts.min() >= 2 else None
+def select_threshold(pipeline, validation):
+    probabilities = pipeline.predict_proba(validation["text"])
+    predictions = pipeline.classes_[probabilities.argmax(axis=1)]
+    confidences = probabilities.max(axis=1)
+    rows = []
+    for threshold in [0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80]:
+        accepted = confidences >= threshold
+        coverage = float(accepted.mean())
+        accepted_accuracy = float((predictions[accepted] == validation.loc[accepted, "label"]).mean()) if accepted.any() else 0.0
+        rows.append({"threshold": threshold, "coverage": coverage, "accepted_accuracy": accepted_accuracy})
+    # Conversational routing needs useful model coverage as well as precision. A
+    # 75% floor prevents a superficially accurate threshold from sending most
+    # ordinary utterances to the rule fallback.
+    eligible = [row for row in rows if row["coverage"] >= 0.75]
+    chosen = max(eligible or rows, key=lambda row: (row["accepted_accuracy"], row["coverage"], -row["threshold"]))
+    return chosen, rows
 
-    return train_test_split(
-        data["text"],
-        data["label"],
-        test_size=0.2,
-        random_state=42,
-        stratify=stratify_labels,
-    )
+
+def save_report_csv(report, path):
+    rows = []
+    for label in PROJECT_LABELS:
+        values = report[label]
+        rows.append({
+            "label": label,
+            "precision": values["precision"],
+            "recall": values["recall"],
+            "f1": values["f1-score"],
+            "support": int(values["support"]),
+        })
+    pd.DataFrame(rows).to_csv(path, index=False)
 
 
-def save_artifacts(best_result, all_metrics, output_dir):
+def train(dataset_path, output_dir, results_dir):
+    data = load_dataset(dataset_path)
+    train_data, validation_data, test_data = split_dataset(data)
+    results_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    pipeline = best_result["pipeline"]
-    joblib.dump(pipeline.named_steps["model"], output_dir / "emotion_classifier.pkl")
-    joblib.dump(pipeline.named_steps["tfidf"], output_dir / "tfidf_vectorizer.pkl")
+    validation_results = {}
+    trained_on_train = {}
+    for name, estimator in build_estimators().items():
+        pipeline = build_pipeline(estimator)
+        pipeline.fit(train_data["text"], train_data["label"])
+        trained_on_train[name] = pipeline
+        validation_results[name] = evaluate(pipeline, validation_data)
 
-    metrics_payload = {
-        "selected_model": best_result["name"],
-        "selection_metric": "f1_macro",
-        "models": all_metrics,
+    selected_name = max(
+        validation_results,
+        key=lambda name: (
+            validation_results[name]["macro_f1"],
+            validation_results[name]["macro_recall"],
+            -MODEL_PREFERENCE[name],
+        ),
+    )
+    threshold_choice, threshold_curve = select_threshold(trained_on_train[selected_name], validation_data)
+
+    train_validation = pd.concat([train_data, validation_data], ignore_index=True)
+    test_results = {}
+    final_pipelines = {}
+    for name, estimator in build_estimators().items():
+        pipeline = build_pipeline(clone(estimator))
+        pipeline.fit(train_validation["text"], train_validation["label"])
+        final_pipelines[name] = pipeline
+        test_results[name] = evaluate(pipeline, test_data)
+        save_report_csv(test_results[name]["classification_report"], results_dir / f"classification_report_{name}.csv")
+        pd.DataFrame(
+            test_results[name]["confusion_matrix"], index=PROJECT_LABELS, columns=PROJECT_LABELS
+        ).to_csv(results_dir / f"confusion_matrix_{name}.csv")
+
+    comparison_rows = []
+    for name in build_estimators():
+        comparison_rows.append({
+            "model": name,
+            "validation_macro_f1": validation_results[name]["macro_f1"],
+            "accuracy": test_results[name]["accuracy"],
+            "macro_precision": test_results[name]["macro_precision"],
+            "macro_recall": test_results[name]["macro_recall"],
+            "macro_f1": test_results[name]["macro_f1"],
+            "weighted_f1": test_results[name]["weighted_f1"],
+        })
+    pd.DataFrame(comparison_rows).to_csv(results_dir / "model_comparison.csv", index=False)
+    pd.DataFrame(threshold_curve).to_csv(results_dir / "confidence_threshold_evaluation.csv", index=False)
+
+    model_version = f"tfidf_{selected_name}_v2"
+    selected_pipeline = final_pipelines[selected_name]
+    joblib.dump(selected_pipeline, output_dir / "emotion_pipeline.pkl")
+    metadata = {
+        "model_version": model_version,
+        "selected_model": selected_name,
+        "selection_metric": "validation_macro_f1",
+        "selection_tiebreak": "validation_macro_recall_then_model_preference",
+        "confidence_semantics": "maximum calibrated/predict_proba class probability",
+        "confidence_threshold": threshold_choice["threshold"],
+        "threshold_validation_coverage": threshold_choice["coverage"],
+        "threshold_validation_accepted_accuracy": threshold_choice["accepted_accuracy"],
+        "supported_classes": PROJECT_LABELS,
+        "random_seed": SEED,
+        "split": {"train": len(train_data), "validation": len(validation_data), "test": len(test_data)},
+        "dataset_rows": len(data),
+        "dataset_distribution": data["label"].value_counts().sort_index().to_dict(),
+        "source_distribution": data["source"].value_counts().sort_index().to_dict(),
+        "validation_metrics": {
+            name: {key: value for key, value in metrics.items() if key not in {"classification_report", "confusion_matrix", "predicted"}}
+            for name, metrics in validation_results.items()
+        },
+        "test_metrics": {
+            name: {key: value for key, value in metrics.items() if key not in {"classification_report", "confusion_matrix", "predicted"}}
+            for name, metrics in test_results.items()
+        },
     }
-
-    with open(output_dir / "model_metrics.json", "w", encoding="utf-8") as metrics_file:
-        json.dump(metrics_payload, metrics_file, indent=2)
-
-
-def train(dataset_path, mapping_path, output_dir):
-    label_mapping = load_label_mapping(mapping_path)
-    data = load_dataset(dataset_path, label_mapping)
-    train_texts, test_texts, train_labels, test_labels = split_dataset(data)
-
-    results = []
-    for name, model in build_models().items():
-        vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=5000)
-        result = evaluate_model(name, model, vectorizer, train_texts, test_texts, train_labels, test_labels)
-        results.append(result)
-
-    best_result = max(results, key=lambda result: result["metrics"]["f1_macro"])
-    all_metrics = {result["name"]: result["metrics"] for result in results}
-    save_artifacts(best_result, all_metrics, output_dir)
-
-    print(f"Training rows: {len(train_texts)}")
-    print(f"Test rows: {len(test_texts)}")
-    print(f"Selected model: {best_result['name']}")
-    print(f"Macro F1: {best_result['metrics']['f1_macro']:.4f}")
-    print(f"Saved artifacts to: {output_dir}")
+    with open(output_dir / "selected_model_metadata.json", "w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, indent=2)
+    with open(results_dir / "selected_model_metadata.json", "w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, indent=2)
+    print(json.dumps(metadata, indent=2))
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train the Component 4 emotion classifier.")
-    parser.add_argument("dataset_csv", help="Path to a CSV dataset with text,label columns.")
-    parser.add_argument(
-        "--label-mapping",
-        default=DEFAULT_MAPPING_PATH,
-        help="Path to label_mapping.json. Defaults to this module's mapping file.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default=MODULE_DIR,
-        help="Directory where emotion_classifier.pkl, tfidf_vectorizer.pkl, and model_metrics.json are saved.",
-    )
+    module_dir = Path(__file__).resolve().parent
+    parser = argparse.ArgumentParser(description="Train and compare ElderMeds emotion models.")
+    parser.add_argument("--dataset", type=Path, default=module_dir / "data" / "training_dataset_v2.csv")
+    parser.add_argument("--output-dir", type=Path, default=module_dir)
+    parser.add_argument("--results-dir", type=Path, default=module_dir / "results")
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    train(
-        dataset_path=Path(args.dataset_csv),
-        mapping_path=Path(args.label_mapping),
-        output_dir=Path(args.output_dir),
-    )
-
-
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    train(args.dataset, args.output_dir, args.results_dir)

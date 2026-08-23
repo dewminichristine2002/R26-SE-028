@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const themeStyles = {
@@ -25,33 +25,17 @@ function getActivityLabel(moduleKey) {
   return labels[moduleKey] || 'Gentle support activity';
 }
 
-function SupportActivity({ moduleKey, colors }) {
-  const activityText = {
-    sensory_breathing_guide: 'Take a slow breath in, pause gently, then breathe out slowly. Repeat this three times.',
-    memory_puzzle: 'Name three familiar things from your old home, school, or workplace.',
-    relaxing_music: 'Choose a familiar gentle song and rest with it for a few minutes.',
-    conversation_prompt: 'Think of someone kind from that memory. What would you like to tell them today?',
-    positive_journal: 'Write or say one good thing from this memory that you want to keep.',
-    standard_menu: 'You can choose breathing, music, a memory question, or a short journal note.',
-  };
-
-  return (
-    <View style={[styles.activityCard, { backgroundColor: colors.soft }]}>
-      <Text style={[styles.activityTitle, { color: colors.accent }]}>{getActivityLabel(moduleKey)}</Text>
-      <Text style={styles.activityText}>{activityText[moduleKey] || activityText.standard_menu}</Text>
-    </View>
-  );
-}
-
 export default function SupportResultScreen({ navigation, route }) {
   const params = route.params || {};
   const supportDirective = params.support_directive || {};
+  const recommendedActivity = params.recommended_activity || {};
   const themeKey = supportDirective.tier_3_ui_theme || 'DEFAULT';
   const colors = themeStyles[themeKey] || themeStyles.DEFAULT;
-  const confidencePercent = useMemo(
-    () => Math.round(Number(params.confidence_score || 0) * 100),
-    [params.confidence_score]
-  );
+  const destination = {
+    cognitive_engagement: 'CognitiveActivityScreen',
+    reminiscence_engagement: 'ReminiscenceActivityScreen',
+    calming_support: 'CalmingActivityScreen',
+  }[recommendedActivity.category];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -64,30 +48,12 @@ export default function SupportResultScreen({ navigation, route }) {
 
           <View style={styles.detailsGrid}>
             <View style={[styles.detailBox, { backgroundColor: colors.soft }]}>
-              <Text style={styles.detailLabel}>Detected Emotion</Text>
+              <Text style={styles.detailLabel}>Emotional State</Text>
               <Text style={styles.detailValue}>{formatLabel(params.detected_emotional_state)}</Text>
             </View>
             <View style={[styles.detailBox, { backgroundColor: colors.soft }]}>
-              <Text style={styles.detailLabel}>Confidence</Text>
-              <Text style={styles.detailValue}>{confidencePercent}%</Text>
-            </View>
-            <View style={[styles.detailBox, { backgroundColor: colors.soft }]}>
-              <Text style={styles.detailLabel}>Risk Level</Text>
-              <Text style={styles.detailValue}>{formatLabel(params.risk_level)}</Text>
-            </View>
-            <View style={[styles.detailBox, { backgroundColor: colors.soft }]}>
-              <Text style={styles.detailLabel}>Cognitive Engagement</Text>
-              <Text style={styles.detailValue}>{formatLabel(params.cognitive_engagement_status || 'stable')}</Text>
-            </View>
-            <View style={[styles.detailBox, { backgroundColor: colors.soft }]}>
               <Text style={styles.detailLabel}>Recommended Activity</Text>
-              <Text style={styles.detailValue}>{getActivityLabel(supportDirective.tier_2_module)}</Text>
-            </View>
-            <View style={[styles.detailBox, { backgroundColor: colors.soft }]}>
-              <Text style={styles.detailLabel}>Caregiver Notice</Text>
-              <Text style={styles.detailValue}>
-                {params.caregiver_notification_required ? 'Shared for support' : 'Not needed today'}
-              </Text>
+              <Text style={styles.detailValue}>{recommendedActivity.title || getActivityLabel(supportDirective.tier_2_module)}</Text>
             </View>
           </View>
 
@@ -96,13 +62,22 @@ export default function SupportResultScreen({ navigation, route }) {
           </Text>
         </View>
 
-        <SupportActivity moduleKey={supportDirective.tier_2_module} colors={colors} />
+        <View style={[styles.activityCard, { backgroundColor: colors.soft }]}>
+          <Text style={[styles.activityTitle, { color: colors.accent }]}>{recommendedActivity.title || 'Gentle support activity'}</Text>
+          <Text style={styles.activityText}>{recommendedActivity.description || 'Choose a short activity to stay engaged.'}</Text>
+          {recommendedActivity.estimated_duration_minutes ? (
+            <Text style={styles.durationText}>About {recommendedActivity.estimated_duration_minutes} minutes</Text>
+          ) : null}
+        </View>
 
         <Pressable
           style={[styles.primaryButton, { backgroundColor: colors.accent }]}
-          onPress={() => navigation.navigate('ReminiscenceActivityScreen')}
+          onPress={() => {
+            if (destination) navigation.navigate(destination, { recommended_activity: recommendedActivity, activity_context: params.activity_context });
+          }}
+          disabled={!destination}
         >
-          <Text style={styles.primaryButtonText}>Do Memory Activity</Text>
+          <Text style={styles.primaryButtonText}>{destination ? 'Start Activity' : 'Activity unavailable'}</Text>
         </Pressable>
 
         <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('EmotionalTrendScreen')}>
@@ -127,6 +102,7 @@ const styles = StyleSheet.create({
   activityCard: { borderRadius: 22, marginTop: 22, padding: 22 },
   activityTitle: { fontSize: 25, fontWeight: '900', marginBottom: 10 },
   activityText: { color: '#263238', fontSize: 19, fontWeight: '700', lineHeight: 29 },
+  durationText: { color: '#56616A', fontSize: 16, fontWeight: '800', marginTop: 12 },
   primaryButton: {
     alignItems: 'center',
     borderRadius: 20,

@@ -12,8 +12,8 @@ import {
   View,
 } from 'react-native';
 import { respondAdaptiveChat, startAdaptiveChat } from '../api/emotionalSupportApi';
+import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
 
-const DEMO_USER_ID = 1;
 const TOTAL_QUESTIONS = 5;
 
 function normalizeQuestion(question) {
@@ -29,6 +29,7 @@ function normalizeQuestion(question) {
 }
 
 export default function AdaptiveSupportChatScreen({ navigation }) {
+  const { elderId } = useEmotionalSupportContext();
   const [sessionId, setSessionId] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [currentAnswer, setCurrentAnswer] = useState('');
@@ -51,7 +52,8 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
         setLoading(true);
         setErrorMessage('');
 
-        const response = await startAdaptiveChat({ user_id: DEMO_USER_ID });
+        if (!elderId) throw new Error('Please sign in again to start a check-in.');
+        const response = await startAdaptiveChat({ user_id: elderId });
         const nextQuestion = normalizeQuestion(response.question);
 
         if (!nextQuestion?.questionText || !response.session_id) {
@@ -64,7 +66,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
 
         setSessionId(response.session_id);
         setCurrentQuestion(nextQuestion);
-        setQuestionIndex(1);
+        setQuestionIndex(Number(response.question_number) || 1);
         setMessages([{ id: 'bot-1', actor: 'bot', text: nextQuestion.questionText }]);
       } catch (startError) {
         if (isMounted) {
@@ -82,7 +84,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [elderId]);
 
   async function handleSendAnswer() {
     if (!canSend) {
@@ -96,7 +98,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
       const answerText = currentAnswer.trim();
       const response = await respondAdaptiveChat({
         session_id: sessionId,
-        user_id: DEMO_USER_ID,
+        user_id: elderId,
         question_id: currentQuestion.questionId,
         answer_text: answerText,
       });
@@ -109,11 +111,9 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
       if (response.is_complete) {
         navigation.navigate('SupportResultScreen', {
           detected_emotional_state: response.final_emotional_state,
-          confidence_score: response.confidence_score,
-          risk_level: response.risk_level,
-          cognitive_engagement_status: response.cognitive_engagement_status,
-          caregiver_notification_required: response.caregiver_notification_required,
           support_directive: response.support_directive,
+          recommended_activity: response.recommended_activity,
+          activity_context: { user_id: elderId, session_id: response.session_id },
         });
         return;
       }
@@ -130,7 +130,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
       ]);
       setCurrentQuestion(nextQuestion);
       setCurrentAnswer('');
-      setQuestionIndex((current) => current + 1);
+      setQuestionIndex(Number(response.question_number) || questionIndex + 1);
     } catch (sendError) {
       setErrorMessage(sendError.message || 'We could not send your answer right now.');
     } finally {

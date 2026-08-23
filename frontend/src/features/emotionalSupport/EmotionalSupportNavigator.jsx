@@ -6,6 +6,8 @@ import ReminiscenceActivityScreen from './screens/ReminiscenceActivityScreen';
 import AdaptiveSupportChatScreen from './screens/AdaptiveSupportChatScreen';
 import SupportMoodCheckInScreen from './screens/SupportMoodCheckInScreen';
 import SupportResultScreen from './screens/SupportResultScreen';
+import CognitiveActivityScreen from './screens/CognitiveActivityScreen';
+import CalmingActivityScreen from './screens/CalmingActivityScreen';
 
 const routes = {
   ElderHome: ElderHomeScreen,
@@ -13,10 +15,12 @@ const routes = {
   AdaptiveSupportChatScreen,
   SupportResultScreen,
   ReminiscenceActivityScreen,
+  CognitiveActivityScreen,
+  CalmingActivityScreen,
   EmotionalTrendScreen,
 };
 
-export default function EmotionalSupportNavigator() {
+export default function EmotionalSupportNavigator({ user }) {
   const [routeStack, setRouteStack] = useState([{ name: 'ElderHome', params: {} }]);
   const currentRoute = routeStack[routeStack.length - 1];
   const CurrentScreen = routes[currentRoute.name] || ElderHomeScreen;
@@ -40,7 +44,7 @@ export default function EmotionalSupportNavigator() {
   );
 
   return (
-    <EmotionalSupportProvider>
+    <EmotionalSupportProvider user={user}>
       <CurrentScreen navigation={navigation} route={{ name: currentRoute.name, params: currentRoute.params }} />
     </EmotionalSupportProvider>
   );

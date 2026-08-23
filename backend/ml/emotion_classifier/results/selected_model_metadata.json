@@ -1,0 +1,86 @@
+{
+  "model_version": "tfidf_linear_svm_calibrated_v2",
+  "selected_model": "linear_svm_calibrated",
+  "selection_metric": "validation_macro_f1",
+  "selection_tiebreak": "validation_macro_recall_then_model_preference",
+  "confidence_semantics": "maximum calibrated/predict_proba class probability",
+  "confidence_threshold": 0.35,
+  "threshold_validation_coverage": 0.7836065573770492,
+  "threshold_validation_accepted_accuracy": 0.6861924686192469,
+  "supported_classes": [
+    "happiness",
+    "sadness",
+    "loneliness",
+    "anxiety",
+    "anger",
+    "cognitive_fog",
+    "neutral"
+  ],
+  "random_seed": 42,
+  "split": {
+    "train": 1218,
+    "validation": 305,
+    "test": 381
+  },
+  "dataset_rows": 1904,
+  "dataset_distribution": {
+    "anger": 310,
+    "anxiety": 293,
+    "cognitive_fog": 305,
+    "happiness": 310,
+    "loneliness": 58,
+    "neutral": 310,
+    "sadness": 318
+  },
+  "source_distribution": {
+    "goemotions_explicit_loneliness_relabel": 48,
+    "goemotions_unambiguous": 1783,
+    "project_authored": 73
+  },
+  "validation_metrics": {
+    "logistic_regression": {
+      "accuracy": 0.5967213114754099,
+      "macro_precision": 0.6420697822589752,
+      "macro_recall": 0.6316887200675609,
+      "macro_f1": 0.6357202199620712,
+      "weighted_f1": 0.6011331586894798
+    },
+    "linear_svm_calibrated": {
+      "accuracy": 0.6196721311475409,
+      "macro_precision": 0.6648398922839013,
+      "macro_recall": 0.664786936051016,
+      "macro_f1": 0.6641136744727858,
+      "weighted_f1": 0.6190605279518312
+    },
+    "multinomial_naive_bayes": {
+      "accuracy": 0.5836065573770491,
+      "macro_precision": 0.6427527010504779,
+      "macro_recall": 0.5294377122682914,
+      "macro_f1": 0.5248799594180443,
+      "weighted_f1": 0.5660563418562664
+    }
+  },
+  "test_metrics": {
+    "logistic_regression": {
+      "accuracy": 0.5931758530183727,
+      "macro_precision": 0.6381973811188971,
+      "macro_recall": 0.6304676140663287,
+      "macro_f1": 0.6325787078484261,
+      "weighted_f1": 0.5957473922976333
+    },
+    "linear_svm_calibrated": {
+      "accuracy": 0.5826771653543307,
+      "macro_precision": 0.6145713571162167,
+      "macro_recall": 0.6212389400747054,
+      "macro_f1": 0.6163755640527031,
+      "weighted_f1": 0.5772246335002924
+    },
+    "multinomial_naive_bayes": {
+      "accuracy": 0.5406824146981627,
+      "macro_precision": 0.46781309672061727,
+      "macro_recall": 0.4778168786964634,
+      "macro_f1": 0.4671127872694471,
+      "weighted_f1": 0.5285418819132053
+    }
+  }
+}

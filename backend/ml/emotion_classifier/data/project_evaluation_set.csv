@@ -1,0 +1,23 @@
+expected_emotion,text
+happiness,I feel happy today.
+happiness,I felt much happier after my daughter called.
+happiness,I enjoyed reading and felt good.
+happiness,Today was a lovely day.
+sadness,I have been feeling sad today.
+sadness,Nothing interested me much today.
+sadness,I felt down this morning.
+loneliness,The house feels very quiet and I miss my family.
+loneliness,I have not spoken to anyone today and I feel lonely.
+loneliness,I wish I had someone here to talk with.
+anxiety,I have been worried all morning.
+anxiety,I cannot seem to relax today.
+anxiety,I keep thinking something may go wrong.
+anger,I felt frustrated and angry today.
+anger,Something upset me and I am still annoyed.
+cognitive_fog,I have had trouble concentrating today.
+cognitive_fog,My thoughts feel a little foggy.
+cognitive_fog,I kept forgetting what I was doing.
+neutral,Everything has been normal today.
+neutral,My day has been ordinary.
+neutral,Nothing unusual happened.
+happiness,My daughter called and I felt much happier after talking with her.

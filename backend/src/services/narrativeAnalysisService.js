@@ -1,170 +1,105 @@
-const axios = require('axios');
+const {
+  ML_CONFIDENCE_THRESHOLD,
+  requestEmotionPrediction,
+} = require('./emotionPredictionService');
 
 const emotionKeywords = {
   loneliness: ['alone', 'lonely', 'isolated', 'nobody', 'quiet', 'empty', 'miss', 'no one', 'by myself'],
-  anxiety: ['worried', 'scared', 'afraid', 'nervous', 'panicked', 'stress', 'bills', 'fear'],
-  sadness: ['sad', 'unhappy', 'cry', 'hurt', 'gone', 'tired', 'lost'],
-  happiness: ['happy', 'good', 'wonderful', 'great', 'loved', 'smile', 'enjoyed'],
+  anxiety: ['worried', 'scared', 'afraid', 'nervous', 'panicked', 'stress', 'bills', 'fear', 'cannot relax'],
+  sadness: ['sad', 'unhappy', 'cry', 'hurt', 'gone', 'tired', 'lost', 'down'],
+  happiness: ['happy', 'happier', 'cheerful', 'good', 'wonderful', 'great', 'lovely', 'loved', 'smile', 'enjoyed'],
   anger: ['angry', 'upset', 'annoyed', 'irritated', 'frustrated'],
-  cognitive_fog: ['confused', 'forgot', 'forget', 'unclear', 'cannot remember', "don't remember"],
+  cognitive_fog: ['confused', 'foggy', 'concentrating', 'concentrate', 'forgot', 'forget', 'unclear', 'cannot remember', "don't remember"],
 };
 
 const concernStates = new Set(['loneliness', 'anxiety', 'sadness', 'anger', 'cognitive_fog']);
-const DEFAULT_ML_SERVICE_URL = 'http://localhost:8001';
-const ML_CONFIDENCE_THRESHOLD = 0.6;
-const ML_MODEL_VERSION = 'tfidf_logistic_regression_v1';
-const LONELINESS_FALLBACK_PHRASES = [
-  'lonely',
-  'alone',
-  'miss my family',
-  'miss my daughter',
-  'miss my son',
-  'house feels quiet',
-  'no one visits',
-  'feel left out',
-  'isolated',
-  'disconnected',
-];
 
 function normalizeNarrative(text = '') {
-  return text.toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
-function clampConfidence(confidence) {
-  const numericConfidence = Number(confidence);
-
-  if (!Number.isFinite(numericConfidence)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(1, numericConfidence));
+  return String(text).toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
 function countKeywordMatches(normalizedText, keywords) {
   return keywords.reduce((total, keyword) => {
-    const normalizedKeyword = normalizeNarrative(keyword);
-    const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`(^|\\W)${escapedKeyword}(?=\\W|$)`, 'g');
-    const matches = normalizedText.match(pattern);
-
+    const escaped = normalizeNarrative(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matches = normalizedText.match(new RegExp(`(^|\\W)${escaped}(?=\\W|$)`, 'g'));
     return total + (matches ? matches.length : 0);
   }, 0);
 }
 
 function scoreNarrative(text) {
-  const normalizedText = normalizeNarrative(text);
-
-  return Object.entries(emotionKeywords).reduce((scores, [emotion, keywords]) => {
-    scores[emotion] = countKeywordMatches(normalizedText, keywords);
-    return scores;
-  }, {});
+  const normalized = normalizeNarrative(text);
+  return Object.fromEntries(
+    Object.entries(emotionKeywords).map(([emotion, keywords]) => [emotion, countKeywordMatches(normalized, keywords)])
+  );
 }
 
 function selectDetectedEmotion(scores) {
-  const rankedScores = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  const [topEmotion, topScore] = rankedScores[0];
-  const tiedTopScores = rankedScores.filter(([, score]) => score === topScore);
-
-  if (topScore === 0 || tiedTopScores.length > 1) {
-    return 'neutral';
-  }
-
-  return topEmotion;
+  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const topScore = ranked[0]?.[1] || 0;
+  if (!topScore || ranked.filter(([, score]) => score === topScore).length > 1) return 'neutral';
+  return ranked[0][0];
 }
 
-function calculateConfidence(scores, detectedEmotion) {
-  const totalMatches = Object.values(scores).reduce((total, score) => total + score, 0);
-
-  if (detectedEmotion === 'neutral' || totalMatches === 0) {
-    return 0;
-  }
-
-  const confidence = scores[detectedEmotion] / totalMatches;
-  return Number(confidence.toFixed(2));
+function getBaseRiskLevel(emotion) {
+  return concernStates.has(emotion) ? 'medium' : 'low';
 }
 
-function getBaseRiskLevel(detectedEmotion) {
-  if (detectedEmotion === 'happiness' || detectedEmotion === 'neutral') {
-    return 'low';
-  }
-
-  if (concernStates.has(detectedEmotion)) {
-    return 'medium';
-  }
-
-  return 'low';
-}
-
-function hasLonelinessFallbackPhrase(normalizedText) {
-  return LONELINESS_FALLBACK_PHRASES.some((phrase) => normalizedText.includes(phrase));
-}
-
-function buildRuleFallbackAnalysis(transcribedNarrative) {
+function buildRuleFallbackAnalysis(transcribedNarrative, fallbackReason = 'rule_fallback_requested') {
   const normalizedText = normalizeNarrative(transcribedNarrative);
   const scores = scoreNarrative(normalizedText);
   const detectedEmotionalState = selectDetectedEmotion(scores);
-  const confidenceScore = calculateConfidence(scores, detectedEmotionalState);
-
+  const totalMatches = Object.values(scores).reduce((total, score) => total + score, 0);
+  const ruleScore = detectedEmotionalState === 'neutral' || totalMatches === 0
+    ? null
+    : Number((scores[detectedEmotionalState] / totalMatches).toFixed(3));
   return {
+    emotion: detectedEmotionalState,
+    confidence: null,
+    detectedEmotionalState,
+    confidenceScore: null,
+    ruleScore,
     normalizedText,
     scores,
-    detectedEmotionalState,
-    confidenceScore,
     baseRiskLevel: getBaseRiskLevel(detectedEmotionalState),
     detectionSource: 'rule_fallback',
     modelVersion: null,
+    uncertainty: detectedEmotionalState === 'neutral',
+    fallbackReason,
   };
 }
 
-async function requestMlPrediction(transcribedNarrative) {
-  const baseUrl = process.env.EMOTION_ML_SERVICE_URL || DEFAULT_ML_SERVICE_URL;
-  const response = await axios.post(
-    `${baseUrl}/predict-emotion`,
-    { text: transcribedNarrative },
-    { timeout: 2000 }
-  );
-
-  return response.data;
-}
-
-async function analyzeNarrative(transcribedNarrative) {
-  const fallbackAnalysis = buildRuleFallbackAnalysis(transcribedNarrative);
-
-  if (hasLonelinessFallbackPhrase(fallbackAnalysis.normalizedText)) {
-    return {
-      ...fallbackAnalysis,
-      detectedEmotionalState: 'loneliness',
-      confidenceScore: Math.max(fallbackAnalysis.confidenceScore, 0.8),
-      baseRiskLevel: getBaseRiskLevel('loneliness'),
-    };
-  }
-
+async function analyzeNarrative(transcribedNarrative, options = {}) {
   try {
-    const mlResult = await requestMlPrediction(transcribedNarrative);
-    const confidence = clampConfidence(mlResult?.confidence);
-
-    if (mlResult?.success && mlResult.emotion && confidence >= ML_CONFIDENCE_THRESHOLD) {
+    const prediction = await requestEmotionPrediction(transcribedNarrative, options);
+    if (prediction.confidence >= ML_CONFIDENCE_THRESHOLD) {
       return {
-        ...fallbackAnalysis,
-        detectedEmotionalState: mlResult.emotion,
-        confidenceScore: Number(confidence.toFixed(2)),
-        baseRiskLevel: getBaseRiskLevel(mlResult.emotion),
-        detectionSource: 'ml_model',
-        modelVersion: mlResult.model_version || ML_MODEL_VERSION,
+        emotion: prediction.emotion,
+        confidence: prediction.confidence,
+        detectedEmotionalState: prediction.emotion,
+        confidenceScore: Number(prediction.confidence.toFixed(4)),
+        ruleScore: null,
+        scores: null,
+        baseRiskLevel: getBaseRiskLevel(prediction.emotion),
+        detectionSource: prediction.detectionSource,
+        modelVersion: prediction.modelVersion,
+        uncertainty: false,
+        fallbackReason: null,
       };
     }
+    return buildRuleFallbackAnalysis(transcribedNarrative, 'ml_below_threshold');
   } catch (error) {
-    return fallbackAnalysis;
+    return buildRuleFallbackAnalysis(transcribedNarrative, error.reason || 'ml_unavailable');
   }
-
-  return fallbackAnalysis;
 }
 
 module.exports = {
+  ML_CONFIDENCE_THRESHOLD,
   analyzeNarrative,
   buildRuleFallbackAnalysis,
   concernStates,
   emotionKeywords,
-  hasLonelinessFallbackPhrase,
+  getBaseRiskLevel,
   normalizeNarrative,
+  scoreNarrative,
+  selectDetectedEmotion,
 };

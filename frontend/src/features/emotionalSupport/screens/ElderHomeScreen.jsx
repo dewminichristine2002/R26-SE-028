@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { emotionalSupportApiBaseUrl, getTrendSummary } from '../api/emotionalSupportApi';
+import { getWellnessSummary } from '../api/emotionalSupportApi';
 import StatusMessage from '../components/StatusMessage';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
 
@@ -10,12 +10,6 @@ const menuCards = [
     title: 'Start Adaptive Check-In',
     description: 'Dynamic questions based on how you feel',
     route: 'AdaptiveSupportChatScreen',
-  },
-  {
-    icon: '~',
-    title: 'Reminiscence Memory Activity',
-    description: 'Share a familiar memory or activity',
-    route: 'ReminiscenceActivityScreen',
   },
   {
     icon: '#',
@@ -38,25 +32,15 @@ export default function ElderHomeScreen({ navigation }) {
       try {
         setLoading(true);
         setError('');
-        const { data } = await getTrendSummary(elderId);
+        if (!elderId) throw new Error('Please sign in again.');
+        const data = await getWellnessSummary(elderId, '7d');
 
         if (active) {
           setSummary(data);
         }
       } catch (loadError) {
         if (active) {
-          const status = loadError.response?.status ? `HTTP ${loadError.response.status}` : loadError.message;
-          const backendMessage = loadError.response?.data?.details || loadError.response?.data?.error || '';
-          setError(
-            [
-              'Failed to fetch trend summary.',
-              status,
-              backendMessage,
-              `${emotionalSupportApiBaseUrl}/elders/${elderId}/trends/summary`,
-            ]
-              .filter(Boolean)
-              .join('\n')
-          );
+          setError(loadError.message || 'We could not load your wellness summary. Please try again.');
         }
       } finally {
         if (active) {

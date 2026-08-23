@@ -1,0 +1,23 @@
+expected_emotion,text,predicted_emotion,confidence,source,correct
+happiness,I feel happy today.,happiness,0.535553592266833,ml_model,True
+happiness,I felt much happier after my daughter called.,happiness,0.49728238239031397,ml_model,True
+happiness,I enjoyed reading and felt good.,happiness,0.6788725154235359,ml_model,True
+happiness,Today was a lovely day.,happiness,0.5493840613772039,ml_model,True
+sadness,I have been feeling sad today.,sadness,0.8255767946931002,ml_model,True
+sadness,Nothing interested me much today.,sadness,0.3601855827340414,ml_model,True
+sadness,I felt down this morning.,neutral,0.34340844852939195,ml_model,False
+loneliness,The house feels very quiet and I miss my family.,sadness,0.5373847856695015,ml_model,False
+loneliness,I have not spoken to anyone today and I feel lonely.,loneliness,0.7645107752305015,ml_model,True
+loneliness,I wish I had someone here to talk with.,loneliness,0.7014852879284217,ml_model,True
+anxiety,I have been worried all morning.,anxiety,0.5825921229517941,ml_model,True
+anxiety,I cannot seem to relax today.,cognitive_fog,0.3964455496591755,ml_model,False
+anxiety,I keep thinking something may go wrong.,neutral,0.37730176317688696,ml_model,False
+anger,I felt frustrated and angry today.,anger,0.7771749810920696,ml_model,True
+anger,Something upset me and I am still annoyed.,sadness,0.4486032408074362,ml_model,False
+cognitive_fog,I have had trouble concentrating today.,neutral,0.2929223882175952,ml_model,False
+cognitive_fog,My thoughts feel a little foggy.,sadness,0.5166129232642981,ml_model,False
+cognitive_fog,I kept forgetting what I was doing.,anger,0.33563349937317294,ml_model,False
+neutral,Everything has been normal today.,neutral,0.6946529762894221,ml_model,True
+neutral,My day has been ordinary.,neutral,0.5062665553225135,ml_model,True
+neutral,Nothing unusual happened.,neutral,0.6078940664701574,ml_model,True
+happiness,My daughter called and I felt much happier after talking with her.,happiness,0.41234401483163874,ml_model,True

@@ -1,17 +1,16 @@
 import React, { createContext, useContext, useMemo } from 'react';
 
 const EmotionalSupportContext = createContext({
-  elderId: 1,
-  caregiverId: 1,
+  elderId: null,
 });
 
-export function EmotionalSupportProvider({ children }) {
+export function EmotionalSupportProvider({ children, user }) {
   const value = useMemo(
     () => ({
-      elderId: 1,
-      caregiverId: 1,
+      elderId: Number(user?.id) || null,
+      user,
     }),
-    []
+    [user]
   );
 
   return (

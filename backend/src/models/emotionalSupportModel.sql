@@ -196,6 +196,20 @@ CREATE TABLE IF NOT EXISTS adaptive_question_bank (
     priority INTEGER DEFAULT 1,
     construct_source VARCHAR(150),
     is_active BOOLEAN DEFAULT TRUE,
+    positive_next_code VARCHAR(80),
+    negative_next_code VARCHAR(80),
+    neutral_next_code VARCHAR(80),
+    followup_next_code VARCHAR(80),
+    assessment_dimension VARCHAR(50) CHECK (
+        assessment_dimension IS NULL OR assessment_dimension IN (
+            'general_wellbeing', 'social_connection', 'energy_motivation',
+            'daily_engagement', 'worry_calmness', 'memory_concentration',
+            'positive_protective_factor', 'clarification'
+        )
+    ),
+    is_assessment BOOLEAN NOT NULL DEFAULT FALSE,
+    min_confidence NUMERIC(4,3) CHECK (min_confidence IS NULL OR (min_confidence >= 0 AND min_confidence <= 1)),
+    difficulty VARCHAR(30),
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -215,8 +229,14 @@ CREATE TABLE IF NOT EXISTS adaptive_chat_sessions (
     turn_count INTEGER DEFAULT 0,
     is_complete BOOLEAN DEFAULT FALSE,
     final_emotional_state VARCHAR(50),
+    current_question_id INTEGER REFERENCES adaptive_question_bank(question_id) ON DELETE SET NULL,
+    final_confidence NUMERIC(5,4),
+    conversation_engagement VARCHAR(50),
+    recommended_activity VARCHAR(80),
+    caregiver_notification_required BOOLEAN NOT NULL DEFAULT FALSE,
     risk_level VARCHAR(20),
     support_directive JSONB,
+    completed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -228,6 +248,15 @@ CREATE TABLE IF NOT EXISTS adaptive_chat_turns (
     user_answer TEXT,
     detected_state VARCHAR(50),
     confidence_score NUMERIC(5,2),
+    question_number INTEGER CHECK (question_number IS NULL OR question_number BETWEEN 1 AND 5),
+    question_code VARCHAR(80),
+    question_text TEXT,
+    answer_polarity VARCHAR(20),
+    risk_indicator VARCHAR(20),
+    detection_source VARCHAR(50),
+    model_version VARCHAR(80),
+    analysis_metadata JSONB,
+    selection_metadata JSONB,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -242,6 +271,24 @@ CREATE INDEX IF NOT EXISTS adaptive_chat_turns_session_created_idx
 
 CREATE INDEX IF NOT EXISTS adaptive_chat_turns_question_idx
     ON adaptive_chat_turns (question_id);
+
+CREATE INDEX IF NOT EXISTS adaptive_question_bank_assessment_candidates_idx
+    ON adaptive_question_bank (target_state, assessment_dimension, priority, question_id)
+    WHERE is_active = TRUE AND is_assessment = TRUE;
+
+CREATE INDEX IF NOT EXISTS adaptive_question_bank_positive_next_idx
+    ON adaptive_question_bank (positive_next_code) WHERE positive_next_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS adaptive_question_bank_negative_next_idx
+    ON adaptive_question_bank (negative_next_code) WHERE negative_next_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS adaptive_question_bank_neutral_next_idx
+    ON adaptive_question_bank (neutral_next_code) WHERE neutral_next_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS adaptive_question_bank_followup_next_idx
+    ON adaptive_question_bank (followup_next_code) WHERE followup_next_code IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS adaptive_chat_turns_session_question_number_uidx
+    ON adaptive_chat_turns (session_id, question_number) WHERE question_number IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS adaptive_chat_turns_session_question_uidx
+    ON adaptive_chat_turns (session_id, question_id) WHERE question_id IS NOT NULL;
 
 ALTER TABLE emotional_support_response_bank
     DROP CONSTRAINT IF EXISTS emotional_support_response_bank_emotion_category_check;
