@@ -9,6 +9,8 @@ node_modules/
 # Logs
 logs/
 *.log
+*.out
+*.err
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -18,8 +20,12 @@ pnpm-debug.log*
 dist/
 build/
 coverage/
+htmlcov/
 .cache/
 .parcel-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Expo / React Native
 .expo/
@@ -27,12 +33,23 @@ coverage/
 .eas/
 eas-builds/
 web-build/
+android.local-backup-*/
+.metro-cache/
+.npm-cache/
 
 # Python
 .venv/
 venv/
 __pycache__/
 *.py[cod]
+*$py.class
+
+# ML / experiment outputs
+runs/
+**/runs/
+**/.ultralytics/
+*.tmp
+*.bak
 
 # OS / editor
 .DS_Store

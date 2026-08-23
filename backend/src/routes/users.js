@@ -133,25 +133,54 @@ router.get('/caregiver-alerts', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `
-        SELECT
-          id,
-          user_id,
-          status_event_id,
-          medication_id,
-          caregiver_email,
-          caregiver_phone,
-          CASE
-            WHEN LOWER(COALESCE(message, '')) LIKE '%please arrange a refill%'
-              OR LOWER(COALESCE(message, '')) LIKE '%requested refill%'
-              OR LOWER(COALESCE(message, '')) LIKE '%need my%' THEN 'Refill Alert'
-            ELSE title
-          END AS title,
-          message,
-          is_read,
-          created_at,
-          read_at
-        FROM caregiver_alerts
-        WHERE user_id = $1
+        SELECT *
+        FROM (
+          SELECT
+            id::text AS id,
+            'medication' AS source,
+            user_id,
+            status_event_id,
+            medication_id,
+            caregiver_email,
+            caregiver_phone,
+            CASE
+              WHEN LOWER(COALESCE(message, '')) LIKE '%please arrange a refill%'
+                OR LOWER(COALESCE(message, '')) LIKE '%requested refill%'
+                OR LOWER(COALESCE(message, '')) LIKE '%need my%' THEN 'Refill Alert'
+              ELSE title
+            END AS title,
+            message,
+            is_read,
+            created_at,
+            read_at,
+            NULL::text AS alert_type,
+            NULL::text AS severity,
+            NULL::text AS status
+          FROM caregiver_alerts
+          WHERE user_id = $1
+
+          UNION ALL
+
+          SELECT
+            'emotional:' || id::text AS id,
+            'emotional_support' AS source,
+            elder_user_id AS user_id,
+            NULL::integer AS status_event_id,
+            NULL::integer AS medication_id,
+            NULL::text AS caregiver_email,
+            NULL::text AS caregiver_phone,
+            title,
+            message,
+            status <> 'open' AS is_read,
+            created_at,
+            COALESCE(acknowledged_at, resolved_at) AS read_at,
+            alert_type,
+            severity,
+            status
+          FROM emotional_support_caregiver_alerts
+          WHERE caregiver_user_id = $1
+             OR elder_user_id = $1
+        ) combined_alerts
         ORDER BY created_at DESC
         LIMIT 50
       `,
@@ -171,12 +200,57 @@ router.patch('/caregiver-alerts/:id/read', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Caregiver access required' });
   }
 
-  const alertId = Number(req.params.id);
-  if (!Number.isInteger(alertId) || alertId <= 0) {
+  const rawAlertId = String(req.params.id || '').trim();
+  if (!rawAlertId) {
     return res.status(400).json({ error: 'Valid alert id is required' });
   }
 
   try {
+    if (rawAlertId.startsWith('emotional:')) {
+      const emotionalAlertId = rawAlertId.replace(/^emotional:/, '').trim();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(emotionalAlertId)) {
+        return res.status(400).json({ error: 'Valid alert id is required' });
+      }
+      const updated = await pool.query(
+        `
+          UPDATE emotional_support_caregiver_alerts
+          SET
+            status = CASE WHEN status = 'open' THEN 'acknowledged' ELSE status END,
+            acknowledged_at = COALESCE(acknowledged_at, NOW())
+          WHERE id = $1::uuid
+            AND (caregiver_user_id = $2 OR elder_user_id = $2)
+          RETURNING
+            'emotional:' || id::text AS id,
+            'emotional_support' AS source,
+            elder_user_id AS user_id,
+            NULL::integer AS status_event_id,
+            NULL::integer AS medication_id,
+            NULL::text AS caregiver_email,
+            NULL::text AS caregiver_phone,
+            title,
+            message,
+            status <> 'open' AS is_read,
+            created_at,
+            COALESCE(acknowledged_at, resolved_at) AS read_at,
+            alert_type,
+            severity,
+            status
+        `,
+        [emotionalAlertId, req.user.id]
+      );
+
+      if (updated.rows.length === 0) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      return res.json({ alert: updated.rows[0] });
+    }
+
+    const alertId = Number(rawAlertId);
+    if (!Number.isInteger(alertId) || alertId <= 0) {
+      return res.status(400).json({ error: 'Valid alert id is required' });
+    }
+
     const updated = await pool.query(
       `
         UPDATE caregiver_alerts

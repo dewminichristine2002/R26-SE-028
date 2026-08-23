@@ -46,6 +46,26 @@ export default function App() {
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState('');
   const [assistantReturnScreen, setAssistantReturnScreen] = useState('home');
 
+  const handleAssistantNavigation = (navigation = {}) => {
+    const launchIntent = navigation.launchIntent
+      ? { ...navigation.launchIntent, nonce: navigation.launchIntent.nonce || Date.now() }
+      : null;
+
+    if (navigation.screen === 'home' || launchIntent) {
+      if (launchIntent) {
+        setHomeLaunchIntent(launchIntent);
+      }
+      setActiveScreen('home');
+      setAssistantInitialPrompt('');
+      return;
+    }
+
+    if (navigation.screen) {
+      setActiveScreen(navigation.screen);
+      setAssistantInitialPrompt('');
+    }
+  };
+
   // Android hardware back button navigation
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -97,6 +117,19 @@ export default function App() {
   const closeAssistant = () => {
     setActiveScreen(assistantReturnScreen || 'home');
     setAssistantInitialPrompt('');
+  };
+
+  const openAssistantFromFab = () => {
+    if (activeScreen === 'unified-dashboard') {
+      openAssistant({
+        initialPrompt: currentUser?.role === 'caregiver'
+          ? 'Give me a short overall summary of how my elder is doing today.'
+          : 'Give me a short overall summary of how I am doing today.',
+      });
+      return;
+    }
+
+    openAssistant();
   };
 
   // Android hardware back button navigation
@@ -344,6 +377,8 @@ export default function App() {
         <AssistantChatScreen
           initialPrompt={assistantInitialPrompt}
           onBack={closeAssistant}
+          onAgentNavigate={handleAssistantNavigation}
+          user={currentUser}
         />
       );
     }
@@ -356,6 +391,7 @@ export default function App() {
         onOpenMedicine={() => setActiveScreen('allergies')}
         onOpenHistory={() => setActiveScreen('history')}
         launchIntent={homeLaunchIntent}
+        onLaunchIntentConsumed={() => setHomeLaunchIntent(null)}
         onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
         onOpenDashboard={() => setActiveScreen('unified-dashboard')}
         onOpenDiabetesPrediction={() => setActiveScreen('diabetes-prediction')}
@@ -375,7 +411,7 @@ export default function App() {
   return (
     <I18nextProvider i18n={i18n}>
       {renderContent()}
-      <AssistantFAB visible={showFab} onPress={() => openAssistant()} />
+      <AssistantFAB visible={showFab} onPress={openAssistantFromFab} />
     </I18nextProvider>
   );
 }

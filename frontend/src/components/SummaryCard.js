@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 const severityStyles = {
   good: {
@@ -27,16 +27,16 @@ const severityStyles = {
     cardBg: '#FEF2F2',
   },
   default: {
-    border: '#3B82F6',
-    badge: '#DBEAFE',
-    badgeText: '#1E3A8A',
+    border: '#2f6654',
+    badge: '#e3f8ee',
+    badgeText: '#2f6654',
     label: 'Update',
     icon: '\u{1F4AC}',
-    cardBg: '#FFFFFF',
+    cardBg: '#fffdf8',
   },
 };
 
-const SummaryCard = ({ card, onAskAssistant }) => {
+const SummaryCard = ({ card }) => {
   if (!card) {
     return null;
   }
@@ -63,18 +63,6 @@ const SummaryCard = ({ card, onAskAssistant }) => {
       <Text style={styles.headline}>{card.headline}</Text>
       {card.detail ? <Text style={styles.detail}>{card.detail}</Text> : null}
 
-      {card.chatPrompt ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Ask assistant: ${card.chatPrompt}`}
-          onPress={() => onAskAssistant?.(card.chatPrompt)}
-          style={({ pressed }) => [styles.askButton, pressed && styles.askButtonPressed]}
-        >
-          <Text style={styles.askButtonIcon}>{'\u{1F4AC}'}</Text>
-          <Text style={styles.askButtonText}>Ask about this</Text>
-          <Text style={styles.askButtonArrow}>{'\u279C'}</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 };
@@ -82,15 +70,21 @@ const SummaryCard = ({ card, onAskAssistant }) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 20,
     paddingHorizontal: 20,
     marginBottom: 16,
     borderLeftWidth: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderTopColor: '#eadfcd',
+    borderRightColor: '#eadfcd',
+    borderBottomColor: '#eadfcd',
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.1,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
   headerRow: {
@@ -103,7 +97,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '900',
-    color: '#374151',
+    color: '#18352f',
     flex: 1,
   },
   badge: {
@@ -120,43 +114,15 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 25,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
     marginTop: 4,
     lineHeight: 31,
   },
   detail: {
     fontSize: 18,
-    color: '#374151',
+    color: '#5e5143',
     marginTop: 8,
     lineHeight: 27,
-  },
-  askButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    alignSelf: 'flex-start',
-    minHeight: 58,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#3B82F6',
-  },
-  askButtonPressed: {
-    backgroundColor: '#EFF6FF',
-  },
-  askButtonIcon: { fontSize: 20, marginRight: 8 },
-  askButtonText: {
-    color: '#1D4ED8',
-    fontWeight: '900',
-    fontSize: 17,
-  },
-  askButtonArrow: {
-    color: '#1D4ED8',
-    fontWeight: '800',
-    fontSize: 19,
-    marginLeft: 6,
   },
 });
 

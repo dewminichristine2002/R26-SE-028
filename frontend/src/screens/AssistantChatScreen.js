@@ -39,7 +39,7 @@ try {
   console.log('[AssistantChat] expo-modules-core EventEmitter unavailable:', error?.message || error);
 }
 
-const SUGGESTED_PROMPTS = [
+const ELDER_SUGGESTED_PROMPTS = [
   'Check my diabetes risk.',
   'Now my weight is 60kg',
   'Check my stroke risk.',
@@ -47,6 +47,9 @@ const SUGGESTED_PROMPTS = [
   'How can I reduce this risk?',
   'Why is this risk high?',
   'What should my caregiver monitor?',
+  'Is paracetamol risky in my saved allergy checks?',
+  'I feel lonely today.',
+  'I feel confused and need support.',
   'Did I miss any medicine this week?',
   'How has my mood been recently?',
   'Which medicines are running low?',
@@ -54,7 +57,167 @@ const SUGGESTED_PROMPTS = [
   'Show my recent caregiver alerts.',
 ];
 
+const getCareSubject = () => 'my mother';
+
+const getPossessiveSubject = (subject) => {
+  const text = String(subject || '').trim() || 'my mother';
+  if (/^my\b/i.test(text)) {
+    return `${text}'s`;
+  }
+  return text.endsWith('s') ? `${text}'` : `${text}'s`;
+};
+
+const buildCaregiverSuggestedPrompts = (user) => {
+  const subject = getCareSubject();
+  const possessive = getPossessiveSubject(subject);
+
+  return [
+    `How is ${subject} doing today?`,
+    `Did ${subject} miss any medicine this week?`,
+    `Which medicines are running low for ${subject}?`,
+    `Show me ${possessive} recent caregiver alerts.`,
+    `Has ${subject} seemed lonely or confused recently?`,
+    `What emotional concerns should I check today?`,
+    `Show ${possessive} mood trend this week.`,
+    `Are any saved medicines dangerous for ${subject}?`,
+    `Is paracetamol risky in ${possessive} saved allergy checks?`,
+    'Add 20 tablets to Metformin stock.',
+    'Change breakfast routine to 8 AM.',
+    'What should I monitor as a caregiver?',
+  ];
+};
+
+const getAssistantSuggestedPrompts = (user) =>
+  String(user?.role || '').toLowerCase() === 'caregiver'
+    ? buildCaregiverSuggestedPrompts(user)
+    : ELDER_SUGGESTED_PROMPTS;
+
+const adaptCaregiverFollowUp = (question, user) => {
+  const text = String(question || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  const subject = getCareSubject();
+  const possessive = getPossessiveSubject(subject);
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ');
+
+  const replacements = {
+    'check my diabetes risk.': `Check ${possessive} diabetes risk.`,
+    'check my stroke risk.': `Check ${possessive} stroke risk.`,
+    'check my hypertension risk.': `Check ${possessive} hypertension risk.`,
+    'now my weight is 60kg': `${possessive} weight is 60kg.`,
+    'my weight is 60kg': `${possessive} weight is 60kg.`,
+    'my bp is 145 over 90': `${possessive} BP is 145 over 90.`,
+    'my sugar is 150 today': `${possessive} sugar is 150 today.`,
+    'my cholesterol is 240': `${possessive} cholesterol is 240.`,
+    'how can i reduce this risk?': 'How can I help reduce this risk?',
+    'why is this risk high?': `Why is this risk high for ${subject}?`,
+    'what should my caregiver monitor?': 'What should I monitor as a caregiver?',
+    'what cognitive activity should i do next?': `What cognitive activity should ${subject} do next?`,
+    'show my mood trend this week.': `Show ${possessive} mood trend this week.`,
+    'did i miss any medicine this week?': `Did ${subject} miss any medicine this week?`,
+    'how has my mood been recently?': `How has ${possessive} mood been recently?`,
+    'which medicines are running low?': `Which medicines are running low for ${subject}?`,
+    'are any of my saved medicines dangerous for me?': `Are any saved medicines dangerous for ${subject}?`,
+    'is paracetamol risky in my saved allergy checks?': `Is paracetamol risky in ${possessive} saved allergy checks?`,
+    'show my recent caregiver alerts.': `Show me ${possessive} recent caregiver alerts.`,
+    'i feel lonely today.': `Has ${subject} seemed lonely today?`,
+    'i feel confused and need support.': `Has ${subject} seemed confused recently?`,
+  };
+
+  return replacements[normalized] || text;
+};
+
+const getVisibleFollowUps = (followUps, user) => {
+  if (String(user?.role || '').toLowerCase() !== 'caregiver') {
+    return followUps;
+  }
+
+  return (followUps || [])
+    .map((question) => adaptCaregiverFollowUp(question, user))
+    .filter(Boolean);
+};
+
+const ASSISTANT_PROGRESS_STAGES = [
+  'Understanding your question',
+  'Searching relevant information',
+  'Identifying key details',
+  'Preparing the final answer',
+];
+
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const AssistantProgressCard = ({ progressIndex }) => {
+  const safeIndex = Math.max(
+    0,
+    Math.min(Number(progressIndex) || 0, ASSISTANT_PROGRESS_STAGES.length - 1)
+  );
+  const activeStage = ASSISTANT_PROGRESS_STAGES[safeIndex];
+  const progressPercent = `${((safeIndex + 1) / ASSISTANT_PROGRESS_STAGES.length) * 100}%`;
+
+  return (
+    <View
+      style={styles.progressRow}
+      accessibilityRole="progressbar"
+      accessibilityLabel={activeStage}
+      accessibilityValue={{
+        min: 1,
+        max: ASSISTANT_PROGRESS_STAGES.length,
+        now: safeIndex + 1,
+      }}
+    >
+      <View style={styles.progressAvatar}>
+        <Text style={styles.progressAvatarText}>{'\u{1F49A}'}</Text>
+      </View>
+      <View style={styles.progressCard}>
+        <View style={styles.progressHeader}>
+          <ActivityIndicator size="small" color="#2f6654" />
+          <Text style={styles.progressTitle}>{activeStage}</Text>
+        </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: progressPercent }]} />
+        </View>
+        <View style={styles.progressStepList}>
+          {ASSISTANT_PROGRESS_STAGES.map((stage, index) => {
+            const isDone = index < safeIndex;
+            const isActive = index === safeIndex;
+            return (
+              <View key={stage} style={styles.progressStepRow}>
+                <View
+                  style={[
+                    styles.progressStepDot,
+                    isDone && styles.progressStepDotDone,
+                    isActive && styles.progressStepDotActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.progressStepDotText,
+                      (isDone || isActive) && styles.progressStepDotTextActive,
+                    ]}
+                  >
+                    {isDone ? '\u2713' : index + 1}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.progressStepText,
+                    isDone && styles.progressStepTextDone,
+                    isActive && styles.progressStepTextActive,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {stage}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+};
 
 const formatRelativeTime = (isoString) => {
   if (!isoString) {
@@ -101,7 +264,7 @@ const mapServerMessageToBubble = (row) => ({
   followUps: [],
 });
 
-const AssistantChatScreen = ({ initialPrompt, onBack }) => {
+const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState(initialPrompt || '');
   const [conversationId, setConversationId] = useState(null);
@@ -118,15 +281,40 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
   const [followUpsCollapsed, setFollowUpsCollapsed] = useState(true);
+  const [assistantProgressIndex, setAssistantProgressIndex] = useState(0);
   const scrollRef = useRef(null);
   const sentInitial = useRef(false);
   const finalTranscriptRef = useRef('');
+  const isCaregiver = String(user?.role || '').toLowerCase() === 'caregiver';
+  const suggestedPrompts = getAssistantSuggestedPrompts(user);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       scrollRef.current?.scrollToEnd?.({ animated: true });
     }, 50);
   }, []);
+
+  useEffect(() => {
+    if (!sending) {
+      setAssistantProgressIndex(0);
+      return undefined;
+    }
+
+    setAssistantProgressIndex(0);
+    const timer = setInterval(() => {
+      setAssistantProgressIndex((prev) =>
+        Math.min(prev + 1, ASSISTANT_PROGRESS_STAGES.length - 1)
+      );
+    }, 1300);
+
+    return () => clearInterval(timer);
+  }, [sending]);
+
+  useEffect(() => {
+    if (sending) {
+      scrollToBottom();
+    }
+  }, [assistantProgressIndex, scrollToBottom, sending]);
 
   const stopSpeaking = useCallback(() => {
     if (SpeechModule && SpeechModule.stop) {
@@ -335,6 +523,8 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           content: response.answer || '',
           sql: response.sql || '',
           rows: Array.isArray(response.rows) ? response.rows : [],
+          actionResult: response.actionResult || null,
+          pendingAction: response.pendingAction || null,
           sources: Array.isArray(response.sources) ? response.sources : extractSourcesFromRows(response.rows),
           safetyNote: response.safetyNote || '',
           fallback: Boolean(response.fallback),
@@ -344,6 +534,17 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           setFollowUpsCollapsed(true);
         }
         setMessages((prev) => [...prev, assistantBubble]);
+        const navigation = response.actionResult?.navigation
+          || response.navigation
+          || (response.intent === 'routine'
+            ? { screen: 'home', launchIntent: { type: 'routine-setup' } }
+            : null);
+
+        if (navigation && onAgentNavigate) {
+          setTimeout(() => {
+            onAgentNavigate(navigation);
+          }, 900);
+        }
       } catch (err) {
         const errMsg = err.response?.data?.error || err.message || 'Failed to get a reply';
         setError(errMsg);
@@ -361,7 +562,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
         scrollToBottom();
       }
     },
-    [conversationId, scrollToBottom, sending, stopSpeaking]
+    [conversationId, onAgentNavigate, scrollToBottom, sending, stopSpeaking]
   );
 
   useEffect(() => {
@@ -497,6 +698,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
     }
     return [];
   })();
+  const visibleFollowUps = getVisibleFollowUps(lastFollowUps, user);
 
   return (
     <KeyboardAvoidingView
@@ -541,7 +743,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           <Text style={styles.titleEmoji}>{'\u{1F49A}'}</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Your Health Helper</Text>
-            <Text style={styles.subtitle}>Ask me anything about your health.</Text>
+            <Text style={styles.subtitle}>
+              {isCaregiver ? "Ask me anything about the elder's care." : 'Ask me anything about your health.'}
+            </Text>
           </View>
         </View>
       </View>
@@ -556,11 +760,13 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
         {messages.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>{'\u{1F44B}'}</Text>
-            <Text style={styles.emptyTitle}>Hello! How can I help today?</Text>
+            <Text style={styles.emptyTitle}>
+              {isCaregiver ? 'Hello! How can I help with care today?' : 'Hello! How can I help today?'}
+            </Text>
             <Text style={styles.emptyHint}>
               Tap the microphone to talk, or pick a question below.
             </Text>
-            {SUGGESTED_PROMPTS.map((prompt) => (
+            {suggestedPrompts.map((prompt) => (
               <Pressable
                 key={prompt}
                 accessibilityRole="button"
@@ -575,7 +781,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
             <View style={styles.disclaimerCard}>
               <Text style={styles.disclaimerCardIcon}>{'\u2139\uFE0F'}</Text>
               <Text style={styles.disclaimerCardText}>
-                I use your own health records to answer. I am here to help, but I am not a doctor.
+                {isCaregiver
+                  ? "I use the elder's health records to answer caregiver questions. I am here to help, but I am not a doctor."
+                  : 'I use your own health records to answer. I am here to help, but I am not a doctor.'}
               </Text>
             </View>
           </View>
@@ -596,15 +804,10 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
           />
         ))}
 
-        {sending ? (
-          <View style={styles.thinkingRow}>
-            <ActivityIndicator size="small" color="#2563EB" />
-            <Text style={styles.thinkingText}>Looking through your records\u2026</Text>
-          </View>
-        ) : null}
+        {sending ? <AssistantProgressCard progressIndex={assistantProgressIndex} /> : null}
       </ScrollView>
 
-      {lastFollowUps.length > 0 && !sending ? (
+      {visibleFollowUps.length > 0 && !sending ? (
         <View style={styles.followUpPanel}>
           <Pressable
             accessibilityRole="button"
@@ -613,7 +816,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
             style={({ pressed }) => [styles.followUpHeader, pressed && styles.followUpHeaderPressed]}
           >
             <Text style={styles.followUpHeaderText}>Suggested questions</Text>
-            <Text style={styles.followUpHeaderCount}>{lastFollowUps.length}</Text>
+            <Text style={styles.followUpHeaderCount}>{visibleFollowUps.length}</Text>
             <Text style={styles.followUpHeaderArrow}>
               {followUpsCollapsed ? '\u25BE' : '\u25B4'}
             </Text>
@@ -621,7 +824,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
 
           {!followUpsCollapsed ? (
             <View style={styles.followUpRow}>
-              {lastFollowUps.map((q) => (
+              {visibleFollowUps.map((q) => (
                 <Pressable
                   key={q}
                   accessibilityRole="button"
@@ -664,7 +867,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
         <TextInput
           style={styles.textInput}
           placeholder={isListening ? 'I am listening\u2026' : 'Type your question here\u2026'}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#9b8a76"
           value={input}
           onChangeText={setInput}
           editable={!sending}
@@ -721,7 +924,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
 
             {loadingHistory ? (
               <View style={styles.historyLoading}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color="#2f6654" />
                 <Text style={styles.historyLoadingText}>Loading your chats\u2026</Text>
               </View>
             ) : null}
@@ -783,7 +986,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
                         </Text>
                       </View>
                       {isLoading ? (
-                        <ActivityIndicator size="small" color="#2563EB" />
+                        <ActivityIndicator size="small" color="#2f6654" />
                       ) : null}
                     </Pressable>
 
@@ -843,7 +1046,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
               value={renameValue}
               onChangeText={setRenameValue}
               placeholder="e.g. Weekly adherence review"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#9b8a76"
               autoFocus
               maxLength={80}
               editable={!renameSaving}
@@ -889,14 +1092,14 @@ const AssistantChatScreen = ({ initialPrompt, onBack }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: '#f7efe4' },
   header: {
     paddingTop: 34,
     paddingHorizontal: 18,
-    paddingBottom: 14,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: '#eadfcd',
+    backgroundColor: '#f7efe4',
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -915,42 +1118,78 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#fffdf8',
     marginLeft: 8,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: '#c6ddce',
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   headerPillIcon: { fontSize: 16, marginRight: 6 },
   headerPillText: {
-    color: '#1E3A8A',
+    color: '#2f6654',
     fontWeight: '900',
     fontSize: 16,
   },
-  backButton: { minHeight: 46, justifyContent: 'center', paddingVertical: 6, paddingRight: 8 },
-  backButtonText: { color: '#2563EB', fontWeight: '900', fontSize: 18 },
+  backButton: {
+    minHeight: 46,
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#fffdf8',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
+  },
+  backButtonText: { color: '#2f6654', fontWeight: '900', fontSize: 18 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 14,
+    minHeight: 126,
+    borderRadius: 22,
+    backgroundColor: '#2f6654',
+    borderWidth: 2,
+    borderColor: '#e5c44f',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    shadowColor: '#725e25',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
-  titleEmoji: { fontSize: 36, marginRight: 10 },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#111827' },
-  subtitle: { fontSize: 18, color: '#4B5563', marginTop: 2, lineHeight: 25 },
+  titleEmoji: {
+    width: 66,
+    height: 66,
+    borderRadius: 20,
+    backgroundColor: '#fff4b8',
+    fontSize: 34,
+    lineHeight: 66,
+    marginRight: 14,
+    textAlign: 'center',
+    overflow: 'hidden',
+  },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#FFFFFF' },
+  subtitle: { fontSize: 18, color: '#ecfff6', marginTop: 4, lineHeight: 25, fontWeight: '700' },
 
-  scroll: { flex: 1, backgroundColor: '#F9FAFB' },
-  scrollContent: { paddingVertical: 14, paddingBottom: 24 },
+  scroll: { flex: 1, backgroundColor: '#f7efe4' },
+  scrollContent: { paddingVertical: 16, paddingBottom: 26 },
   emptyState: { padding: 20 },
   emptyEmoji: { fontSize: 48, textAlign: 'center', marginBottom: 6 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
     textAlign: 'center',
     marginBottom: 8,
   },
   emptyHint: {
     fontSize: 18,
-    color: '#4B5563',
+    color: '#5e5143',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 27,
@@ -961,22 +1200,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 64,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: '#fffdf8',
+    borderRadius: 18,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderColor: '#cfe9dd',
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  suggestionPressed: { backgroundColor: '#EFF6FF' },
+  suggestionPressed: { backgroundColor: '#e3f8ee' },
   suggestionEmoji: { fontSize: 22, marginRight: 12 },
   suggestionText: {
     flex: 1,
-    color: '#111827',
+    color: '#18352f',
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '800',
@@ -986,31 +1225,128 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginTop: 18,
     padding: 14,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#fff7db',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#f1d572',
   },
   disclaimerCardIcon: { fontSize: 20, marginRight: 10 },
   disclaimerCardText: {
     flex: 1,
     fontSize: 16,
-    color: '#92400E',
+    color: '#725319',
     lineHeight: 24,
     fontWeight: '700',
   },
-  thinkingRow: {
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  progressAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#e3f8ee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 2,
+  },
+  progressAvatarText: { fontSize: 22 },
+  progressCard: {
+    flex: 1,
+    maxWidth: '84%',
+    backgroundColor: '#fffdf8',
+    borderWidth: 1,
+    borderColor: '#b8ead6',
+    borderRadius: 18,
+    borderBottomLeftRadius: 6,
+    padding: 14,
+  },
+  progressHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    minHeight: 28,
   },
-  thinkingText: { marginLeft: 10, color: '#4B5563', fontSize: 17, fontWeight: '700' },
+  progressTitle: {
+    flex: 1,
+    marginLeft: 10,
+    color: '#18352f',
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '900',
+  },
+  progressTrack: {
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: '#eadfcd',
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#2f6654',
+  },
+  progressStepList: {
+    marginTop: 12,
+  },
+  progressStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 30,
+    marginTop: 6,
+  },
+  progressStepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff8eb',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
+    marginRight: 9,
+  },
+  progressStepDotActive: {
+    backgroundColor: '#2f6654',
+    borderColor: '#2f6654',
+  },
+  progressStepDotDone: {
+    backgroundColor: '#168464',
+    borderColor: '#168464',
+  },
+  progressStepDotText: {
+    color: '#6B7280',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
+  progressStepDotTextActive: {
+    color: '#FFFFFF',
+  },
+  progressStepText: {
+    flex: 1,
+    color: '#6B7280',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  progressStepTextActive: {
+    color: '#2f6654',
+    fontWeight: '900',
+  },
+  progressStepTextDone: {
+    color: '#168464',
+    fontWeight: '800',
+  },
 
   followUpPanel: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fffdf8',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#eadfcd',
   },
   followUpHeader: {
     minHeight: 48,
@@ -1019,10 +1355,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  followUpHeaderPressed: { backgroundColor: '#E5E7EB' },
+  followUpHeaderPressed: { backgroundColor: '#f0e4d4' },
   followUpHeaderText: {
     flex: 1,
-    color: '#1F2937',
+    color: '#18352f',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1031,8 +1367,8 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: 10,
-    backgroundColor: '#DBEAFE',
-    color: '#1D4ED8',
+    backgroundColor: '#e3f8ee',
+    color: '#2f6654',
     textAlign: 'center',
     textAlignVertical: 'center',
     fontSize: 15,
@@ -1040,7 +1376,7 @@ const styles = StyleSheet.create({
     paddingTop: 3,
   },
   followUpHeaderArrow: {
-    color: '#1D4ED8',
+    color: '#2f6654',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1054,16 +1390,16 @@ const styles = StyleSheet.create({
   followUpChip: {
     flexShrink: 1,
     maxWidth: '48%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderWidth: 1.5,
-    borderColor: '#3B82F6',
+    borderColor: '#2f6654',
     paddingHorizontal: 14,
     minHeight: 52,
     paddingVertical: 12,
     borderRadius: 22,
   },
-  followUpChipPressed: { backgroundColor: '#EFF6FF' },
-  followUpText: { color: '#1D4ED8', fontWeight: '900', fontSize: 16, lineHeight: 21 },
+  followUpChipPressed: { backgroundColor: '#e3f8ee' },
+  followUpText: { color: '#2f6654', fontWeight: '900', fontSize: 16, lineHeight: 21 },
 
   errorBar: {
     backgroundColor: '#FEE2E2',
@@ -1080,20 +1416,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#eadfcd',
   },
   micButton: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#e3f8ee',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
     borderWidth: 2,
-    borderColor: '#22C55E',
+    borderColor: '#2f6654',
   },
   micButtonActive: {
     backgroundColor: '#FEE2E2',
@@ -1103,9 +1439,9 @@ const styles = StyleSheet.create({
   micLabel: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#166534',
+    color: '#2f6654',
     marginTop: 2,
-    letterSpacing: 0.4,
+    letterSpacing: 0,
   },
   micLabelActive: { color: '#991B1B' },
   textInput: {
@@ -1114,17 +1450,19 @@ const styles = StyleSheet.create({
     minHeight: 60,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fff8eb',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
     borderRadius: 28,
     fontSize: 18,
-    color: '#111827',
+    color: '#27231f',
     lineHeight: 25,
   },
   sendButton: {
     marginLeft: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#2f6654',
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1132,17 +1470,17 @@ const styles = StyleSheet.create({
     minHeight: 60,
     flexDirection: 'row',
   },
-  sendButtonDisabled: { backgroundColor: '#9CA3AF' },
+  sendButtonDisabled: { backgroundColor: '#a5aa9c' },
   sendButtonIcon: { color: '#FFFFFF', fontSize: 16, marginRight: 6 },
   sendButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 17 },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(47, 38, 27, 0.58)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
@@ -1156,28 +1494,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  modalTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
-  modalSubtitle: { fontSize: 16, lineHeight: 22, color: '#6B7280', marginTop: 2 },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: '#27231f' },
+  modalSubtitle: { fontSize: 16, lineHeight: 22, color: '#6b5a49', marginTop: 2 },
   modalCloseButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#f0e4d4',
     borderRadius: 999,
   },
-  modalCloseText: { color: '#374151', fontWeight: '900', fontSize: 16 },
+  modalCloseText: { color: '#2f6654', fontWeight: '900', fontSize: 16 },
 
   newChatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#e3f8ee',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#b8ead6',
   },
-  newChatIcon: { fontSize: 20, color: '#1D4ED8', marginRight: 12 },
-  newChatText: { color: '#1D4ED8', fontWeight: '800', fontSize: 17 },
+  newChatIcon: { fontSize: 20, color: '#2f6654', marginRight: 12 },
+  newChatText: { color: '#2f6654', fontWeight: '800', fontSize: 17 },
 
   historyLoading: {
     flexDirection: 'row',
@@ -1185,7 +1523,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
   },
-  historyLoadingText: { marginLeft: 10, color: '#4B5563', fontSize: 16, fontWeight: '700' },
+  historyLoadingText: { marginLeft: 10, color: '#5e5143', fontSize: 16, fontWeight: '700' },
   historyErrorText: {
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -1203,11 +1541,11 @@ const styles = StyleSheet.create({
   historyEmptyTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
     marginBottom: 4,
   },
   historyEmptyText: {
-    color: '#6B7280',
+    color: '#6b5a49',
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
@@ -1216,15 +1554,15 @@ const styles = StyleSheet.create({
   historyList: { paddingHorizontal: 14, paddingBottom: 16, paddingTop: 4 },
   historyRow: {
     borderRadius: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff8eb',
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#eadfcd',
     overflow: 'hidden',
   },
   historyRowCurrent: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#A5B4FC',
+    backgroundColor: '#e3f8ee',
+    borderColor: '#2f6654',
     borderWidth: 2,
   },
   historyRowTop: {
@@ -1239,25 +1577,25 @@ const styles = StyleSheet.create({
   historyRowTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#111827',
+    color: '#27231f',
   },
   historyRowSnippet: {
     fontSize: 16,
-    color: '#4B5563',
+    color: '#5e5143',
     marginTop: 4,
     lineHeight: 23,
   },
   historyRowTime: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#7d6b59',
     marginTop: 6,
     fontWeight: '600',
   },
   historyActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: '#eadfcd',
+    backgroundColor: '#fffdf8',
   },
   historyActionBtn: {
     flex: 1,
@@ -1268,20 +1606,20 @@ const styles = StyleSheet.create({
   },
   historyRenameBtn: {
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    borderRightColor: '#eadfcd',
   },
   historyDeleteBtn: {},
   historyActionIcon: { fontSize: 16, marginRight: 6 },
   historyActionText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#2f6654',
   },
   historyDeleteText: { color: '#B91C1C' },
 
   renameOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(47, 38, 27, 0.58)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -1289,10 +1627,10 @@ const styles = StyleSheet.create({
   renameDialog: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fffdf8',
     borderRadius: 20,
     padding: 22,
-    shadowColor: '#000',
+    shadowColor: '#4e3f31',
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -1302,12 +1640,12 @@ const styles = StyleSheet.create({
   renameTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: '#27231f',
     textAlign: 'center',
   },
   renameSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: '#6b5a49',
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 16,
@@ -1315,13 +1653,13 @@ const styles = StyleSheet.create({
   },
   renameInput: {
     borderWidth: 2,
-    borderColor: '#C7D2FE',
+    borderColor: '#b8ead6',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 17,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
+    color: '#27231f',
+    backgroundColor: '#fff8eb',
   },
   renameButtonRow: {
     flexDirection: 'row',
@@ -1338,15 +1676,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   renameCancelButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#f0e4d4',
     marginRight: 8,
   },
-  renameCancelText: { color: '#374151', fontWeight: '700', fontSize: 16 },
+  renameCancelText: { color: '#5e5143', fontWeight: '700', fontSize: 16 },
   renameSaveButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#2f6654',
     marginLeft: 8,
   },
-  renameSaveButtonDisabled: { backgroundColor: '#93C5FD' },
+  renameSaveButtonDisabled: { backgroundColor: '#a5aa9c' },
   renameSaveText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
 });
 

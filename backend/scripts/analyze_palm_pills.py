@@ -408,6 +408,7 @@ def _predict_with_detector(image: Image.Image, model_path: str) -> dict[str, Any
         }
 
     try:
+        os.environ.setdefault("YOLO_CONFIG_DIR", str((Path(__file__).resolve().parents[1] / "ml" / ".ultralytics").resolve()))
         from ultralytics import YOLO
     except Exception as error:
         return {

@@ -10,6 +10,9 @@ const {
   getRecentConcernCount,
   getSupportActivityByKey,
 } = require('../repositories/narrativeRepository');
+const { getProfileByElderId } = require('../repositories/profileRepository');
+const { createAlertsForCaregivers } = require('../repositories/alertRepository');
+const { evaluateAlertNeed } = require('../services/alertService');
 
 function validateProcessNarrativePayload(body) {
   const errors = [];
@@ -70,12 +73,19 @@ async function processNarrative(req, res) {
       baseRiskLevel: analysis.baseRiskLevel,
       recentSameConcernCount,
     });
-    const caregiverNotificationRequired = riskLevel === 'high';
+    const emotionalSupportAlertPayload = evaluateAlertNeed({
+      elderId: userId,
+      caregiverId: null,
+      detectedEmotion: analysis.detectedEmotionalState,
+      riskLevel,
+      negativeMoodCount7d: recentSameConcernCount,
+    });
+    const caregiverNotificationRequired = riskLevel === 'high' || Boolean(emotionalSupportAlertPayload);
     const { supportActivityKey, supportDirective } = getSupportDirective(
       analysis.detectedEmotionalState
     );
     const supportActivity = await getSupportActivityByKey(supportActivityKey);
-    const alertPayload = caregiverNotificationRequired
+    const alertPayload = riskLevel === 'high'
       ? buildCaregiverAlertPayload({
           detectedEmotionalState: analysis.detectedEmotionalState,
           recentSameConcernCount,
@@ -96,6 +106,24 @@ async function processNarrative(req, res) {
       detectionSource: analysis.detectionSource,
       modelVersion: analysis.modelVersion,
     });
+    let emotionalAlertsCreated = 0;
+    if (emotionalSupportAlertPayload) {
+      const profile = await getProfileByElderId(userId).catch(() => null);
+      const createdAlerts = await createAlertsForCaregivers({
+        elderId: userId,
+        caregiverIds: profile?.caregiverIds || [],
+        sessionId: null,
+        alertPayload: emotionalSupportAlertPayload,
+        explanation: {
+          source: 'reminiscence_narrative',
+          detectedEmotion: analysis.detectedEmotionalState,
+          recentSameConcernCount,
+          riskLevel,
+          concernSummary: emotionalSupportAlertPayload.concernSummary || null,
+        },
+      });
+      emotionalAlertsCreated = createdAlerts.length;
+    }
 
     return res.status(201).json({
       success: true,
@@ -105,6 +133,7 @@ async function processNarrative(req, res) {
       model_version: created.narrative.modelVersion,
       risk_level: created.narrative.riskLevel,
       caregiver_notification_required: created.narrative.caregiverNotificationRequired,
+      emotional_alerts_created: emotionalAlertsCreated,
       support_directive: created.narrative.supportDirective,
     });
   } catch (error) {

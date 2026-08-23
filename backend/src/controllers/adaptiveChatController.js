@@ -2,6 +2,10 @@ const { analyzeNarrative } = require('../services/narrativeAnalysisService');
 const { determineAnswerPolarity } = require('../services/answerPolarityService');
 const { aggregateAdaptiveSessionResult } = require('../services/adaptiveResultAggregator');
 const { recommendActivity } = require('../services/activityRecommendationService');
+const { getRecentConcernCount } = require('../repositories/narrativeRepository');
+const { getProfileByElderId } = require('../repositories/profileRepository');
+const { createAlertsForCaregivers } = require('../repositories/alertRepository');
+const { evaluateAlertNeed } = require('../services/alertService');
 const {
   getRepeatedHistoryState,
   selectFirstAdaptiveQuestion,
@@ -156,6 +160,11 @@ async function respondAdaptiveChat(req, res) {
     const detectedState = normalizeState(analysis.detectedEmotionalState);
     const answerPolarity = determineAnswerPolarity(answerText, { detectedEmotion: detectedState });
     const recentLogs = await getRecentCompletedAdaptiveEmotionHistory(userId, HISTORY_DAYS, HISTORY_LIMIT);
+    const recentSameConcernCount = await getRecentConcernCount({
+      userId,
+      detectedEmotionalState: detectedState,
+      days: HISTORY_DAYS,
+    });
     // Individual turns use base risk only. Repetition is assessed once, from the
     // completed five-turn aggregate session, by riskAssessmentService.
     const riskLevel = getBaseRisk(detectedState);
@@ -326,6 +335,33 @@ async function respondAdaptiveChat(req, res) {
       });
     }
 
+    let emotionalAlertsCreated = 0;
+    const emotionalSupportAlertPayload = evaluateAlertNeed({
+      elderId: userId,
+      caregiverId: null,
+      detectedEmotion: responsePayload.session.finalEmotionalState || responsePayload.turn.detectedState,
+      riskLevel: responsePayload.session.riskLevel,
+      negativeMoodCount7d: recentSameConcernCount,
+    });
+
+    if (emotionalSupportAlertPayload) {
+      const profile = await getProfileByElderId(userId).catch(() => null);
+      const createdAlerts = await createAlertsForCaregivers({
+        elderId: userId,
+        caregiverIds: profile?.caregiverIds || [],
+        sessionId: null,
+        alertPayload: emotionalSupportAlertPayload,
+        explanation: {
+          source: 'adaptive_support_chat',
+          detectedEmotion: responsePayload.session.finalEmotionalState || responsePayload.turn.detectedState,
+          recentSameConcernCount,
+          riskLevel: responsePayload.session.riskLevel,
+          concernSummary: emotionalSupportAlertPayload.concernSummary || null,
+        },
+      });
+      emotionalAlertsCreated = createdAlerts.length;
+    }
+
     return res.json({
       success: true,
       session_id: sessionId,
@@ -344,7 +380,8 @@ async function respondAdaptiveChat(req, res) {
       model_version: null,
       support_directive: publicSupportDirective(responsePayload.session.supportDirective),
       cognitive_engagement_status: responsePayload.cognitiveEngagementStatus,
-      caregiver_notification_required: responsePayload.caregiverNotificationRequired,
+      caregiver_notification_required: responsePayload.caregiverNotificationRequired || emotionalAlertsCreated > 0,
+      emotional_alerts_created: emotionalAlertsCreated,
       narrative_log_id: responsePayload.narrativeLog?.interactionId || null,
       caregiver_alert: responsePayload.alert || null,
     });
