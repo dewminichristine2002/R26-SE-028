@@ -63,10 +63,11 @@ export function getExpoSpeechRecognitionModule() {
       speechRecognitionModule = false;
       return null;
     }
-    speechRecognitionModule = {
-      ...pkg.ExpoSpeechRecognitionModule,
-      addSpeechRecognitionListener: pkg.addSpeechRecognitionListener,
-    };
+    speechRecognitionModule = pkg.ExpoSpeechRecognitionModule;
+    if (pkg.addSpeechRecognitionListener) {
+      speechRecognitionModule.addSpeechRecognitionListener =
+        pkg.addSpeechRecognitionListener;
+    }
     return speechRecognitionModule;
   } catch {
     speechRecognitionModule = false;
