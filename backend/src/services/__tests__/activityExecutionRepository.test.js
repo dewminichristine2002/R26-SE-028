@@ -1,4 +1,4 @@
-const { buildTaskSnapshot, findActiveAttempt } = require('../../repositories/activityExecutionRepository');
+const { buildTaskSnapshot, findActiveAttempt, findActiveSelfSelectedAttempt, listSelfSelectableActivities } = require('../../repositories/activityExecutionRepository');
 
 describe('activity attempt ownership', () => {
   test('active-attempt reuse is scoped to user, session, and activity', async () => {
@@ -7,6 +7,24 @@ describe('activity attempt ownership', () => {
     const [sql, values] = client.query.mock.calls[0];
     expect(sql).toContain('WHERE user_id = $1 AND adaptive_session_id = $2');
     expect(values).toEqual([9, 'session-1', 'word_category_easy']);
+  });
+
+  test('self-selected reuse is scoped to user and activity and does not require a session', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+    await findActiveSelfSelectedAttempt({ userId: 9, activityCode: 'odd_one_out_easy' }, client);
+    const [sql, values] = client.query.mock.calls[0];
+    expect(sql).toContain("activity_source = 'self_selected'");
+    expect(sql).not.toContain('adaptive_session_id = $');
+    expect(values).toEqual([9, 'odd_one_out_easy']);
+  });
+
+  test('library is sourced from active cognitive support activities', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+    await listSelfSelectableActivities(client);
+    const [sql] = client.query.mock.calls[0];
+    expect(sql).toContain('FROM support_activities');
+    expect(sql).toContain("category = 'cognitive_engagement'");
+    expect(sql).toContain('is_active = TRUE');
   });
 });
 
