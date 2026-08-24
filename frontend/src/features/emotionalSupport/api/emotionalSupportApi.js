@@ -64,6 +64,8 @@ export const respondAdaptiveChat = (payload) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-chat/respond', payload));
 export const startAdaptiveActivity = (payload) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-activities/start', payload));
+export const getCognitiveActivities = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get('/cognitive-activities', { params: { user_id: Number(userId) } }));
 export const submitAdaptiveActivity = (attemptId, payload) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.post(`/adaptive-activities/attempts/${attemptId}/submit`, payload));
 

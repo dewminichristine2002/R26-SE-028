@@ -86,7 +86,12 @@ async function analyzeNarrative(transcribedNarrative, options = {}) {
         fallbackReason: null,
       };
     }
-    return buildRuleFallbackAnalysis(transcribedNarrative, 'ml_below_threshold');
+    return {
+      ...buildRuleFallbackAnalysis(transcribedNarrative, 'ml_below_threshold'),
+      rawMlEmotion: prediction.emotion,
+      rawMlConfidence: prediction.confidence,
+      rawMlModelVersion: prediction.modelVersion,
+    };
   } catch (error) {
     return buildRuleFallbackAnalysis(transcribedNarrative, error.reason || 'ml_unavailable');
   }

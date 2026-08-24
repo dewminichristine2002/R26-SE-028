@@ -5,7 +5,7 @@ jest.mock('../../repositories/activityExecutionRepository', () => ({
 }));
 
 const repository = require('../../repositories/activityExecutionRepository');
-const { submitActivity } = require('../activityExecutionController');
+const { publicTask, submitActivity } = require('../activityExecutionController');
 
 function response() {
   return { statusCode: 200, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
@@ -42,5 +42,12 @@ describe('activity submission integrity', () => {
     await submitActivity({ params: { attemptId: attempt.attemptId }, body: { user_id: 1, response: { selectedAnswer: 'Carrot' } } }, res);
     expect(res.statusCode).toBe(409);
     expect(repository.completeAttempt).not.toHaveBeenCalled();
+  });
+});
+
+describe('task response safety', () => {
+  test('recursively removes every scoring key before a task reaches the frontend', () => {
+    const safe = publicTask({ taskSnapshot: { items: [{ id: 'one', correctAnswer: 'a' }, { id: 'two', correctAnswers: ['a'], correctOrder: ['a'] }] } });
+    expect(JSON.stringify(safe)).not.toMatch(/correctAnswer|correctAnswers|correctOrder/);
   });
 });

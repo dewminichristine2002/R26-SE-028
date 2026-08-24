@@ -172,6 +172,25 @@ describe('adaptiveQuestionSelector', () => {
     expect(selected.every((item) => item.isAssessment)).toBe(true);
     expect(await selectNextAdaptiveQuestion(nextContext({ nextQuestionNumber: 6 }), repo)).toBeNull();
   });
+
+  test('contextual sadness evidence adapts away from the generic neutral chain', async () => {
+    const sadnessQuestion = question('sad_energy', 'sadness', 'energy_motivation', { questionId: 20 });
+    const result = await selectNextAdaptiveQuestion(nextContext({ detectedEmotion: 'sadness', confidence: 0.65 }), repositoryFor([...bank, sadnessQuestion]));
+    expect(result.question.targetState).toBe('sadness');
+    expect(result.selectionReason.targetSource).toBe('current_answer');
+  });
+
+  test('recent opening questions receive deterministic cross-session penalties', async () => {
+    const alternateOpening = question('open_alternate', 'neutral', 'general_wellbeing', { questionId: 21, phase: 'opening', priority: 2 });
+    const repo = repositoryFor([...bank, alternateOpening]);
+    const result = await selectFirstAdaptiveQuestion({
+      userId: 1,
+      recentEmotionHistory: [],
+      recentQuestionUsage: [{ questionCode: 'open_general', recentCount: 2, mostRecentSessionRank: 1 }],
+    }, repo);
+    expect(result.question.questionCode).not.toBe('open_general');
+    expect(result.selectionReason.scoreBreakdown.recentQuestionDiversity).toBe(0);
+  });
 });
 
 describe('answer polarity', () => {

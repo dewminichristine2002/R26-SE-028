@@ -17,6 +17,8 @@ const SCORE_WEIGHTS = Object.freeze({
   NEUTRAL_FALLBACK: 5,
   REPEATED_DIMENSION_PENALTY: -10,
   CONTEXTUAL_MISMATCH_PENALTY: -10,
+  IMMEDIATE_PREVIOUS_SESSION_PENALTY: -30,
+  RECENT_QUESTION_FREQUENCY_PENALTY: -8,
 });
 
 const supportedStates = new Set([
@@ -125,6 +127,7 @@ function scoreCandidate(question, context) {
     uncertaintyClarification: 0,
     neutralFallback: 0,
     penalties: 0,
+    recentQuestionDiversity: 0,
   };
 
   if (strongCurrentEvidence && question.targetState === currentEmotion) {
@@ -153,6 +156,14 @@ function scoreCandidate(question, context) {
   if (strongCurrentEvidence && question.targetState !== currentEmotion && question.targetState !== 'neutral') {
     breakdown.penalties += SCORE_WEIGHTS.CONTEXTUAL_MISMATCH_PENALTY;
   }
+  const recentUsage = (context.recentQuestionUsage || []).find((entry) => entry.questionCode === question.questionCode);
+  if (recentUsage) {
+    breakdown.recentQuestionDiversity += Number(recentUsage.mostRecentSessionRank) === 1
+      ? SCORE_WEIGHTS.IMMEDIATE_PREVIOUS_SESSION_PENALTY
+      : 0;
+    breakdown.recentQuestionDiversity += Math.min(3, Number(recentUsage.recentCount || 0))
+      * SCORE_WEIGHTS.RECENT_QUESTION_FREQUENCY_PENALTY;
+  }
 
   return {
     valid: true,
@@ -168,7 +179,7 @@ function chooseHighestScoring(candidates, context) {
     .sort((a, b) => b.score - a.score || Number(a.question.priority || 1) - Number(b.question.priority || 1) || a.question.questionCode.localeCompare(b.question.questionCode))[0] || null;
 }
 
-function buildSelectionReason({ selected, context, target }) {
+function buildSelectionReason({ selected, context, target, candidates = [] }) {
   return {
     targetState: target.targetState,
     targetSource: target.source,
@@ -180,6 +191,11 @@ function buildSelectionReason({ selected, context, target }) {
     selectedDimension: selected.question.assessmentDimension,
     score: selected.score,
     scoreBreakdown: selected.breakdown,
+    candidateScores: candidates
+      .map((question) => ({ questionCode: question.questionCode, targetState: question.targetState, ...scoreCandidate(question, context) }))
+      .filter((entry) => entry.valid)
+      .sort((a, b) => b.score - a.score || a.questionCode.localeCompare(b.questionCode))
+      .map(({ questionCode, targetState, score, breakdown }) => ({ questionCode, targetState, score, breakdown })),
   };
 }
 
@@ -208,11 +224,11 @@ async function selectNextAdaptiveQuestion(context, repository = questionReposito
 
   return {
     question: selected.question,
-    selectionReason: buildSelectionReason({ selected, context, target }),
+    selectionReason: buildSelectionReason({ selected, context, target, candidates }),
   };
 }
 
-async function selectFirstAdaptiveQuestion({ userId, recentEmotionHistory = [] }, repository = questionRepository) {
+async function selectFirstAdaptiveQuestion({ userId, recentEmotionHistory = [], recentQuestionUsage = [] }, repository = questionRepository) {
   const historyTarget = getRepeatedHistoryState(recentEmotionHistory);
   const targetState = historyTarget || 'neutral';
   const candidates = await repository.getAssessmentCandidates({ targetState });
@@ -227,6 +243,7 @@ async function selectFirstAdaptiveQuestion({ userId, recentEmotionHistory = [] }
     askedQuestionIds: [],
     askedQuestionCodes: [],
     askedDimensions: [],
+    recentQuestionUsage,
   };
   const selected = chooseHighestScoring(eligibleCandidates.length ? eligibleCandidates : candidates, context);
   if (!selected) return null;
@@ -237,6 +254,7 @@ async function selectFirstAdaptiveQuestion({ userId, recentEmotionHistory = [] }
       selected,
       context,
       target: { targetState, source: historyTarget ? 'repeated_recent_history' : 'neutral_opening' },
+      candidates: eligibleCandidates.length ? eligibleCandidates : candidates,
     }),
   };
 }

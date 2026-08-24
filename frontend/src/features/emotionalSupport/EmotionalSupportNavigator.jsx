@@ -8,6 +8,7 @@ import SupportMoodCheckInScreen from './screens/SupportMoodCheckInScreen';
 import SupportResultScreen from './screens/SupportResultScreen';
 import CognitiveActivityScreen from './screens/CognitiveActivityScreen';
 import CalmingActivityScreen from './screens/CalmingActivityScreen';
+import CognitiveActivityLibraryScreen from './screens/CognitiveActivityLibraryScreen';
 
 const routes = {
   ElderHome: ElderHomeScreen,
@@ -17,6 +18,7 @@ const routes = {
   ReminiscenceActivityScreen,
   CognitiveActivityScreen,
   CalmingActivityScreen,
+  CognitiveActivityLibraryScreen,
   EmotionalTrendScreen,
 };
 

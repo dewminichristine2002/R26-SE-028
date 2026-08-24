@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,9 +11,15 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { respondAdaptiveChat, startAdaptiveChat } from '../api/emotionalSupportApi';
+import { ListenControl, VoiceAnswerControl, VoiceStatus } from '../components/VoiceControls';
+import { Button, Card, Greeting, InlineState, Progress, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
+import useEnglishVoice from '../voice/useEnglishVoice';
+import { colors, radius, screenInsets, spacing, type } from '../theme';
+import { getPersonalizedGreeting } from '../utils/personalization';
 
 const TOTAL_QUESTIONS = 5;
 
@@ -21,15 +28,21 @@ function normalizeQuestion(question) {
     return null;
   }
 
+  const sourceReplies = question.quick_replies ?? question.quickReplies ?? [];
   return {
     questionId: question.question_id ?? question.questionId,
     questionText: question.question_text ?? question.questionText ?? '',
     responseType: question.response_type ?? question.responseType ?? 'free_text',
+    quickReplies: Array.isArray(sourceReplies) ? sourceReplies.slice(0, 3).map((reply, index) => ({
+      id: String(reply?.id || `reply_${index + 1}`),
+      label: String(reply?.label || reply?.value || '').trim(),
+      value: String(reply?.value || reply?.label || '').trim(),
+    })).filter((reply) => reply.label && reply.value) : [],
   };
 }
 
 export default function AdaptiveSupportChatScreen({ navigation }) {
-  const { elderId } = useEmotionalSupportContext();
+  const { elderId, user } = useEmotionalSupportContext();
   const [sessionId, setSessionId] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [currentAnswer, setCurrentAnswer] = useState('');
@@ -38,6 +51,19 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const { width } = useWindowDimensions();
+  const questionMotion = useRef(new Animated.Value(0));
+  const submissionLockRef = useRef(false);
+  const spokenQuestionRef = useRef(null);
+  const handleTranscript = useCallback((transcript) => {
+    setCurrentAnswer(transcript);
+    setVoiceTranscript(transcript);
+  }, []);
+  const voice = useEnglishVoice({ onTranscript: handleTranscript });
+  const greeting = useMemo(() => getPersonalizedGreeting(user), [user]);
+  const selectedQuickReplyId = useMemo(() => currentQuestion?.quickReplies?.find((reply) => reply.value === currentAnswer)?.id || null, [currentAnswer, currentQuestion]);
 
   const canSend = useMemo(
     () => currentAnswer.trim().length > 0 && !loading && !sending && Boolean(currentQuestion),
@@ -86,12 +112,27 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
     };
   }, [elderId]);
 
+  useEffect(() => {
+    const questionKey = currentQuestion?.questionId;
+    if (!questionKey || !currentQuestion?.questionText || spokenQuestionRef.current === questionKey) return;
+    spokenQuestionRef.current = questionKey;
+    voice.speak(currentQuestion.questionText);
+  }, [currentQuestion?.questionId, currentQuestion?.questionText, voice.speak]);
+
+  useEffect(() => {
+    if (!currentQuestion?.questionId) return;
+    questionMotion.current.setValue(0);
+    Animated.timing(questionMotion.current, { toValue: 1, duration: 230, useNativeDriver: true }).start();
+  }, [currentQuestion?.questionId]);
+
   async function handleSendAnswer() {
-    if (!canSend) {
+    if (!canSend || submissionLockRef.current || voice.isListening) {
       return;
     }
 
     try {
+      submissionLockRef.current = true;
+      voice.stopAll();
       setSending(true);
       setErrorMessage('');
 
@@ -109,6 +150,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
       ];
 
       if (response.is_complete) {
+        voice.stopAll();
         navigation.navigate('SupportResultScreen', {
           detected_emotional_state: response.final_emotional_state,
           support_directive: response.support_directive,
@@ -130,57 +172,40 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
       ]);
       setCurrentQuestion(nextQuestion);
       setCurrentAnswer('');
+      setVoiceTranscript('');
       setQuestionIndex(Number(response.question_number) || questionIndex + 1);
     } catch (sendError) {
       setErrorMessage(sendError.message || 'We could not send your answer right now.');
     } finally {
       setSending(false);
+      submissionLockRef.current = false;
     }
   }
 
+  function handleQuickReply(reply) {
+    setCurrentAnswer(reply.value);
+    setVoiceTranscript('');
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}><WellnessBackdrop />
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.title}>Adaptive Check-In</Text>
-            <Text style={styles.subtitle}>
-              Answer one small question at a time. The next question adapts to your answer.
-            </Text>
-          </View>
-
-          <View style={styles.progressCard}>
-            <Text style={styles.progressText}>Question {Math.min(questionIndex, TOTAL_QUESTIONS)} of {TOTAL_QUESTIONS}</Text>
-          </View>
-
-          {messages.map((message) => {
-            const isBot = message.actor === 'bot';
-
-            return (
-              <View key={message.id} style={[styles.messageRow, isBot ? styles.botRow : styles.userRow]}>
-                <View style={[styles.bubble, isBot ? styles.botBubble : styles.userBubble]}>
-                  <Text style={[styles.messageText, isBot ? styles.botText : styles.userText]}>
-                    {message.text}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
+          <Greeting text={greeting} /><ScreenHeader navigation={navigation} title="Adaptive Check-In" subtitle="One question at a time." />
+          <Progress current={Math.min(questionIndex, TOTAL_QUESTIONS)} total={TOTAL_QUESTIONS} />
+          {messages.filter((m) => m.actor === 'user').length ? <View style={styles.historyWrap}><Pressable onPress={() => setShowHistory((v) => !v)} style={styles.historyToggle}><Text style={styles.historyLabel}>{showHistory ? 'Hide previous answers' : 'View previous answers'}</Text><Text style={styles.historyArrow}>{showHistory ? '⌃' : '⌄'}</Text></Pressable>{showHistory ? messages.filter((m) => m.actor === 'user').map((m) => <View key={m.id} style={styles.previous}><Text style={styles.previousLabel}>Previous answer</Text><Text numberOfLines={3} style={styles.previousText}>{m.text}</Text></View>) : <View style={styles.previous}><Text style={styles.previousLabel}>Previous answer</Text><Text numberOfLines={1} style={styles.previousText}>{messages.filter((m) => m.actor === 'user').slice(-1)[0]?.text}</Text></View>}</View> : null}
+          {!loading && currentQuestion ? <Animated.View style={{ opacity: questionMotion.current, transform: [{ translateY: questionMotion.current.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}><Card style={styles.questionCard}><View style={styles.questionAccent} /><View style={styles.questionTop}><View style={styles.questionMark}><Text style={styles.questionMarkText}>?</Text></View><Text style={styles.questionEyebrow}>CURRENT QUESTION</Text></View><Text style={styles.questionText}>{currentQuestion.questionText}</Text><ListenControl isSpeaking={voice.isSpeaking} onPress={() => voice.isSpeaking ? voice.stopSpeaking() : voice.speak(currentQuestion.questionText)} /></Card></Animated.View> : null}
+          {!loading && currentQuestion?.quickReplies?.length ? <View style={styles.quickSection}><Text style={styles.quickTitle}>Quick answers</Text>{currentQuestion.quickReplies.map((reply) => { const selected = reply.id === selectedQuickReplyId; return <Pressable key={reply.id} accessibilityRole="button" accessibilityLabel={`Quick answer: ${reply.label}`} accessibilityState={{ selected }} onPress={() => handleQuickReply(reply)} style={({ pressed }) => [styles.quickReply, selected && styles.quickReplySelected, pressed && styles.quickReplyPressed]}><Text style={[styles.quickReplyText, selected && styles.quickReplyTextSelected]}>{reply.label}</Text><View style={[styles.quickMark, selected && styles.quickMarkSelected]}>{selected ? <Text style={styles.quickMarkText}>OK</Text> : null}</View></Pressable>; })}<View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or answer in your own words</Text><View style={styles.orLine} /></View></View> : !loading && currentQuestion ? <Text style={styles.ownWords}>Answer in your own words</Text> : null}
 
           {loading ? (
-            <View style={styles.loadingCard}>
-              <ActivityIndicator color="#2F6F62" />
-              <Text style={styles.loadingText}>Loading your first adaptive question...</Text>
-            </View>
+            <InlineState loading emptyText="Loading your next question…" />
           ) : null}
 
           {errorMessage ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
+            <InlineState error />
           ) : null}
 
           <View style={styles.inputCard}>
@@ -191,23 +216,13 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
               onChangeText={setCurrentAnswer}
               multiline
               editable={!loading && !sending}
-              placeholder="Type your answer here..."
-              placeholderTextColor="#7D8B8B"
+              placeholder="Type your answer..."
+              placeholderTextColor={colors.secondary}
               textAlignVertical="top"
             />
+            <VoiceStatus audioState={voice.audioState} error={voice.voiceError} transcript={voiceTranscript} />
           </View>
-
-          <Pressable
-            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-            onPress={handleSendAnswer}
-            disabled={!canSend}
-          >
-            {sending ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.sendButtonText}>Send Answer</Text>
-            )}
-          </Pressable>
+          <View style={[styles.actionRow, width < 370 && styles.actionStack]}><VoiceAnswerControl compact audioState={voice.audioState} disabled={loading || sending} onStart={voice.startListening} onStop={() => voice.stopListening()} /><Button style={styles.continue} label="Continue" loading={sending} disabled={!canSend || voice.isListening} onPress={handleSendAnswer} /></View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -215,9 +230,9 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F8F5' },
+  safeArea: { flex: 1, backgroundColor: colors.background },
   keyboardView: { flex: 1 },
-  container: { paddingHorizontal: 22, paddingTop: 30, paddingBottom: 40 },
+  container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
   header: { marginBottom: 18 },
   title: { color: '#173E37', fontSize: 34, fontWeight: '900', lineHeight: 42 },
   subtitle: { color: '#546B64', fontSize: 18, fontWeight: '700', lineHeight: 26, marginTop: 8 },
@@ -267,14 +282,15 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   errorText: { color: '#9B1C1C', fontSize: 16, fontWeight: '700', lineHeight: 22 },
-  inputCard: {
+  questionCard: { marginTop: spacing.xl, overflow: 'hidden' }, questionAccent: { backgroundColor: colors.mint, borderRadius: 60, height: 120, position: 'absolute', right: -45, top: -55, width: 120 }, questionTop: { alignItems: 'center', flexDirection: 'row' }, questionMark: { alignItems: 'center', backgroundColor: colors.mint, borderRadius: 14, height: 28, justifyContent: 'center', marginRight: spacing.sm, width: 28 }, questionMarkText: { color: colors.primary, fontSize: 16, fontWeight: '900' }, questionEyebrow: { ...type.meta, color: colors.primary, letterSpacing: 1 }, questionText: { ...type.question, color: colors.text, marginTop: spacing.md }, historyWrap: { marginTop: spacing.lg }, historyToggle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 44 }, historyLabel: { ...type.meta, color: colors.primary, fontWeight: '900' }, historyArrow: { color: colors.primary, fontSize: 20 }, previous: { backgroundColor: colors.mint, borderRadius: radius.small, marginBottom: spacing.sm, padding: spacing.md }, previousLabel: { ...type.meta, color: colors.secondary }, previousText: { ...type.body, color: colors.text, marginTop: 2 }, inputCard: {
     backgroundColor: '#FFFFFF',
     borderColor: '#D8E9E0',
     borderRadius: 22,
-    borderWidth: 2,
+    borderWidth: 1,
     marginTop: 18,
     padding: 18,
   },
+  quickSection: { marginTop: spacing.xl }, quickTitle: { ...type.card, color: colors.text, marginBottom: spacing.sm }, quickReply: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.button, borderWidth: 1, flexDirection: 'row', marginTop: spacing.sm, minHeight: 56, paddingHorizontal: spacing.lg, paddingVertical: spacing.md }, quickReplySelected: { backgroundColor: colors.mint, borderColor: colors.primary, borderWidth: 1.5 }, quickReplyPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] }, quickReplyText: { ...type.body, color: colors.text, flex: 1, fontWeight: '800' }, quickReplyTextSelected: { color: colors.primary, fontWeight: '900' }, quickMark: { alignItems: 'center', borderColor: colors.border, borderRadius: 14, borderWidth: 1.5, height: 28, justifyContent: 'center', marginLeft: spacing.md, width: 28 }, quickMarkSelected: { backgroundColor: colors.primary, borderColor: colors.primary }, quickMarkText: { color: colors.white, fontSize: 8, fontWeight: '900' }, orRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl }, orLine: { backgroundColor: colors.border, flex: 1, height: 1 }, orText: { ...type.meta, color: colors.secondary, textAlign: 'center' }, ownWords: { ...type.card, color: colors.text, marginTop: spacing.xl },
   inputLabel: { color: '#173E37', fontSize: 20, fontWeight: '900', marginBottom: 12 },
   input: {
     backgroundColor: '#F9FCFA',
@@ -283,11 +299,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: '#18332E',
     fontSize: 18,
-    minHeight: 130,
+    minHeight: 88,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  sendButton: {
+  actionRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }, actionStack: { flexDirection: 'column' }, continue: { flex: 1 }, sendButton: {
     alignItems: 'center',
     backgroundColor: '#2F6F62',
     borderRadius: 20,

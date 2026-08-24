@@ -40,4 +40,6 @@ describe('dynamic activity recommendation', () => {
     expect(recommendActivity(input)).toEqual(recommendActivity(input));
   });
   test('high risk never receives medium cognitive activity', () => expect(recommendActivity(context('happiness', { riskLevel: 'high' })).recommendation.difficulty).toBe('easy'));
+  test('a persisted Medium recommendation is used when the new context remains safe', () => expect(recommendActivity(context('neutral', { recommendedDifficulty: 'medium' })).recommendation.difficulty).toBe('medium'));
+  test('cognitive fog overrides a persisted Medium recommendation', () => expect(recommendActivity(context('cognitive_fog', { recommendedDifficulty: 'medium' })).recommendation.difficulty).toBe('easy'));
 });

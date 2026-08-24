@@ -47,7 +47,7 @@ function buildWellnessTrends({ userId, period = '7d', sessions = [], activities 
       days_active: activeDates.size,
       reminiscence: { completed_count: categoryCounts.reminiscence_engagement, total_duration_ms: durationByCategory.reminiscence_engagement, recent_activity: validActivities.find((item) => item.category === 'reminiscence_engagement')?.activityCode || null },
       calming: { completed_count: categoryCounts.calming_support, total_duration_ms: durationByCategory.calming_support, recent_activity: validActivities.find((item) => item.category === 'calming_support')?.activityCode || null },
-      recent_activity_log: validActivities.slice(0, 20).map((item) => ({ date: dateKey(item.completedAt), completed_at: item.completedAt, activity_code: item.activityCode, activity_type: item.activityType, category: item.category, difficulty: item.difficulty, accuracy: item.category === 'cognitive_engagement' ? item.accuracy : null, response_time_ms: item.responseTimeMs })),
+      recent_activity_log: validActivities.slice(0, 20).map((item) => ({ date: dateKey(item.completedAt), completed_at: item.completedAt, activity_code: item.activityCode, activity_type: item.activityType, activity_source: item.activitySource || 'recommended', category: item.category, difficulty: item.difficulty, accuracy: item.category === 'cognitive_engagement' ? item.accuracy : null, response_time_ms: item.responseTimeMs })),
     },
     cognitive_engagement: {
       activities_completed: cognitive.length, scored_activities: scored.length,

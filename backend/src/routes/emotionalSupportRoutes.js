@@ -25,6 +25,7 @@ router.get('/adaptive-question-bank/next', adaptiveQuestionBankController.getNex
 router.post('/adaptive-chat/start', adaptiveChatController.startAdaptiveChat);
 router.post('/adaptive-chat/respond', adaptiveChatController.respondAdaptiveChat);
 router.post('/adaptive-activities/start', activityExecutionController.startActivity);
+router.get('/cognitive-activities', activityExecutionController.listCognitiveActivities);
 router.post('/adaptive-activities/attempts/:attemptId/submit', activityExecutionController.submitActivity);
 router.get('/sessions/:sessionId/chat-logs', checkInController.getChatLogs);
 router.get('/elders/:elderId/history', checkInController.getHistory);

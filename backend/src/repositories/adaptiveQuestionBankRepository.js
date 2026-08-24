@@ -1,5 +1,15 @@
 const { query } = require('../db/postgres');
 
+function normalizeQuickReplies(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).map((reply, index) => {
+    const label = String(reply?.label || reply?.value || '').trim();
+    const responseValue = String(reply?.value || label).trim();
+    if (!label || !responseValue) return null;
+    return { id: String(reply?.id || `reply_${index + 1}`), label, value: responseValue };
+  }).filter(Boolean);
+}
+
 function mapQuestion(row) {
   if (!row) {
     return null;
@@ -16,6 +26,7 @@ function mapQuestion(row) {
     triggerKeywords: row.triggerKeywords,
     questionText: row.questionText,
     responseType: row.responseType,
+    quickReplies: normalizeQuickReplies(row.quickReplies),
     priority: row.priority,
     constructSource: row.constructSource,
     isActive: row.isActive,
@@ -27,6 +38,9 @@ function mapQuestion(row) {
     isAssessment: Boolean(row.isAssessment),
     minConfidence: row.minConfidence == null ? null : Number(row.minConfidence),
     difficulty: row.difficulty,
+    positiveResponseEffect: row.positiveResponseEffect,
+    negativeResponseEffect: row.negativeResponseEffect,
+    neutralResponseEffect: row.neutralResponseEffect,
   };
 }
 
@@ -41,6 +55,7 @@ const assessmentColumns = `
   trigger_keywords AS "triggerKeywords",
   question_text AS "questionText",
   response_type AS "responseType",
+  quick_replies AS "quickReplies",
   priority,
   construct_source AS "constructSource",
   is_active AS "isActive",
@@ -51,7 +66,10 @@ const assessmentColumns = `
   assessment_dimension AS "assessmentDimension",
   is_assessment AS "isAssessment",
   min_confidence AS "minConfidence",
-  difficulty
+  difficulty,
+  positive_response_effect AS "positiveResponseEffect",
+  negative_response_effect AS "negativeResponseEffect",
+  neutral_response_effect AS "neutralResponseEffect"
 `;
 
 async function getAssessmentQuestionByCode(questionCode) {
@@ -124,6 +142,7 @@ async function getOpeningQuestion() {
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -152,6 +171,7 @@ async function getQuestionByCode(questionCode) {
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -187,6 +207,7 @@ async function getQuestionByTargetState(targetState, excludedQuestionCode = null
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -226,6 +247,7 @@ async function getAnyActiveQuestion(targetState = null) {
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -286,6 +308,7 @@ async function getQuestionByCriteria({
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -328,4 +351,5 @@ module.exports = {
   getQuestionByCriteria,
   getQuestionById,
   getAnyActiveQuestion,
+  normalizeQuickReplies,
 };

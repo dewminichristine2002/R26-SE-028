@@ -1,85 +1,46 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getWellnessSummary, getWellnessTrends } from '../api/emotionalSupportApi';
+import { Button, Card, InlineState, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
+import { activityStyles, colors, emotionStyles, radius, screenInsets, spacing, type } from '../theme';
 
-const label = (value) => String(value || 'Not available').replace(/_/g, ' ');
-const percent = (value) => `${Math.round(Number(value) * 100)}%`;
-const seconds = (value) => value == null ? 'Not available' : `${Math.round(value / 100) / 10} sec`;
-const dateLabel = (value) => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+const label = (value) => String(value || 'Not available').replace(/_(easy|medium)$/i, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const pct = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+const time = (value) => value == null ? '—' : `${Math.round(value / 100) / 10} sec`;
+const date = (value) => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
-export default function EmotionalTrendScreen() {
-  const { elderId } = useEmotionalSupportContext();
-  const [period, setPeriod] = useState('7d');
-  const [trends, setTrends] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let active = true;
-    setLoading(true); setError(''); setSummary(null);
-    if (!elderId) { setError('Please sign in again to view wellness trends.'); setLoading(false); return () => { active = false; }; }
-    getWellnessTrends(elderId, period).then((data) => active && setTrends(data)).catch((requestError) => active && setError(requestError.message)).finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, [elderId, period]);
-
-  async function showSummary() {
-    try { setSummary(await getWellnessSummary(elderId, period)); } catch (requestError) { setError(requestError.message); }
-  }
-
-  const emotional = trends?.emotional;
-  const activities = trends?.activities;
-  const cognitive = trends?.cognitive_engagement;
-  return <SafeAreaView style={styles.safeArea}><ScrollView contentContainerStyle={styles.container}>
-    <Text style={styles.title}>Your Wellness Trends</Text>
-    <Text style={styles.subtitle}>App-based emotional check-ins and engagement activity history.</Text>
-    <View style={styles.tabs}>{['7d', '30d'].map((value) => <Pressable key={value} style={[styles.tab, period === value && styles.tabActive]} onPress={() => setPeriod(value)}><Text style={[styles.tabText, period === value && styles.tabTextActive]}>{value === '7d' ? '7 Days' : '30 Days'}</Text></Pressable>)}</View>
-    {loading ? <View style={styles.loading}><ActivityIndicator color="#236F60" /><Text style={styles.muted}>Loading history…</Text></View> : null}
-    {error ? <Text style={styles.error}>{error}</Text> : null}
-    {!loading && trends ? <>
-      <View style={styles.summaryRow}>
-        <SummaryCard title="Check-ins" value={emotional.total_checkins} />
-        <SummaryCard title="Activities" value={activities.total_completed} />
-        <SummaryCard title="Frequent State" value={label(emotional.most_frequent_emotion)} />
-      </View>
-      <Section title="Emotional Check-In History">
-        {emotional.total_checkins ? emotional.distribution.filter((item) => item.count).map((item) => <View key={item.emotion} style={styles.barRow}><Text style={styles.barLabel}>{label(item.emotion)}</Text><View style={styles.barTrack}><View style={[styles.barFill, { width: `${item.percentage}%` }]} /></View><Text style={styles.barValue}>{item.count} · {item.percentage}%</Text></View>) : <Empty text="No completed emotional check-ins in this period." />}
-        {emotional.timeline.map((item) => <View key={item.completed_at} style={styles.timelineRow}><Text style={styles.timelineDate}>{dateLabel(item.completed_at)}</Text><Text style={styles.timelineEmotion}>{label(item.emotion)}</Text><Text style={styles.timelineRisk}>{label(item.risk)} support</Text></View>)}
+export default function EmotionalTrendScreen({ navigation }) {
+  const { elderId } = useEmotionalSupportContext(); const [period, setPeriod] = useState('7d'); const [data, setData] = useState(null); const [summary, setSummary] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(false); const [summaryLoading, setSummaryLoading] = useState(false);
+  const load = useCallback(async () => { try { setLoading(true); setError(false); if (!elderId) throw new Error(); setData(await getWellnessTrends(elderId, period)); } catch { setError(true); } finally { setLoading(false); } }, [elderId, period]);
+  useEffect(() => { load(); }, [load]);
+  async function toggleSummary() { if (summary) return setSummary(null); try { setSummaryLoading(true); setSummary(await getWellnessSummary(elderId, period)); } catch { setError(true); } finally { setSummaryLoading(false); } }
+  const emotional = data?.emotional || {}; const activities = data?.activities || {}; const cognitive = data?.cognitive_engagement || {};
+  return <SafeAreaView style={s.safe}><WellnessBackdrop /><ScrollView contentContainerStyle={s.container}>
+    <ScreenHeader navigation={navigation} title="Your Wellness" subtitle="Your recent check-ins and engagement activity." />
+    <View style={s.tabs}>{[['7d', '7 Days'], ['30d', '30 Days']].map(([value, text]) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: period === value }} key={value} onPress={() => setPeriod(value)} style={[s.tab, period === value && s.tabActive]}><Text style={[s.tabText, period === value && s.tabTextActive]}>{text}</Text></Pressable>)}</View>
+    <InlineState loading={loading} error={error} onRetry={load} emptyText="Loading your trends…" />
+    {!loading && !error && data ? <>
+      <View style={s.summaryRow}><MetricCard value={emotional.total_checkins || 0} label="Check-ins" /><MetricCard value={activities.total_completed || 0} label="Activities" /></View>
+      <Card style={s.frequent}><Text style={s.meta}>Most Frequent State</Text><Text style={s.frequentValue}>{emotional.total_checkins ? label(emotional.most_frequent_emotion) : 'No check-ins yet'}</Text></Card>
+      <Section title="Emotional Check-Ins">
+        {emotional.total_checkins ? emotional.distribution?.filter((x) => x.count).map((item) => <EmotionBar key={item.emotion} item={item} />) : <Empty title="No check-ins yet" text="Complete a short check-in to begin building your wellness history." />}
+        {emotional.timeline?.length ? <Text style={s.subheading}>Recent check-ins</Text> : null}
+        {emotional.timeline?.map((item, index) => { const look = emotionStyles[item.emotion] || emotionStyles.neutral; return <View key={`${item.completed_at}-${index}`} style={s.timeline}><Text style={s.date}>{date(item.completed_at)}</Text><View style={[s.dot, { backgroundColor: look.accent }]} /><Text style={s.timelineLabel}>{label(item.emotion)}</Text></View>; })}
       </Section>
-      <Section title="Cognitive Activity">
-        {cognitive.scored_activities ? <>
-          <Metric label="Activities Completed" value={cognitive.activities_completed} />
-          <Metric label="Average Activity Accuracy" value={percent(cognitive.average_activity_accuracy)} />
-          <Metric label="Recent Difficulty" value={label(cognitive.recent_difficulty)} />
-          <Metric label="Average Activity Time" value={seconds(cognitive.average_response_time_ms)} />
-          <Text style={styles.subheading}>Activity Accuracy Over Time</Text>
-          {cognitive.accuracy_history.map((item, index) => <View key={`${item.date}-${item.activity_code}-${index}`} style={styles.accuracyRow}><Text style={styles.accuracyDate}>{dateLabel(item.date)}</Text><View style={styles.accuracyTrack}><View style={[styles.accuracyFill, { width: `${item.accuracy * 100}%` }]} /></View><Text style={styles.accuracyValue}>{percent(item.accuracy)}</Text></View>)}
-          <Text style={styles.note}>Difficulty reflects the activity used by the app, not a medical assessment.</Text>
-        </> : <Empty text="No cognitive activity data yet." />}
+      <Section title="Cognitive Engagement">
+        {cognitive.scored_activities ? <><View style={s.grid}><MetricCard value={cognitive.activities_completed} label="Activities Completed" /><MetricCard value={pct(cognitive.average_activity_accuracy)} label="Average Activity Accuracy" /><MetricCard value={label(cognitive.recent_difficulty)} label="Recent Difficulty" /><MetricCard value={time(cognitive.average_response_time_ms)} label="Average Activity Time" /></View><Text style={s.subheading}>Activity Accuracy</Text>{cognitive.accuracy_history?.length === 1 ? <View style={s.onePoint}><Text style={s.onePointValue}>{pct(cognitive.accuracy_history[0].accuracy)}</Text><Text style={s.meta}>{date(cognitive.accuracy_history[0].date)}</Text><Text style={s.body}>1 activity recorded</Text></View> : cognitive.accuracy_history?.map((item, i) => <Accuracy key={`${item.date}-${i}`} item={item} />)}<Text style={s.note}>Difficulty and accuracy describe app activities only, not a medical assessment.</Text></> : <Empty title="No cognitive activities completed yet" text="Your activity history will appear here after completion." />}
       </Section>
-      <Section title="Recent Activity">
-        {activities.recent_activity_log.length ? activities.recent_activity_log.map((item, index) => <View key={`${item.completed_at}-${index}`} style={styles.activityRow}><View><Text style={styles.activityTitle}>{label(item.activity_code)}</Text><Text style={styles.muted}>{dateLabel(item.completed_at)} · {label(item.difficulty)}</Text></View><Text style={styles.activityResult}>{item.accuracy == null ? 'Completed' : `Activity Accuracy: ${percent(item.accuracy)}`}</Text></View>) : <Empty text="No completed activities in this period." />}
-      </Section>
-      <Pressable style={styles.summaryButton} onPress={showSummary}><Text style={styles.summaryButtonText}>View Wellness Summary</Text></Pressable>
-      {summary ? <View style={styles.disclaimerCard}><Text style={styles.subheading}>{summary.title}</Text><Text style={styles.muted}>Check-ins: {summary.checkins_completed} · Activities: {summary.activities_completed}</Text><Text style={styles.disclaimer}>{summary.disclaimer}</Text></View> : null}
+      <Section title="Recent Activity">{activities.recent_activity_log?.length ? activities.recent_activity_log.map((item, i) => <Activity key={`${item.completed_at}-${i}`} item={item} />) : <Empty title="No activities yet" text="Recommended activities you complete will appear here." />}</Section>
+      <Button variant="secondary" label={summary ? 'Hide Wellness Summary' : 'View Wellness Summary'} loading={summaryLoading} onPress={toggleSummary} style={s.summaryButton} />
+      {summary ? <Card style={s.summaryPanel}><Text style={s.cardTitle}>{summary.title || 'Wellness Summary'}</Text><Text style={s.body}>{summary.disclaimer || 'This summary supports wellbeing and engagement and is not a medical diagnosis.'}</Text></Card> : null}
     </> : null}
   </ScrollView></SafeAreaView>;
 }
-
-function SummaryCard({ title, value }) { return <View style={styles.summaryCard}><Text style={styles.summaryValue}>{value ?? '—'}</Text><Text style={styles.summaryLabel}>{title}</Text></View>; }
-function Section({ title, children }) { return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text>{children}</View>; }
-function Metric({ label: title, value }) { return <View style={styles.metric}><Text style={styles.metricLabel}>{title}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
-function Empty({ text }) { return <Text style={styles.empty}>{text}</Text>; }
-
-const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#F2F7F4', flex: 1 }, container: { padding: 22, paddingBottom: 44 }, title: { color: '#173D35', fontSize: 34, fontWeight: '900', lineHeight: 42 }, subtitle: { color: '#526963', fontSize: 18, fontWeight: '700', lineHeight: 27, marginTop: 8 },
-  tabs: { backgroundColor: '#DDEBE5', borderRadius: 18, flexDirection: 'row', marginTop: 22, padding: 4 }, tab: { alignItems: 'center', borderRadius: 14, flex: 1, minHeight: 52, justifyContent: 'center' }, tabActive: { backgroundColor: '#236F60' }, tabText: { color: '#466159', fontSize: 18, fontWeight: '900' }, tabTextActive: { color: '#FFF' }, loading: { alignItems: 'center', flexDirection: 'row', gap: 12, marginTop: 24 }, error: { color: '#991B1B', fontSize: 17, fontWeight: '800', marginTop: 18 },
-  summaryRow: { flexDirection: 'row', gap: 10, marginTop: 22 }, summaryCard: { backgroundColor: '#FFF', borderRadius: 18, flex: 1, minHeight: 112, padding: 14 }, summaryValue: { color: '#173D35', fontSize: 24, fontWeight: '900', textTransform: 'capitalize' }, summaryLabel: { color: '#61746E', fontSize: 13, fontWeight: '800', marginTop: 8 },
-  section: { backgroundColor: '#FFF', borderRadius: 22, marginTop: 20, padding: 20 }, sectionTitle: { color: '#173D35', fontSize: 24, fontWeight: '900', marginBottom: 16 }, subheading: { color: '#244C42', fontSize: 19, fontWeight: '900', marginTop: 18 },
-  barRow: { marginBottom: 16 }, barLabel: { color: '#263D37', fontSize: 17, fontWeight: '900', textTransform: 'capitalize' }, barTrack: { backgroundColor: '#E5EEE9', borderRadius: 8, height: 14, marginTop: 7, overflow: 'hidden' }, barFill: { backgroundColor: '#54A287', borderRadius: 8, height: 14 }, barValue: { color: '#61746E', fontSize: 14, fontWeight: '800', marginTop: 5 },
-  timelineRow: { alignItems: 'center', borderTopColor: '#E5EEE9', borderTopWidth: 1, flexDirection: 'row', marginTop: 10, paddingTop: 12 }, timelineDate: { color: '#61746E', fontSize: 15, fontWeight: '800', width: 70 }, timelineEmotion: { color: '#173D35', flex: 1, fontSize: 17, fontWeight: '900', textTransform: 'capitalize' }, timelineRisk: { color: '#61746E', fontSize: 14, fontWeight: '700', textTransform: 'capitalize' },
-  metric: { alignItems: 'center', borderBottomColor: '#E5EEE9', borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }, metricLabel: { color: '#526963', flex: 1, fontSize: 17, fontWeight: '800' }, metricValue: { color: '#173D35', fontSize: 19, fontWeight: '900', textTransform: 'capitalize' },
-  accuracyRow: { alignItems: 'center', flexDirection: 'row', marginTop: 12 }, accuracyDate: { color: '#61746E', fontSize: 14, fontWeight: '800', width: 54 }, accuracyTrack: { backgroundColor: '#E5EEE9', borderRadius: 7, flex: 1, height: 13, overflow: 'hidden' }, accuracyFill: { backgroundColor: '#D5A63D', height: 13 }, accuracyValue: { color: '#526963', fontSize: 14, fontWeight: '900', marginLeft: 9, width: 42 }, note: { color: '#61746E', fontSize: 14, fontWeight: '700', lineHeight: 21, marginTop: 16 },
-  activityRow: { borderBottomColor: '#E5EEE9', borderBottomWidth: 1, paddingVertical: 14 }, activityTitle: { color: '#173D35', fontSize: 18, fontWeight: '900', textTransform: 'capitalize' }, activityResult: { color: '#236F60', fontSize: 15, fontWeight: '900', marginTop: 7 }, muted: { color: '#61746E', fontSize: 15, fontWeight: '700', lineHeight: 22, marginTop: 4 }, empty: { color: '#61746E', fontSize: 17, fontWeight: '700', lineHeight: 25 },
-  summaryButton: { alignItems: 'center', backgroundColor: '#236F60', borderRadius: 20, justifyContent: 'center', marginTop: 22, minHeight: 68 }, summaryButtonText: { color: '#FFF', fontSize: 20, fontWeight: '900' }, disclaimerCard: { backgroundColor: '#FFF', borderRadius: 20, marginTop: 16, padding: 20 }, disclaimer: { color: '#526963', fontSize: 14, fontWeight: '700', lineHeight: 21, marginTop: 12 },
-});
+function Section({ title, children }) { return <Card style={s.section}><Text style={s.sectionTitle}>{title}</Text>{children}</Card>; }
+function MetricCard({ value, label: text }) { return <View style={s.metric}><Text numberOfLines={2} adjustsFontSizeToFit style={s.metricValue}>{value ?? '—'}</Text><Text style={s.metricLabel}>{text}</Text></View>; }
+function EmotionBar({ item }) { const look = emotionStyles[item.emotion] || emotionStyles.neutral; return <View style={s.bar}><View style={s.barHead}><View style={[s.dot, { backgroundColor: look.accent }]} /><Text style={s.barLabel}>{label(item.emotion)}</Text><Text style={s.meta}>{item.percentage}%</Text></View><View style={s.track}><View style={[s.fill, { backgroundColor: look.accent, width: `${item.percentage}%` }]} /></View></View>; }
+function Accuracy({ item }) { return <View style={s.accuracy}><Text style={s.date}>{date(item.date)}</Text><View style={s.track}><View style={[s.fill, { backgroundColor: colors.primary, width: `${item.accuracy * 100}%` }]} /></View><Text style={s.accuracyValue}>{pct(item.accuracy)}</Text></View>; }
+function Activity({ item }) { const key = String(item.activity_code || '').replace(/_(easy|medium)$/i, ''); const look = activityStyles[key] || { accent: colors.primary, soft: colors.mint, symbol: '✓' }; return <View style={s.activity}><View style={[s.activityIcon, { backgroundColor: look.soft }]}><Text style={[s.activitySymbol, { color: look.accent }]}>{look.symbol}</Text></View><View style={s.activityCopy}><Text style={s.cardTitle}>{label(item.activity_code)}</Text><Text style={s.meta}>{label(item.difficulty)} · {date(item.completed_at)}</Text><Text style={[s.result, { color: look.accent }]}>{item.accuracy == null ? 'Completed' : `Activity Accuracy ${pct(item.accuracy)}`}</Text></View></View>; }
+function Empty({ title, text }) { return <View style={s.empty}><Text style={s.emptyIcon}>○</Text><View style={{ flex: 1 }}><Text style={s.cardTitle}>{title}</Text><Text style={s.body}>{text}</Text></View></View>; }
+const s = StyleSheet.create({ safe: { backgroundColor: colors.background, flex: 1 }, container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl }, tabs: { backgroundColor: colors.mint, borderRadius: radius.button, flexDirection: 'row', marginBottom: spacing.xl, padding: 4 }, tab: { alignItems: 'center', borderRadius: 13, flex: 1, justifyContent: 'center', minHeight: 50 }, tabActive: { backgroundColor: colors.primary }, tabText: { ...type.body, color: colors.secondary, fontWeight: '900' }, tabTextActive: { color: colors.white }, summaryRow: { flexDirection: 'row', gap: spacing.md }, metric: { backgroundColor: colors.background, borderRadius: radius.button, flex: 1, minHeight: 104, minWidth: 0, padding: spacing.lg }, metricValue: { ...type.section, color: colors.text }, metricLabel: { ...type.meta, color: colors.secondary, marginTop: spacing.sm }, frequent: { backgroundColor: colors.mint, marginTop: spacing.md }, frequentValue: { ...type.section, color: colors.text, marginTop: spacing.xs, textTransform: 'capitalize' }, meta: { ...type.meta, color: colors.secondary }, section: { marginTop: spacing.xl }, sectionTitle: { ...type.section, color: colors.text, marginBottom: spacing.lg }, subheading: { ...type.card, color: colors.text, marginBottom: spacing.md, marginTop: spacing.xl }, bar: { marginBottom: spacing.lg }, barHead: { alignItems: 'center', flexDirection: 'row' }, dot: { borderRadius: 6, height: 10, marginRight: spacing.sm, width: 10 }, barLabel: { ...type.body, color: colors.text, flex: 1, fontWeight: '900', textTransform: 'capitalize' }, track: { backgroundColor: colors.border, borderRadius: 7, flex: 1, height: 11, marginTop: spacing.sm, overflow: 'hidden' }, fill: { borderRadius: 7, height: 11 }, timeline: { alignItems: 'center', borderTopColor: colors.border, borderTopWidth: 1, flexDirection: 'row', minHeight: 50 }, date: { ...type.meta, color: colors.secondary, width: 58 }, timelineLabel: { ...type.body, color: colors.text, fontWeight: '900', textTransform: 'capitalize' }, grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, accuracy: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }, accuracyValue: { ...type.meta, color: colors.text, textAlign: 'right', width: 42 }, onePoint: { backgroundColor: colors.mint, borderRadius: radius.button, padding: spacing.lg }, onePointValue: { ...type.section, color: colors.primary }, body: { ...type.body, color: colors.secondary, marginTop: spacing.xs }, note: { ...type.meta, color: colors.secondary, marginTop: spacing.lg }, activity: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', paddingVertical: spacing.md }, activityIcon: { alignItems: 'center', borderRadius: radius.button, height: 50, justifyContent: 'center', width: 50 }, activitySymbol: { fontSize: 13, fontWeight: '900' }, activityCopy: { flex: 1, marginLeft: spacing.md, minWidth: 0 }, cardTitle: { ...type.card, color: colors.text, textTransform: 'capitalize' }, result: { ...type.meta, fontWeight: '900', marginTop: spacing.xs }, empty: { alignItems: 'center', flexDirection: 'row', gap: spacing.md }, emptyIcon: { color: colors.primary, fontSize: 34 }, summaryButton: { alignSelf: 'flex-start', marginTop: spacing.xl }, summaryPanel: { marginTop: spacing.md } });

@@ -1,48 +1,23 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { startAdaptiveActivity, submitAdaptiveActivity } from '../api/emotionalSupportApi';
+import { ListenControl, VoiceStatus } from '../components/VoiceControls';
+import { Button, Card, InlineState, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
+import useEnglishVoice from '../voice/useEnglishVoice';
+import { colors, radius, screenInsets, shadows, spacing, type } from '../theme';
 
 export default function CalmingActivityScreen({ navigation, route }) {
-  const activity = route?.params?.recommended_activity || {};
-  const context = route?.params?.activity_context || {};
-  const [attempt, setAttempt] = useState(null);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleAction() {
-    if (loading || result) return;
-    try {
-      setLoading(true);
-      setError('');
-      if (!attempt) setAttempt(await startAdaptiveActivity({ ...context, activity_code: activity.activity_code }));
-      else setResult(await submitAdaptiveActivity(attempt.attempt_id, { user_id: context.user_id, response: {} }));
-    } catch (requestError) {
-      setError(requestError.message || 'We could not save this activity. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return <SafeAreaView style={styles.safeArea}><View style={styles.container}>
-    <Text style={styles.title}>{activity.title || 'Gentle Pause'}</Text>
-    <Text style={styles.description}>{activity.description || 'Take a short and comfortable pause.'}</Text>
+  const activity = route?.params?.recommended_activity || {}; const context = route?.params?.activity_context || {}; const [attempt, setAttempt] = useState(null); const [result, setResult] = useState(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const voice = useEnglishVoice(); const breath = useRef(new Animated.Value(0)).current;
+  useEffect(() => { const loop = Animated.loop(Animated.sequence([Animated.timing(breath, { toValue: 1, duration: 4200, useNativeDriver: true }), Animated.timing(breath, { toValue: 0, duration: 4200, useNativeDriver: true })])); loop.start(); return () => loop.stop(); }, [breath]);
+  const guidance = attempt ? (activity.instructions || 'Breathe in gently. Pause. Breathe out slowly.') : 'Take a comfortable moment. Begin whenever you feel ready.';
+  async function handleAction() { if (loading || result) return; try { setLoading(true); setError(''); if (!attempt) setAttempt(await startAdaptiveActivity({ ...context, activity_code: activity.activity_code })); else setResult(await submitAdaptiveActivity(attempt.attempt_id, { user_id: context.user_id, response: {} })); } catch { setError('Unable to save this activity.'); } finally { setLoading(false); } }
+  return <SafeAreaView style={s.safe}><WellnessBackdrop variant="sky" /><ScrollView contentContainerStyle={s.container}>
+    <ScreenHeader navigation={navigation} eyebrow="CALMING ACTIVITY" title={activity.title || 'Gentle Pause'} subtitle={activity.description || 'A quiet moment at a comfortable pace.'} />
     {!result ? <>
-      <View style={styles.card}><Text style={styles.instructions}>{attempt ? activity.instructions : 'Press Start when you feel ready.'}</Text></View>
-      <Pressable style={styles.button} onPress={handleAction} disabled={loading}>{loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>{attempt ? 'Done' : 'Start'}</Text>}</Pressable>
-    </> : <View style={styles.resultCard}>
-      <Text style={styles.resultTitle}>Activity completed</Text><Text style={styles.resultText}>{result.feedback}</Text>
-      <Pressable style={styles.button} onPress={() => navigation.navigate('EmotionalTrendScreen')}><Text style={styles.buttonText}>View History</Text></Pressable>
-      <Pressable style={styles.homeButton} onPress={() => navigation.popToTop()}><Text style={styles.homeButtonText}>Done</Text></Pressable>
-    </View>}
-    {error ? <Text style={styles.error}>{error}</Text> : null}
-  </View></SafeAreaView>;
+      <View style={s.scene}><View style={s.sceneGlow} /><Animated.View style={[s.breathOuter, { transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1.08] }) }], opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.58, 0.9] }) }]}><View style={s.breathInner}><View style={s.wave} /><View style={[s.wave, s.waveTwo]} /></View></Animated.View><Text style={s.breathTitle}>{attempt ? 'Breathe in gently' : 'Ready when you are'}</Text><View style={s.steps}><Text style={s.step}>Breathe in</Text><View style={s.stepDot} /><Text style={s.step}>Pause</Text><View style={s.stepDot} /><Text style={s.step}>Breathe out</Text></View></View>
+      <Card style={s.guidance}><Text style={s.guidanceText}>{guidance}</Text><ListenControl isSpeaking={voice.isSpeaking} onPress={() => voice.isSpeaking ? voice.stopSpeaking() : voice.speak(guidance)} /><VoiceStatus audioState={voice.audioState} error={voice.voiceError} /></Card>
+      <Button label={attempt ? 'Complete Activity' : 'Begin Gentle Pause'} loading={loading} onPress={handleAction} style={s.button} />{error ? <InlineState error /> : null}
+    </> : <Card style={s.complete}><View style={s.check}><Text style={s.checkText}>OK</Text></View><Text style={s.completeTitle}>Activity Complete</Text><Text style={s.completeText}>{result.feedback || 'A quiet moment completed.'}</Text><Button label="View Trends" onPress={() => navigation.navigate('EmotionalTrendScreen')} style={s.full} /><Button variant="secondary" label="Done" onPress={() => navigation.popToTop()} style={s.done} /></Card>}
+  </ScrollView></SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#EDF8FF', flex: 1 }, container: { flex: 1, padding: 26 }, title: { color: '#245B73', fontSize: 34, fontWeight: '900', lineHeight: 42 },
-  description: { color: '#496A79', fontSize: 20, fontWeight: '700', lineHeight: 30, marginTop: 14 }, card: { backgroundColor: '#FFFFFF', borderRadius: 22, marginTop: 28, minHeight: 180, padding: 24 },
-  instructions: { color: '#1F3744', fontSize: 24, fontWeight: '800', lineHeight: 38 }, button: { alignItems: 'center', backgroundColor: '#226C8C', borderRadius: 20, justifyContent: 'center', marginTop: 28, minHeight: 72 }, buttonText: { color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
-  resultCard: { backgroundColor: '#FFF', borderRadius: 22, marginTop: 28, padding: 24 }, resultTitle: { color: '#245B73', fontSize: 28, fontWeight: '900' }, resultText: { color: '#496A79', fontSize: 19, fontWeight: '700', lineHeight: 29, marginTop: 12 },
-  homeButton: { alignItems: 'center', borderColor: '#226C8C', borderRadius: 20, borderWidth: 2, justifyContent: 'center', marginTop: 14, minHeight: 68 }, homeButtonText: { color: '#226C8C', fontSize: 20, fontWeight: '900' }, error: { color: '#991B1B', fontSize: 17, fontWeight: '800', marginTop: 18 },
-});
+const s = StyleSheet.create({ safe: { backgroundColor: '#F2FBFA', flex: 1 }, container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl }, scene: { ...shadows.level2, alignItems: 'center', backgroundColor: '#E8F7F5', borderRadius: radius.hero, minHeight: 300, overflow: 'hidden', padding: spacing.xxl }, sceneGlow: { backgroundColor: colors.sky, borderRadius: 110, height: 220, opacity: 0.75, position: 'absolute', right: -80, top: -80, width: 220 }, breathOuter: { alignItems: 'center', backgroundColor: '#BDE3DD', borderRadius: 72, height: 144, justifyContent: 'center', marginTop: spacing.sm, width: 144 }, breathInner: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 48, height: 96, justifyContent: 'center', overflow: 'hidden', width: 96 }, wave: { borderColor: colors.primary, borderRadius: 28, borderTopWidth: 3, height: 24, marginTop: 8, width: 58 }, waveTwo: { marginTop: -5, opacity: 0.5, width: 42 }, breathTitle: { ...type.section, color: colors.text, marginTop: spacing.xl }, steps: { alignItems: 'center', flexDirection: 'row', marginTop: spacing.md }, step: { ...type.meta, color: colors.secondary }, stepDot: { backgroundColor: colors.primary, borderRadius: 3, height: 5, marginHorizontal: spacing.sm, width: 5 }, guidance: { backgroundColor: '#FFFFFFDD', marginTop: spacing.lg }, guidanceText: { ...type.body, color: colors.text }, button: { marginTop: spacing.lg }, complete: { alignItems: 'center' }, check: { alignItems: 'center', backgroundColor: colors.mint, borderRadius: 38, height: 76, justifyContent: 'center', width: 76 }, checkText: { color: colors.primary, fontSize: 15, fontWeight: '900' }, completeTitle: { ...type.section, color: colors.text, marginTop: spacing.lg }, completeText: { ...type.body, color: colors.secondary, marginTop: spacing.sm, textAlign: 'center' }, full: { marginTop: spacing.xl, width: '100%' }, done: { marginTop: spacing.md, width: '100%' } });

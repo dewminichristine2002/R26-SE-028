@@ -3,6 +3,7 @@ const EMOTIONS = Object.freeze([
 ]);
 const RECENCY_WEIGHTS = Object.freeze([1, 1.05, 1.1, 1.15, 1.2]);
 const RULE_FALLBACK_WEIGHT = 0.55;
+const DEFAULT_CONTEXTUAL_EVIDENCE_WEIGHT = 0.65;
 const AMBIGUITY_MARGIN = 0.05;
 const CONCERN_EMOTIONS = new Set(['sadness', 'loneliness', 'anxiety', 'anger', 'cognitive_fog']);
 
@@ -53,7 +54,11 @@ function aggregateAdaptiveSessionResult(turns) {
     const recencyWeight = RECENCY_WEIGHTS[index];
     const modelConfidence = turn.detectionSource === 'ml_model' ? Number(turn.confidenceScore) : null;
     const ruleEvidenceWeight = turn.detectionSource === 'rule_fallback' ? RULE_FALLBACK_WEIGHT : null;
-    const sourceWeight = modelConfidence ?? ruleEvidenceWeight;
+    const contextualInterpretation = turn.analysisMetadata?.contextualInterpretation;
+    const contextualEvidenceWeight = contextualInterpretation?.evidenceSource === 'question_context'
+      ? Number(contextualInterpretation.contextualEvidenceWeight || DEFAULT_CONTEXTUAL_EVIDENCE_WEIGHT)
+      : null;
+    const sourceWeight = contextualEvidenceWeight ?? modelConfidence ?? ruleEvidenceWeight;
     const weightedEvidence = sourceWeight * recencyWeight;
     emotionScores[turn.detectedState] += weightedEvidence;
     return {
@@ -63,6 +68,10 @@ function aggregateAdaptiveSessionResult(turns) {
       modelConfidence,
       ruleEvidenceWeight,
       ruleScore: turn.detectionSource === 'rule_fallback' ? turn.analysisMetadata?.ruleScore ?? null : null,
+      contextualEvidenceWeight,
+      evidenceSource: contextualInterpretation?.evidenceSource || turn.detectionSource,
+      rawMlEmotion: contextualInterpretation?.rawMlEmotion || null,
+      rawMlConfidence: contextualInterpretation?.rawMlConfidence ?? null,
       recencyWeight,
       weightedEvidence: round(weightedEvidence),
     };

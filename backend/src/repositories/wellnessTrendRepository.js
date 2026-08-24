@@ -19,6 +19,7 @@ async function getCompletedAdaptiveActivities(userId, days = 30) {
     `SELECT attempt_id AS "attemptId", activity_code AS "activityCode", category,
             activity_type AS "activityType", difficulty, accuracy_score AS accuracy,
             response_time_ms AS "responseTimeMs", completion_status AS "completionStatus",
+            activity_source AS "activitySource",
             recommended_next_difficulty AS "nextDifficulty", started_at AS "startedAt",
             completed_at AS "completedAt"
      FROM adaptive_activity_attempts

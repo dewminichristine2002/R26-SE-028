@@ -1,5 +1,6 @@
 const { analyzeNarrative } = require('../services/narrativeAnalysisService');
 const { determineAnswerPolarity } = require('../services/answerPolarityService');
+const { interpretContextualAnswer } = require('../services/contextualAnswerInterpretationService');
 const { aggregateAdaptiveSessionResult } = require('../services/adaptiveResultAggregator');
 const { recommendActivity } = require('../services/activityRecommendationService');
 const { getRecentConcernCount } = require('../repositories/narrativeRepository');
@@ -17,12 +18,14 @@ const { createAdaptiveCaregiverAlert } = require('../repositories/adaptiveRiskRe
 const { getQuestionById } = require('../repositories/adaptiveQuestionBankRepository');
 const {
   getActiveRoutableActivities,
+  getLatestRecommendedCognitiveDifficulty,
   getRecentRecommendedActivityCodes,
 } = require('../repositories/activityRecommendationRepository');
 const {
   getAdaptiveChatSessionById,
   getAdaptiveChatTurns,
   getRecentCompletedAdaptiveEmotionHistory,
+  getRecentCompletedQuestionUsage,
   insertAdaptiveChatTurn,
   runAdaptiveChatTransaction,
   saveAdaptiveNarrativeLog,
@@ -73,6 +76,7 @@ function mapQuestionForResponse(question) {
     question_code: question.questionCode,
     question_text: question.questionText,
     response_type: question.responseType,
+    quick_replies: question.quickReplies || [],
     assessment_dimension: question.assessmentDimension,
     is_assessment: question.isAssessment,
   };
@@ -110,8 +114,11 @@ async function startAdaptiveChat(req, res) {
     const validationError = validateUserId(userId);
     if (validationError) return res.status(400).json({ success: false, error: validationError });
 
-    const recentLogs = await getRecentCompletedAdaptiveEmotionHistory(userId, HISTORY_DAYS, HISTORY_LIMIT);
-    const firstSelection = await selectFirstAdaptiveQuestion({ userId, recentEmotionHistory: recentLogs });
+    const [recentLogs, recentQuestionUsage] = await Promise.all([
+      getRecentCompletedAdaptiveEmotionHistory(userId, HISTORY_DAYS, HISTORY_LIMIT),
+      getRecentCompletedQuestionUsage(userId, 3),
+    ]);
+    const firstSelection = await selectFirstAdaptiveQuestion({ userId, recentEmotionHistory: recentLogs, recentQuestionUsage });
     if (!firstSelection?.question) {
       return res.status(404).json({ success: false, error: 'No active assessment question was found.' });
     }
@@ -157,8 +164,21 @@ async function respondAdaptiveChat(req, res) {
     }
 
     const analysis = await analyzeNarrative(answerText);
-    const detectedState = normalizeState(analysis.detectedEmotionalState);
-    const answerPolarity = determineAnswerPolarity(answerText, { detectedEmotion: detectedState });
+    const rawTurnState = normalizeState(analysis.detectedEmotionalState);
+    const answerPolarity = determineAnswerPolarity(answerText, { detectedEmotion: rawTurnState });
+    const previousInterpretedEmotion = existingTurns.at(-1)?.detectedState || session.currentState || 'neutral';
+    const interpretation = interpretContextualAnswer({
+      question,
+      answerText,
+      answerPolarity,
+      rawMlEmotion: analysis.rawMlEmotion || (analysis.detectionSource === 'ml_model' ? rawTurnState : 'neutral'),
+      rawMlConfidence: analysis.rawMlConfidence ?? analysis.confidenceScore,
+      rawDetectionSource: analysis.detectionSource,
+      fallbackEmotion: analysis.detectionSource === 'rule_fallback' ? rawTurnState : null,
+      previousInterpretedEmotion,
+    });
+    const detectedState = normalizeState(interpretation.interpretedEmotion);
+    const interpretedEvidenceConfidence = interpretation.contextualEvidenceWeight ?? analysis.confidenceScore;
     const recentLogs = await getRecentCompletedAdaptiveEmotionHistory(userId, HISTORY_DAYS, HISTORY_LIMIT);
     const recentSameConcernCount = await getRecentConcernCount({
       userId,
@@ -180,7 +200,7 @@ async function respondAdaptiveChat(req, res) {
       previousQuestion: question,
       previousAnswer: answerText,
       detectedEmotion: detectedState,
-      confidence: analysis.confidenceScore,
+      confidence: interpretedEvidenceConfidence,
       answerPolarity,
       riskIndicator: riskLevel,
       recentEmotionHistory: recentLogs,
@@ -221,6 +241,11 @@ async function respondAdaptiveChat(req, res) {
           ruleScores: analysis.scores || null,
           uncertainty: analysis.uncertainty,
           fallbackReason: analysis.fallbackReason,
+          contextualInterpretation: interpretation,
+          rawMlEmotion: interpretation.rawMlEmotion,
+          rawMlConfidence: interpretation.rawMlConfidence,
+          rawDetectionSource: interpretation.rawDetectionSource,
+          rawTurnEmotion: rawTurnState,
         },
         selectionMetadata: nextSelection?.selectionReason || { completedAfterQuestion: TOTAL_ADAPTIVE_QUESTIONS },
       });
@@ -254,9 +279,10 @@ async function respondAdaptiveChat(req, res) {
       });
       const aggregateRiskLevel = riskAssessment.finalRisk;
       const { supportActivityKey, supportDirective } = getSupportDirective(aggregateState);
-      const [activities, recentActivityHistory] = await Promise.all([
+      const [activities, recentActivityHistory, recommendedDifficulty] = await Promise.all([
         getActiveRoutableActivities(client),
         getRecentRecommendedActivityCodes(userId, 5, client),
+        getLatestRecommendedCognitiveDifficulty(userId, client),
       ]);
       const activitySelection = recommendActivity({
         userId,
@@ -265,6 +291,7 @@ async function respondAdaptiveChat(req, res) {
         riskLevel: aggregateRiskLevel,
         conversationEngagement: aggregation.conversationEngagement,
         recentActivityHistory,
+        recommendedDifficulty,
         recentEmotionHistory: recentLogs,
         activities,
       });
@@ -395,4 +422,4 @@ async function respondAdaptiveChat(req, res) {
   }
 }
 
-module.exports = { respondAdaptiveChat, startAdaptiveChat };
+module.exports = { mapQuestionForResponse, respondAdaptiveChat, startAdaptiveChat };

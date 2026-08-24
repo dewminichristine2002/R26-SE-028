@@ -31,6 +31,15 @@ function determineAnswerPolarity(answerText, { detectedEmotion = 'neutral' } = {
   if (hasContrastConcern) {
     return 'negative';
   }
+  if (/\b(not good|not great|not much energ(?:y|ized)|did not|didn't|haven't|have not)\b/i.test(text)) {
+    return 'negative';
+  }
+  if (/^(no|nope|nah|not really|not today|nothing much|nothing special)\b/i.test(text)) {
+    return hasPositiveEvidence && !hasNegativeEvidence ? 'positive' : 'negative';
+  }
+  if (/^(yes|yeah|yep|certainly|very much)\b/i.test(text)) {
+    return hasNegativeEvidence ? 'negative' : 'positive';
+  }
   if (hasPositiveEvidence && !hasNegativeEvidence) {
     return 'positive';
   }

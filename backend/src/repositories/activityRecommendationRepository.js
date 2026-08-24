@@ -27,4 +27,17 @@ async function getRecentRecommendedActivityCodes(userId, limit = 5, client = nul
   return result.rows.map((row) => row.activityCode);
 }
 
-module.exports = { getActiveRoutableActivities, getRecentRecommendedActivityCodes };
+async function getLatestRecommendedCognitiveDifficulty(userId, client = null) {
+  const executor = client || { query };
+  const result = await executor.query(
+    `SELECT recommended_next_difficulty AS difficulty
+     FROM adaptive_activity_attempts
+     WHERE user_id = $1 AND category = 'cognitive_engagement' AND completed_at IS NOT NULL
+       AND recommended_next_difficulty IN ('easy', 'medium')
+     ORDER BY completed_at DESC LIMIT 1`,
+    [userId]
+  );
+  return result.rows[0]?.difficulty || null;
+}
+
+module.exports = { getActiveRoutableActivities, getLatestRecommendedCognitiveDifficulty, getRecentRecommendedActivityCodes };

@@ -42,7 +42,7 @@ def build_dataset(goemotions_path, custom_path, output_path, max_external_per_cl
         external["text"].str.contains(EXPLICIT_LONELINESS_PATTERN, na=False)
     ][["text"]].drop_duplicates()
     explicit_loneliness["label"] = "loneliness"
-    explicit_loneliness["source"] = "goemotions_explicit_loneliness_relabel"
+    explicit_loneliness["source"] = "domain_relabel"
 
     non_loneliness = external[~external["text"].isin(explicit_loneliness["text"])]
     label_counts_per_text = non_loneliness.groupby("text")["label"].nunique()
@@ -52,7 +52,7 @@ def build_dataset(goemotions_path, custom_path, output_path, max_external_per_cl
     for label, rows in unambiguous.groupby("label", sort=True):
         count = min(len(rows), max_external_per_class)
         sampled = rows.sample(n=count, random_state=SEED).copy()
-        sampled["source"] = "goemotions_unambiguous"
+        sampled["source"] = "goemotions"
         sampled_parts.append(sampled[["text", "label", "source"]])
 
     custom = pd.read_csv(custom_path, usecols=["text", "label"])
@@ -68,8 +68,8 @@ def build_dataset(goemotions_path, custom_path, output_path, max_external_per_cl
     combined = combined[~combined["text"].isin(conflicting_texts)]
     source_order = {
         "project_authored": 0,
-        "goemotions_explicit_loneliness_relabel": 1,
-        "goemotions_unambiguous": 2,
+        "domain_relabel": 1,
+        "goemotions": 2,
     }
     combined["_source_order"] = combined["source"].map(source_order)
     combined = combined.sort_values(["_source_order", "text"]).drop_duplicates("text")

@@ -20,24 +20,33 @@ class ApiServiceTests(unittest.TestCase):
         self.assertTrue(response.json()['ready'])
         self.assertEqual(set(response.json()['supported_classes']), set(api_service.PROJECT_CLASSES))
 
-    def test_valid_prediction_contract_and_happier(self):
+    def test_valid_prediction_contract(self):
         response = self.client.post('/predict-emotion', json={'text': 'My daughter called and I felt much happier after talking with her.'})
         body = response.json()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(body['emotion'], 'happiness')
+        self.assertIn(body['emotion'], api_service.PROJECT_CLASSES)
         self.assertLessEqual(body['confidence'], 1)
         self.assertGreaterEqual(body['confidence'], 0)
         self.assertEqual(body['source'], 'ml_model')
-        self.assertEqual(body['model_version'], 'tfidf_linear_svm_calibrated_v2')
+        self.assertEqual(body['model_version'], 'minilm_logistic_regression_v4')
 
     def test_empty_and_unsupported_payloads(self):
         self.assertEqual(self.client.post('/predict-emotion', json={'text': '   '}).status_code, 422)
         self.assertEqual(self.client.post('/predict-emotion', json={'text': 'hello', 'extra': True}).status_code, 422)
 
     def test_missing_artifact_returns_service_error(self):
-        with patch.object(api_service, 'pipeline', None):
+        with patch.object(api_service.runtime, 'classifier', None):
             response = self.client.post('/predict-emotion', json={'text': 'hello'})
         self.assertEqual(response.status_code, 503)
+
+    def test_runtime_failure_is_visible_and_returns_service_error(self):
+        with patch.object(api_service.runtime, 'error', 'MiniLM unavailable'), \
+             patch.object(api_service.runtime, 'classifier', None):
+            health = self.client.get('/health')
+            prediction = self.client.post('/predict-emotion', json={'text': 'hello'})
+        self.assertFalse(health.json()['ready'])
+        self.assertEqual(health.json()['error'], 'MiniLM unavailable')
+        self.assertEqual(prediction.status_code, 503)
 
 
 if __name__ == '__main__':

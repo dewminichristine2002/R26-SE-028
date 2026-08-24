@@ -134,6 +134,28 @@ async function getRecentCompletedAdaptiveEmotionHistory(userId, days = 7, limit 
   return result.rows;
 }
 
+async function getRecentCompletedQuestionUsage(userId, sessionLimit = 3, client = null) {
+  const executor = client || { query };
+  const result = await executor.query(
+    `WITH recent_sessions AS (
+       SELECT session_id, ROW_NUMBER() OVER (ORDER BY completed_at DESC, session_id DESC) AS session_rank
+       FROM adaptive_chat_sessions
+       WHERE user_id = $1 AND is_complete = TRUE AND completed_at IS NOT NULL
+       ORDER BY completed_at DESC, session_id DESC
+       LIMIT $2
+     )
+     SELECT turn.question_code AS "questionCode",
+            COUNT(*)::INT AS "recentCount",
+            MIN(recent.session_rank)::INT AS "mostRecentSessionRank"
+     FROM recent_sessions recent
+     JOIN adaptive_chat_turns turn ON turn.session_id = recent.session_id
+     WHERE turn.question_code IS NOT NULL
+     GROUP BY turn.question_code`,
+    [userId, sessionLimit]
+  );
+  return result.rows;
+}
+
 async function getAdaptiveChatTurns(sessionId, client = null) {
   const executor = client || { query };
   const result = await executor.query(
@@ -374,6 +396,7 @@ module.exports = {
   getAdaptiveChatSessionById,
   getAdaptiveChatTurns,
   getRecentCompletedAdaptiveEmotionHistory,
+  getRecentCompletedQuestionUsage,
   getUsedQuestionIds,
   insertAdaptiveChatTurn,
   runAdaptiveChatTransaction,
