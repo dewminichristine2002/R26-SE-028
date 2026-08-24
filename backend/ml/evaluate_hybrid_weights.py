@@ -12,21 +12,25 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 
-from compare_models import make_pipeline, prepare_features
 from data_loaders import load_raw_training_data
+from fda_lr_calibration_support import (
+    FDA_TUNED_LOGISTIC_MODEL_PATH,
+    build_tuned_fda_logistic_pipeline,
+    cap_fda_feature_splits,
+    load_or_fit_tuned_fda_logistic,
+    ml_scores_from_fda_model,
+    project_proxy_frame_to_fda_features,
+)
 from hybrid_eval import THRESHOLDS, derive_risk_labels, derive_rule_score
 
 
 ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
-MODEL_PATH = MODELS_DIR / "baseline_model.joblib"
 OUTPUT_PATH = MODELS_DIR / "hybrid_weight_ablation.json"
 
 RISK_CLASSES = ["Safe", "Warning", "Dangerous"]
@@ -97,13 +101,11 @@ def evaluate_weights(
 
 
 def out_of_fold_ml_scores(X: pd.DataFrame, y: pd.Series) -> np.ndarray:
-    pipeline = make_pipeline(
-        RandomForestClassifier(n_estimators=200, class_weight="balanced", random_state=42, n_jobs=1)
-    )
+    pipeline = build_tuned_fda_logistic_pipeline()
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     oof_proba = cross_val_predict(pipeline, X, y, cv=cv, method="predict_proba", n_jobs=1)
-    adr_idx = 1 if oof_proba.shape[1] > 1 else 0
-    return np.round(oof_proba[:, adr_idx] * 100)
+    serious_idx = 1 if oof_proba.shape[1] > 1 else oof_proba.shape[1] - 1
+    return np.round(oof_proba[:, serious_idx] * 100)
 
 
 def cross_validated_weight_search(
@@ -201,9 +203,9 @@ def summarize_heldout_comparison(heldout_results: list[dict]) -> list[dict]:
 
 def main() -> None:
     df, dataset_names = load_raw_training_data()
-    X, y_adr = prepare_features(df)
+    X = project_proxy_frame_to_fda_features(df)
+    y_adr = pd.to_numeric(df["adr_event"], errors="coerce").fillna(0).astype(int)
     y_labels = derive_risk_labels(df.loc[X.index]).reset_index(drop=True)
-    X = X.reset_index(drop=True)
 
     rule_scores = derive_rule_score(df.loc[X.index]).reset_index(drop=True)
     df = df.loc[X.index].reset_index(drop=True)
@@ -217,6 +219,13 @@ def main() -> None:
         random_state=42,
         stratify=y_labels,
     )
+    X_train, X_test, numeric_caps = cap_fda_feature_splits(X_train.reset_index(drop=True), X_test.reset_index(drop=True))
+    y_train = y_train.reset_index(drop=True)
+    y_test = y_test.reset_index(drop=True)
+    rule_train = rule_train.reset_index(drop=True)
+    rule_test = rule_test.reset_index(drop=True)
+    label_train = label_train.reset_index(drop=True)
+    label_test = label_test.reset_index(drop=True)
 
     print("[hybrid-ablation] Generating out-of-fold ML scores on training split...")
     oof_ml = out_of_fold_ml_scores(X_train, y_train)
@@ -224,22 +233,9 @@ def main() -> None:
 
     cv_selection = cross_validated_weight_search(rule_train, ml_train, label_train.reset_index(drop=True))
 
-    if MODEL_PATH.exists():
-        model = joblib.load(MODEL_PATH)
-        test_proba = model.predict_proba(X_test)
-        classes = list(getattr(model.named_steps["classifier"], "classes_", [0, 1]))
-        adr_idx = classes.index(1) if 1 in classes else classes[-1]
-        ml_test = pd.Series([round(float(row[adr_idx]) * 100) for row in test_proba], index=rule_test.index)
-    else:
-        fitted = make_pipeline(
-            RandomForestClassifier(n_estimators=200, class_weight="balanced", random_state=42, n_jobs=1)
-        ).fit(X_train, y_train)
-        test_proba = fitted.predict_proba(X_test)
-        adr_idx = 1 if test_proba.shape[1] > 1 else 0
-        ml_test = pd.Series(np.round(test_proba[:, adr_idx] * 100), index=rule_test.index)
+    model = load_or_fit_tuned_fda_logistic(X_train, y_train)
+    ml_test = ml_scores_from_fda_model(model, X_test).reset_index(drop=True)
 
-    label_test = label_test.reset_index(drop=True)
-    rule_test = rule_test.reset_index(drop=True)
     ml_test = ml_test.reset_index(drop=True)
 
     baseline_configs = [(row["configuration"], row["alpha"], row["beta"]) for row in ABLATION_CONFIGURATIONS]
@@ -273,7 +269,7 @@ def main() -> None:
             },
         },
         "validation": {
-            "method": "5-fold stratified CV on 80% train split (out-of-fold ML scores) + 20% held-out test",
+            "method": "5-fold stratified CV on 80% train split (out-of-fold tuned Logistic Regression scores) + 20% held-out test",
             "optimization_metric": "joint F1-weighted across Safe/Warning/Dangerous",
             "thresholds": THRESHOLDS,
             "cv_weight_selection": cv_selection,
@@ -290,6 +286,12 @@ def main() -> None:
         "rows_total": int(len(X)),
         "rows_train": int(len(X_train)),
         "rows_test": int(len(X_test)),
+        "ml_model_artifact": str(FDA_TUNED_LOGISTIC_MODEL_PATH),
+        "fda_feature_projection": {
+            "source_dataset": "FAERS/OMOP proxy hybrid-evaluation dataset",
+            "target_schema": "FDA serious vs non-serious Logistic Regression feature schema",
+            "numeric_caps": numeric_caps,
+        },
         "ablation_configurations": ABLATION_CONFIGURATIONS,
         "heldout_test_configurations": heldout_results,
         "heldout_comparison_table": comparison_table,
@@ -315,7 +317,9 @@ def main() -> None:
             )["f1_weighted"],
         },
         "note": (
-            "rule_score from dataset risk_score column; mlDangerScore from out-of-fold or held-out ADR probability * 100."
+            "rule_score comes from the proxy hybrid-evaluation dataset risk_score column or derived FAERS proxy. "
+            "mlDangerScore is the tuned FDA Logistic Regression probability of class 1 (Serious) × 100, "
+            "evaluated on a projected FDA-style feature frame built from the proxy calibration dataset."
         ),
     }
 
