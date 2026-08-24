@@ -39,3 +39,7 @@ ml/data/fda_adverse_events_2015_2026_CLEAN.csv
 # Large ML model artifacts
 ml/models/fda_serious_baselines/random_forest.joblib
 ml/models/fda_serious_baselines/random_forest_tuned.joblib
+# Local Tesseract OCR language data
+eng.traineddata
+# Local Tesseract OCR language data
+eng.traineddata
