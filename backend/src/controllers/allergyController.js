@@ -1,4 +1,5 @@
 const allergyModel = require('../models/allergyModel');
+const { pool } = require('../config/db');
 const {
   REACTION_OUTCOMES,
   FEEDBACK_RECORD_TYPES,
@@ -7,6 +8,7 @@ const {
 const {
   enrichMedication,
   resolveMedication,
+  searchMedications,
 } = require('../services/medicationKnowledgeService');
 const { buildRiskReport } = require('../services/riskReportService');
 const { predictMedicineRisk } = require('../services/mlPredictionService');
@@ -43,6 +45,7 @@ const {
 } = require('../utils/formValidation');
 
 const normalizeText = (value) => (value == null ? '' : String(value).trim());
+
 
 const normalizeNullableBoolean = (value) => {
   if (value === true || value === false) {
@@ -316,6 +319,32 @@ const shouldLimitWeakEvidenceMlLift = ({ analysisPayload, ruleScore, rawMlScore,
   return true;
 };
 
+const hasNoPatientSpecificRiskEvidence = (analysisPayload) => {
+  const ruleScore = Number(analysisPayload?.dataUsed?.ruleScore ?? analysisPayload?.riskScore ?? 0);
+  const riskFactors = Array.isArray(analysisPayload?.riskFactors) ? analysisPayload.riskFactors : [];
+  const allergyEvidenceMatches = Array.isArray(analysisPayload?.dataUsed?.allergyEvidenceMatches)
+    ? analysisPayload.dataUsed.allergyEvidenceMatches
+    : [];
+  const interactionCount = Number(analysisPayload?.medicationKnowledge?.interactionCount || 0);
+  const sideEffectMatchCount = Number(analysisPayload?.medicationKnowledge?.sideEffectMatchCount || 0);
+  const severeReactionSignal = Boolean(analysisPayload?.dataUsed?.severeReactionSignal);
+  const chronicRiskFlag = Boolean(analysisPayload?.dataUsed?.chronicRiskFlag);
+  const historyPriorCheckCount = Number(analysisPayload?.dataUsed?.historyPriorCheckCount || 0);
+  const hasCurrentMedicineSpecificReaction = Boolean(analysisPayload?.dataUsed?.currentMedicineSpecificReaction);
+
+  return (
+    ruleScore === 0 &&
+    riskFactors.length === 0 &&
+    allergyEvidenceMatches.length === 0 &&
+    interactionCount === 0 &&
+    sideEffectMatchCount === 0 &&
+    !severeReactionSignal &&
+    !chronicRiskFlag &&
+    historyPriorCheckCount === 0 &&
+    !hasCurrentMedicineSpecificReaction
+  );
+};
+
 const includesAnyTerm = (haystack, terms = []) => {
   const normalizedHaystack = normalizeText(haystack).toLowerCase();
   if (!normalizedHaystack) {
@@ -359,6 +388,40 @@ const FAMILY_TERM_MAP = [
     terms: ['nsaid', 'nonsteroidal anti-inflammatory', 'non steroidal anti inflammatory'],
   },
 ];
+
+const COMBINATION_MEDICINE_INGREDIENTS = {
+  'co trimoxazole': ['sulfamethoxazole', 'trimethoprim'],
+  'co-trimoxazole': ['sulfamethoxazole', 'trimethoprim'],
+  cotrimoxazole: ['sulfamethoxazole', 'trimethoprim'],
+  bactrim: ['sulfamethoxazole', 'trimethoprim'],
+  sulfatrim: ['sulfamethoxazole', 'trimethoprim'],
+  'sulfamethoxazole / trimethoprim': ['sulfamethoxazole', 'trimethoprim'],
+};
+
+const extractIngredientTerms = (...values) => {
+  const terms = new Set();
+  const add = (value) => {
+    const normalized = normalizeText(value).toLowerCase();
+    if (!normalized) {
+      return;
+    }
+
+    terms.add(normalized);
+
+    if (COMBINATION_MEDICINE_INGREDIENTS[normalized]) {
+      COMBINATION_MEDICINE_INGREDIENTS[normalized].forEach((item) => terms.add(item));
+    }
+
+    normalized
+      .split(/\s*\/\s*|\s+\+\s+|\s+and\s+|\s*,\s*/)
+      .map((part) => normalizeText(part).toLowerCase())
+      .filter(Boolean)
+      .forEach((part) => terms.add(part));
+  };
+
+  values.forEach(add);
+  return Array.from(terms);
+};
 
 const getMedicationFlags = (...values) => {
   const combined = values.map((value) => normalizeText(value).toLowerCase()).join(' ');
@@ -405,17 +468,35 @@ const getMedicationFlags = (...values) => {
   };
 };
 
-const hasSevereReactionSignal = (payload, questionnaireText) => {
-  const severity = normalizeText(payload?.severity).toLowerCase();
-  const symptomText = `${normalizeText(payload?.symptomMatch)} ${normalizeText(payload?.notes)} ${normalizeText(questionnaireText)}`.toLowerCase();
+const SEVERE_REACTION_TERMS = [
+  'breathing trouble',
+  'shortness of breath',
+  'swelling',
+  'anaphylaxis',
+  'collapse',
+];
 
-  if (severity === 'severe') {
+const hasSevereReactionSignal = (payload, questionnaireText, medicationKnowledge = null) => {
+  const severity = normalizeText(payload?.severity).toLowerCase();
+  const symptomText = `${normalizeText(payload?.symptomMatch)} ${normalizeText(payload?.notes)}`.toLowerCase();
+  const hasCurrentSevereSymptomText = SEVERE_REACTION_TERMS.some((term) => symptomText.includes(term));
+  const hasCurrentSevereSideEffectMatch = Array.isArray(medicationKnowledge?.sideEffectMatches)
+    && medicationKnowledge.sideEffectMatches.some((match) =>
+      SEVERE_REACTION_TERMS.some((term) => normalizeText(match).toLowerCase().includes(term))
+    );
+  const questionnaireIndicatesCurrentMedicineReaction =
+    payload?.hadReactionBefore === true &&
+    SEVERE_REACTION_TERMS.some((term) => normalizeText(questionnaireText).toLowerCase().includes(term));
+
+  if (severity === 'severe' && (payload?.hadReactionBefore === true || hasCurrentSevereSymptomText)) {
     return true;
   }
 
-  return ['breathing trouble', 'shortness of breath', 'swelling', 'anaphylaxis', 'collapse'].some((term) =>
-    symptomText.includes(term)
-  );
+  if (hasCurrentSevereSymptomText || hasCurrentSevereSideEffectMatch) {
+    return true;
+  }
+
+  return questionnaireIndicatesCurrentMedicineReaction;
 };
 
 const expandFamilyTerms = (...values) => {
@@ -430,6 +511,81 @@ const expandFamilyTerms = (...values) => {
 
   return Array.from(extraTerms);
 };
+
+const buildAllergyEvidenceSources = (profile, questionnaireAnswers = []) => {
+  const questionnaireText = questionnaireAnswers
+    .map((item) => normalizeText(item?.answerText).toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+
+  return [
+    {
+      sourceKey: 'known_allergies_text',
+      label: 'known allergy list',
+      text: normalizeText(profile?.knownAllergiesText).toLowerCase(),
+    },
+    {
+      sourceKey: 'avoided_medicines_text',
+      label: 'avoided medicines list',
+      text: normalizeText(profile?.avoidedMedicinesText).toLowerCase(),
+    },
+    {
+      sourceKey: 'suspected_medicine_names_text',
+      label: 'suspected reaction medicine list',
+      text: normalizeText(profile?.suspectedMedicineNamesText).toLowerCase(),
+    },
+    {
+      sourceKey: 'antibiotic_painkiller_reaction',
+      label: 'antibiotic or painkiller reaction notes',
+      text: normalizeText(profile?.antibioticPainkillerReaction).toLowerCase(),
+    },
+    {
+      sourceKey: 'reaction_symptoms_text',
+      label: 'reaction symptom notes',
+      text: normalizeText(profile?.reactionSymptomsText).toLowerCase(),
+    },
+    {
+      sourceKey: 'questionnaire_answers',
+      label: 'questionnaire answers',
+      text: questionnaireText,
+    },
+  ];
+};
+
+const findAllergyEvidenceMatches = (sources, terms = []) => {
+  const normalizedTerms = Array.from(
+    new Set(
+      (terms || [])
+        .map((term) => normalizeText(term).toLowerCase())
+        .filter(Boolean)
+    )
+  );
+
+  const matches = [];
+  for (const source of sources) {
+    const sourceText = normalizeText(source?.text).toLowerCase();
+    if (!sourceText) {
+      continue;
+    }
+
+    const matchedTerms = normalizedTerms.filter((term) => sourceText.includes(term));
+    if (matchedTerms.length > 0) {
+      matches.push({
+        sourceKey: source.sourceKey,
+        label: source.label,
+        matchedTerms,
+      });
+    }
+  }
+
+  return matches;
+};
+
+const summarizeEvidenceLabels = (matches = []) =>
+  matches
+    .map((match) => match.label)
+    .filter(Boolean)
+    .join(', ');
 
 const assessChronicContraindicationRisk = ({
   chronicDiseasesText,
@@ -564,6 +720,18 @@ const buildMedicationAllergyTerms = (payload, medicationKnowledge, fallbackMedic
     fallbackMedication.ingredientName,
   ].forEach(addTerm);
 
+  extractIngredientTerms(
+    payload.medicineName,
+    payload.normalizedDrugName,
+    medicationKnowledge.normalizedDrugName,
+    medicationKnowledge.rxnormMatchedName,
+    medicationKnowledge.ingredientName,
+    medicationKnowledge.canonicalIngredient,
+    fallbackMedication.displayName,
+    fallbackMedication.normalizedName,
+    fallbackMedication.ingredientName
+  ).forEach(addTerm);
+
   getDrugClassTerms(drugClassInfo).forEach(addTerm);
 
   const therapeuticText = normalizeText(
@@ -656,7 +824,7 @@ const buildGuidelines = ({ riskLevel, medicationKnowledge, profile, payload, ris
 const sanitizeAnalysisPayload = (body) => ({
   inputMethod: normalizeText(body.inputMethod) || 'manual',
   medicineName: normalizeText(body.medicineName),
-  normalizedDrugName: normalizeText(body.normalizedDrugName || body.medicineName).toLowerCase(),
+  normalizedDrugName: normalizeText(body.normalizedDrugName).toLowerCase(),
   dose: normalizeText(body.dose),
   frequency: normalizeText(body.frequency),
   takenBefore: normalizeYesNo(body.takenBefore),
@@ -674,6 +842,46 @@ const sanitizeAnalysisPayload = (body) => ({
     : null,
 });
 
+const getMedicationRecognitionStatus = (resolvedDrug) => {
+  const auditSource = String(
+    resolvedDrug?.normalizationAudit?.normalizationSource ||
+      resolvedDrug?.normalizationSource ||
+      ''
+  )
+    .trim()
+    .toUpperCase();
+  const confidence = Number(
+    resolvedDrug?.normalizationAudit?.normalizationConfidence ??
+      resolvedDrug?.normalizationConfidence ??
+      0
+  );
+  const rxnormCui = String(resolvedDrug?.rxnormCui || '').trim();
+  const matchType = normalizeText(resolvedDrug?.matchType).toLowerCase();
+  const matched = resolvedDrug?.matched === true;
+
+  const unresolved =
+    !matched ||
+    auditSource === 'UNRESOLVED_FALLBACK' ||
+    confidence <= 0 ||
+    matchType === 'unresolved' ||
+    matchType === 'fallback' ||
+    matchType === 'none';
+
+  const unconfirmedFuzzy = matchType.includes('fuzzy');
+  const recognized = !unresolved && !unconfirmedFuzzy;
+
+  return {
+    recognized,
+    unresolved,
+    unconfirmedFuzzy,
+    auditSource,
+    confidence,
+    rxnormCui,
+    matchType,
+    matched,
+  };
+};
+
 const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHistory = [], userId = null) => {
   const medicationKnowledge = await enrichMedication({
     medicineName: payload.normalizedDrugName || payload.medicineName,
@@ -690,6 +898,7 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
   const questionnaireText = questionnaireAnswers
     .map((item) => normalizeText(item.answerText).toLowerCase())
     .join(' ');
+  const allergyEvidenceSources = buildAllergyEvidenceSources(profile, questionnaireAnswers);
   const currentDrugClassInfo = resolveDrugClass(
     payload.normalizedDrugName,
     payload.medicineName,
@@ -723,11 +932,15 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
   };
 
   const allergyTerms = buildMedicationAllergyTerms(payload, medicationKnowledge, fallbackMedication, currentDrugClassInfo);
-  const severeReactionSignal = hasSevereReactionSignal(payload, questionnaireText);
-  const userAllergyEvidence = includesAnyTerm(knownAllergiesText, allergyTerms);
-  const questionnaireAllergyEvidence = includesAnyTerm(questionnaireText, allergyTerms);
+  const severeReactionSignal = hasSevereReactionSignal(payload, questionnaireText, medicationKnowledge);
+  const allergyEvidenceMatches = findAllergyEvidenceMatches(allergyEvidenceSources, allergyTerms);
+  const userAllergyEvidence = allergyEvidenceMatches.some((match) => match.sourceKey !== 'questionnaire_answers');
+  const questionnaireAllergyEvidence = allergyEvidenceMatches.some((match) => match.sourceKey === 'questionnaire_answers');
   const profileDrugClasses = new Set([
     ...extractDrugClassesFromText(profile?.knownAllergiesText),
+    ...extractDrugClassesFromText(profile?.avoidedMedicinesText),
+    ...extractDrugClassesFromText(profile?.suspectedMedicineNamesText),
+    ...extractDrugClassesFromText(profile?.antibioticPainkillerReaction),
     ...extractDrugClassesFromText(questionnaireText),
   ]);
   const hasPenicillinAllergyInProfile = includesAnyTerm(
@@ -745,9 +958,14 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
   };
 
   if (userAllergyEvidence) {
+    const evidenceLabels = summarizeEvidenceLabels(
+      allergyEvidenceMatches.filter((match) => match.sourceKey !== 'questionnaire_answers')
+    );
     addRule(
       'P1',
-      'This medicine directly matches a known allergy in the profile.',
+      evidenceLabels
+        ? `This medicine directly matches allergy evidence recorded in: ${evidenceLabels}.`
+        : 'This medicine directly matches a known allergy in the profile.',
       'high',
       80,
       'PATIENT_PROFILE'
@@ -827,12 +1045,17 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
       : medicationKnowledge.maxInteractionSeverity === 'medium'
         ? 30
         : 10;
+    const ddinterSeverity = medicationKnowledge.maxInteractionSeverity === 'high'
+      ? 'high'
+      : medicationKnowledge.maxInteractionSeverity === 'medium'
+        ? 'medium'
+        : 'low';
 
     if (severityScore > 0) {
       addRule(
         'P4',
         `DDInter-style check found ${medicationKnowledge.interactionCount} possible interaction(s).`,
-        medicationKnowledge.maxInteractionSeverity === 'high' ? 'high' : 'medium',
+        ddinterSeverity,
         severityScore,
         'DDInter'
       );
@@ -1049,32 +1272,25 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     let histScore = 0;
     if (latest?.riskLevel === 'Dangerous') {
       histScore += 30;
-    } else if (latest?.riskLevel === 'Warning') {
-      histScore += 18;
-    } else if (latest?.riskLevel === 'Safe') {
-      histScore += 4;
     }
     if (historyDangerousCount >= 2) {
       histScore += 25;
-    } else if (historyDangerousCount === 1 && historyWarningCount >= 1) {
+    } else if (historyDangerousCount === 1) {
       histScore += 12;
-    }
-    if (historyWarningCount >= 3 && historyDangerousCount === 0) {
-      histScore += 14;
     }
     histScore = Math.min(45, histScore);
     const histSeverity =
       latest?.riskLevel === 'Dangerous' || historyDangerousCount >= 2
         ? 'high'
-        : latest?.riskLevel === 'Warning'
-          ? 'medium'
-          : 'low';
-    addRule(
-      'P15',
-      `Your medicine history includes ${historyRows.length} prior check(s) for this drug: ${historyDangerousCount} Dangerous, ${historyWarningCount} Warning, ${historySafeCount} Safe (latest: ${latest?.riskLevel || 'unknown'}).`,
-      histSeverity,
-      histScore
-    );
+        : 'low';
+    if (histScore > 0) {
+      addRule(
+        'P15',
+        `Your medicine history includes ${historyRows.length} prior check(s) for this drug: ${historyDangerousCount} Dangerous, ${historyWarningCount} Warning, ${historySafeCount} Safe (latest: ${latest?.riskLevel || 'unknown'}).`,
+        histSeverity,
+        histScore
+      );
+    }
   }
   } // end if (!shortCircuited) — P1 skips lower-priority rules (Section 12.2)
 
@@ -1153,8 +1369,6 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
       ruleScore = Math.max(ruleScore, 68);
     } else if (historyDangerousCount >= 1) {
       ruleScore = Math.max(ruleScore, 52);
-    } else if (historyWarningCount >= 2 && historyDangerousCount === 0) {
-      ruleScore = Math.max(ruleScore, 38);
     }
   }
 
@@ -1189,6 +1403,9 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     anonymizedUserId,
     drugName: payload.medicineName,
     normalizedDrugName: normalizedDrug,
+    normalizationSource: medicationKnowledge.normalizationSource,
+    normalizationConfidence: medicationKnowledge.normalizationConfidence,
+    normalizationAudit: medicationKnowledge.normalizationAudit,
   });
   const p1ShortCircuited = shortCircuited;
 
@@ -1208,8 +1425,11 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
   }
 
   const explanationParts = riskFactors.slice(0, 3).map((factor) => factor.factorLabel);
+  const allergyEvidenceSummary = summarizeEvidenceLabels(allergyEvidenceMatches);
   const explanation = explanationParts.length > 0
-    ? explanationParts.join(' ')
+    ? `${explanationParts.join(' ')}${
+        allergyEvidenceSummary ? ` Allergy evidence reviewed from: ${allergyEvidenceSummary}.` : ''
+      }`
     : 'No strong warning signs were found in the saved profile, but continue checking carefully.';
 
   let recommendation = 'Use as directed and keep monitoring for any unusual reaction.';
@@ -1286,6 +1506,10 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
         'gender',
         'hasMedicineAllergy',
         'knownAllergiesText',
+        'avoidedMedicinesText',
+        'suspectedMedicineNamesText',
+        'antibioticPainkillerReaction',
+        'reactionSymptomsText',
         'chronicDiseasesText',
         'currentMedicationsText',
         'emergencyContact',
@@ -1295,12 +1519,28 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
       medicationKnowledgeSources: medicationKnowledge.knowledgeSources,
       derivedDrugClass: currentDrugClassInfo?.drug_class || null,
       derivedDrugClassAtcCode: currentDrugClassInfo?.atc_code || null,
-      knowledgeMatched: medicationKnowledge.matched !== false,
+      knowledgeMatched: Boolean(
+        String(medicationKnowledge.rxnormCui || '').trim() ||
+          String(medicationKnowledge?.whoAtc?.atcCode || '').trim() ||
+          Number(
+            medicationKnowledge?.normalizationAudit?.normalizationConfidence ??
+              medicationKnowledge?.normalizationConfidence ??
+              0
+          ) > 0
+      ),
       historyPriorCheckCount: historyRows.length,
       historyDangerousCount,
       historyWarningCount,
       historySafeCount,
       historyLatestRiskLevel: historyRows[0]?.riskLevel || null,
+      severeReactionSignal,
+      chronicRiskFlag: Boolean(chronicRiskAssessment.hasRisk),
+      currentMedicineSpecificReaction: Boolean(
+        payload.hadReactionBefore === true ||
+        severeReactionSignal ||
+        Number(medicationKnowledge.sideEffectMatchCount || 0) > 0
+      ),
+      allergyEvidenceMatches,
       ruleScore,
       p1ShortCircuited,
       ruleAuditTrail,
@@ -1378,6 +1618,9 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
   const hybridBlend = blendHybridScore(ruleScore, adjustedMlScore);
   let combinedRiskScore = hybridBlend.blendedScore;
   let combinedRiskLevel = classifyRiskLevel(combinedRiskScore);
+  const preGuardrailBlendedScore = combinedRiskScore;
+  const noPatientSpecificRiskEvidence = hasNoPatientSpecificRiskEvidence(analysisPayload);
+  let hybridGuardrailApplied = null;
 
   if (compareRiskLevel(ruleRiskLevel, combinedRiskLevel) > 0) {
     combinedRiskLevel = ruleRiskLevel;
@@ -1423,6 +1666,12 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     combinedRiskScore = Math.max(combinedRiskScore, 28);
   }
 
+  if (noPatientSpecificRiskEvidence) {
+    combinedRiskLevel = 'Safe';
+    combinedRiskScore = Math.min(ruleScore, RISK_THRESHOLDS.warningMin - 1);
+    hybridGuardrailApplied = 'ml_background_only_clean_case';
+  }
+
   const riskFactors = [...analysisPayload.riskFactors];
   const capNote = mlScoreWasCapped
     ? mlAdjustmentReason === 'weak_rule_safe_class_cap'
@@ -1451,6 +1700,9 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
   if (scoreGap >= 35) {
     mlExplanation +=
       ' A large gap between rule score and ML score can happen because the rule score measures case-specific clinical contraindications, while the ML score estimates general severe-ADR probability from FAERS-style patterns. Direct allergy-match and cross-reactivity evidence are intentionally kept on the rule side.';
+  }
+  if (hybridGuardrailApplied === 'ml_background_only_clean_case') {
+    mlExplanation += ` Raw hybrid score before the clean-case guardrail was ${preGuardrailBlendedScore}/100. Because no patient-specific safety evidence was identified, the ML signal was retained as background pharmacovigilance information only and did not escalate the patient-facing result above safe.`;
   }
   mlExplanation += ` Hybrid score = ${HYBRID_RULE_WEIGHT}xrule + ${HYBRID_ML_WEIGHT}xML = ${combinedRiskScore}/100.`;
   if (youdenThreshold != null) {
@@ -1500,6 +1752,7 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
         adjustedMlRiskScore: adjustedMlScore,
         mlScoreWasCapped,
         mlAdjustmentReason,
+        backgroundOnlyForCleanCase: hybridGuardrailApplied === 'ml_background_only_clean_case',
         mlClassConfidenceScore: mlClassConf,
         mlRiskLevel: mlPrediction.mlRiskLevel,
         youdensJThreshold: youdensJ,
@@ -1521,6 +1774,8 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
       adjustedMlScore,
       mlScoreWasCapped,
       mlAdjustmentReason,
+      noPatientSpecificRiskEvidence,
+      hybridGuardrailApplied,
       mlClassConfidenceScore: mlClassConf,
       hybridBreakdown: {
         alpha: hybridBlend.alpha,
@@ -1530,6 +1785,9 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
         rawMlScore,
         adjustedMlScore,
         mlAdjustmentReason,
+        noPatientSpecificRiskEvidence,
+        hybridGuardrailApplied,
+        preGuardrailBlendedScore,
         blendedScore: combinedRiskScore,
         ruleRiskLevel,
         mlRiskLevel: mlPrediction.mlRiskLevel || 'Safe',
@@ -1548,6 +1806,7 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
           ruleScore,
           rawMlScore,
           adjustedMlScore,
+          preGuardrailBlendedScore,
           blendedScore: combinedRiskScore,
         },
         riskFactors,
@@ -1758,6 +2017,34 @@ const analyzeMedicine = async (req, res, next) => {
     }
 
     const prelimDrug = await resolveMedication(payload.normalizedDrugName || payload.medicineName);
+    const recognition = getMedicationRecognitionStatus(prelimDrug);
+    if (!recognition.recognized) {
+      const suggestions = searchMedications(payload.medicineName)
+        .filter((item) => {
+          const matchType = normalizeText(item.matchType).toLowerCase();
+          return matchType !== 'fuzzy' && matchType !== 'fuzzy_brand';
+        })
+        .slice(0, 5);
+
+      return res.status(422).json({
+        error: 'Medicine not recognized. Please check the spelling, choose a suggested medicine, scan the prescription, or try again.',
+        code: 'MEDICINE_NOT_RECOGNIZED',
+        details: {
+          medicineName: payload.medicineName,
+          normalizedDrugName: payload.normalizedDrugName || '',
+          recognition: {
+            matched: recognition.matched,
+            matchType: recognition.matchType || 'none',
+            normalizationConfidence: recognition.confidence,
+            auditSource: recognition.auditSource,
+            unresolved: recognition.unresolved,
+            unconfirmedFuzzy: recognition.unconfirmedFuzzy,
+            rxnormCui: recognition.rxnormCui,
+          },
+          suggestions,
+        },
+      });
+    }
 
     const [profile, questionnaireAnswers, medicineHistory] = await Promise.all([
       allergyModel.getProfile(req.user.id),
@@ -1785,7 +2072,7 @@ const analyzeMedicine = async (req, res, next) => {
     const responseMlPrediction = analysisPayload.medicationKnowledge?.mlPrediction?.available
       ? analysisPayload.medicationKnowledge.mlPrediction
       : mlPrediction;
-    const inputPipeline = buildPipelineReport({
+    const inputPipeline = await buildPipelineReport({
       inputMethod: payload.inputMethod,
       rawInput: payload.notes || payload.medicineName,
       medicineName: payload.medicineName,
@@ -1793,6 +2080,32 @@ const analyzeMedicine = async (req, res, next) => {
       medicationKnowledge: analysisPayload.medicationKnowledge,
     });
     const card = await allergyModel.createCard(req.user.id, analysisPayload);
+
+    if (
+      String(analysisPayload.riskLevel || '').toLowerCase() === 'dangerous' &&
+      (profile.caregiverEmail || profile.caregiverPhone)
+    ) {
+      const medicineName = analysisPayload.medicineName || payload.medicineName || 'a medicine';
+      await pool.query(
+        `
+          INSERT INTO caregiver_alerts (
+            user_id,
+            caregiver_email,
+            caregiver_phone,
+            title,
+            message
+          )
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [
+          req.user.id,
+          profile.caregiverEmail || null,
+          profile.caregiverPhone || null,
+          'Dangerous Medicine Check',
+          `A linked patient checked ${medicineName} and received a dangerous medicine safety result. Please review it as soon as possible.`,
+        ]
+      );
+    }
 
     return res.status(201).json({
       card,
@@ -1833,4 +2146,6 @@ module.exports = {
   createReaction,
   createClinicalOverride,
   analyzeMedicine,
+  buildAnalysis,
+  sanitizeAnalysisPayload,
 };
