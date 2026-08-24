@@ -29,3 +29,8 @@ venv/
 .npm-cache/
 ml/runs/
 ml/.ultralytics/
+.venv*/
+venv*/
+**/.venv*/
+**/venv*/
+**/__pycache__/
