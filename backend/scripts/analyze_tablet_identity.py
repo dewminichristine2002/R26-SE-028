@@ -1036,7 +1036,7 @@ def _resolve_identity_metric_model_path(index: Any | None = None) -> str:
 
     if index is not None:
         indexed_path = _index_scalar_value(index, "metric_model_path", "").strip()
-        if indexed_path:
+        if indexed_path and Path(indexed_path).exists():
             return indexed_path
 
     model_dir = Path(__file__).resolve().parents[1] / "ml" / "models"

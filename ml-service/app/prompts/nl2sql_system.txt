@@ -28,6 +28,34 @@ ALLERGY ROUTING RULE:
 	user_allergy_profiles.
 - Use allergy_cards only for saved medicine safety check results, such as
 	asking whether a specific medicine is risky.
+- For "why", "reason", "factor", or "what made it risky/dangerous" allergy
+  questions, JOIN allergy_cards to allergy_card_risk_factors and scope the
+  parent allergy_cards row with user_id = $1.
+
+EMOTIONAL / COGNITIVE ROUTING RULE:
+- Mood trend, stress, loneliness, check-in history, or detected emotion
+  questions MUST query emotional_support_emotion_sessions.
+- Questions about the supportive chatbot reply MUST query
+  emotional_support_interventions, usually joined to
+  emotional_support_emotion_sessions by session_id.
+- Questions about recommended cognitive support activities MUST join
+  emotional_support_emotion_sessions.activity_id to
+  emotional_support_cognitive_activities.id, and scope the session with
+  elder_user_id = $1.
+- Questions about completed/skipped cognitive activity work MUST query
+  emotional_support_activity_attempts joined to
+  emotional_support_cognitive_activities, scoped by
+  emotional_support_activity_attempts.elder_user_id = $1.
+- Questions about mood/emotional/cognitive alerts MUST query
+  emotional_support_caregiver_alerts, not caregiver_alerts. Use caregiver_alerts
+  only for medication/refill/stock/overdose alerts.
+- Questions about repeated emotional concerns, mood changes, or emotional
+  patterns should aggregate emotional_support_emotion_sessions over a recent
+  time window.
+- Questions about caregiver-safe emotional interaction history should use
+  chat_logs joined to emotional_support_emotion_sessions, but prefer actor_type,
+  message_type, detected_emotion, risk_level, and created_at rather than raw
+  private message_text unless the user explicitly asks for wording.
 
 HARD RULES:
 1. SINGLE SELECT, no semicolons. CTEs allowed.
@@ -56,14 +84,35 @@ Q: "Did my mother miss any medicine today?"
 Q: "How has my mood been recently?"
 {"sql":"SELECT detected_emotion, COUNT(*)::int AS total, AVG(stress_score)::float AS avg_stress, AVG(loneliness_score)::float AS avg_loneliness FROM emotional_support_emotion_sessions WHERE elder_user_id = $1 AND created_at >= NOW() - INTERVAL '7 days' GROUP BY detected_emotion ORDER BY total DESC LIMIT 20","params":["$1"],"intent":"mood_trend_7d","fallback":false,"fallback_message":""}
 
+Q: "What emotional support reply did my mother get last time?"
+{"sql":"SELECT ess.detected_emotion, ess.risk_level, esi.response_type, esi.response_text, esi.follow_up_prompt, ess.created_at FROM emotional_support_emotion_sessions ess JOIN emotional_support_interventions esi ON esi.session_id = ess.id WHERE ess.elder_user_id = $1 ORDER BY ess.created_at DESC LIMIT 5","params":["$1"],"intent":"latest_emotional_intervention","fallback":false,"fallback_message":""}
+
+Q: "What cognitive activity was recommended recently?"
+{"sql":"SELECT ess.detected_emotion, ess.risk_level, eca.title AS activity_title, eca.activity_type, eca.difficulty, eca.prompt, ess.created_at FROM emotional_support_emotion_sessions ess LEFT JOIN emotional_support_cognitive_activities eca ON eca.id = ess.activity_id WHERE ess.elder_user_id = $1 ORDER BY ess.created_at DESC LIMIT 10","params":["$1"],"intent":"recommended_cognitive_activities","fallback":false,"fallback_message":""}
+
+Q: "Which cognitive activities did my mum complete?"
+{"sql":"SELECT eca.title AS activity_title, eca.activity_type, esaa.completion_status, esaa.score::float AS score, esaa.started_at, esaa.completed_at FROM emotional_support_activity_attempts esaa LEFT JOIN emotional_support_cognitive_activities eca ON eca.id = esaa.activity_id WHERE esaa.elder_user_id = $1 ORDER BY esaa.started_at DESC LIMIT 20","params":["$1"],"intent":"cognitive_activity_attempts","fallback":false,"fallback_message":""}
+
 Q: "Show me my recent caregiver alerts."
 {"sql":"SELECT title, message, created_at, COALESCE(is_read, FALSE) AS is_read FROM caregiver_alerts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20","params":["$1"],"intent":"open_alerts","fallback":false,"fallback_message":""}
+
+Q: "Show mood alerts for my mother."
+{"sql":"SELECT title, message, alert_type, severity, status, created_at FROM emotional_support_caregiver_alerts WHERE elder_user_id = $1 ORDER BY created_at DESC LIMIT 20","params":["$1"],"intent":"emotional_support_alerts","fallback":false,"fallback_message":""}
+
+Q: "What repeated emotional concerns are showing recently?"
+{"sql":"SELECT detected_emotion, COUNT(*)::int AS total, MAX(created_at) AS most_recent_at, AVG(stress_score)::float AS avg_stress, AVG(loneliness_score)::float AS avg_loneliness FROM emotional_support_emotion_sessions WHERE elder_user_id = $1 AND created_at >= NOW() - INTERVAL '14 days' GROUP BY detected_emotion ORDER BY total DESC, most_recent_at DESC LIMIT 20","params":["$1"],"intent":"repeated_emotional_concerns","fallback":false,"fallback_message":""}
+
+Q: "Show my elder's recent emotional interaction history."
+{"sql":"SELECT ess.detected_emotion, ess.risk_level, cl.actor_type, cl.message_type, cl.detected_emotion AS log_detected_emotion, cl.created_at FROM chat_logs cl JOIN emotional_support_emotion_sessions ess ON ess.id = cl.session_id AND ess.elder_user_id = $1 WHERE cl.elder_user_id = $1 ORDER BY cl.created_at DESC LIMIT 30","params":["$1"],"intent":"emotional_interaction_history","fallback":false,"fallback_message":""}
 
 Q: "What allergies do I have?"
 {"sql":"SELECT has_medicine_allergy, known_allergies_text, reaction_symptoms_text, avoided_medicines_text, suspected_medicine_names_text, antibiotic_painkiller_reaction FROM user_allergy_profiles WHERE user_id = $1 LIMIT 1","params":["$1"],"intent":"allergy_profile_lookup","fallback":false,"fallback_message":""}
 
 Q: "Is paracetamol risky for me based on my allergies?"
 {"sql":"SELECT medicine_name, risk_level, risk_score, explanation, recommendation FROM allergy_cards WHERE user_id = $1 AND LOWER(medicine_name) LIKE '%paracetamol%' ORDER BY updated_at DESC LIMIT 10","params":["$1"],"intent":"medicine_safety_lookup","fallback":false,"fallback_message":""}
+
+Q: "Why was paracetamol marked dangerous for my allergies?"
+{"sql":"SELECT ac.medicine_name, ac.risk_level, ac.risk_score, acrf.factor_label, acrf.severity, acrf.score FROM allergy_cards ac JOIN allergy_card_risk_factors acrf ON acrf.allergy_card_id = ac.id WHERE ac.user_id = $1 AND LOWER(ac.medicine_name) LIKE '%paracetamol%' ORDER BY ac.updated_at DESC, acrf.score DESC LIMIT 20","params":["$1"],"intent":"allergy_risk_factors","fallback":false,"fallback_message":""}
 
 Q: "Which of my medicines are running low?"
 {"sql":"SELECT um.medicine_name, COALESCE(ms.current_quantity, um.total_quantity)::float AS pills_left, um.daily_amount::float AS daily_amount FROM user_medications um LEFT JOIN medication_stock ms ON ms.medication_id = um.id WHERE um.user_id = $1 AND COALESCE(ms.current_quantity, um.total_quantity) / NULLIF(um.daily_amount, 0) <= 7 ORDER BY pills_left ASC LIMIT 20","params":["$1"],"intent":"low_stock","fallback":false,"fallback_message":""}

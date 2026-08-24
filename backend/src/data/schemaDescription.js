@@ -314,6 +314,47 @@ const TABLES = {
     notes: 'Predictions are for health risk awareness only and are not medical diagnosis.',
   },
 
+  emotional_support_elder_profiles: {
+    purpose: "Patient's emotional/cognitive support profile, including living context, baseline mood and cognitive support level.",
+    userIdColumn: 'elder_user_id',
+    columns: {
+      id: 'uuid',
+      elder_user_id: 'integer FK users.id',
+      display_name: 'text',
+      age: 'integer',
+      gender: 'text',
+      living_status: "text 'alone' | 'family' | 'care_home'",
+      baseline_mood: "text 'happy' | 'sad' | 'angry' | 'anxious' | 'lonely' | 'confused' | 'neutral'",
+      cognitive_level: "text 'low' | 'medium' | 'high'",
+      check_in_times: 'text[]',
+      voice_enabled: 'boolean',
+      chronic_conditions: 'text[]',
+      clinical_notes: 'text',
+      created_at: 'timestamptz',
+      updated_at: 'timestamptz',
+    },
+    notes: 'Never select caregiver_user_ids.',
+  },
+
+  emotional_support_cognitive_activities: {
+    purpose: 'Global catalog of cognitive support activities that can be recommended after mood/emotion check-ins.',
+    userIdColumn: null,
+    columns: {
+      id: 'uuid',
+      title: 'text',
+      activity_type: "text 'memory' | 'attention' | 'orientation' | 'breathing' | 'reflection'",
+      difficulty: "text 'easy' | 'medium' | 'hard'",
+      target_emotions: 'text[]',
+      prompt: 'text',
+      expected_answer_type: "text 'text' | 'choice' | 'timer' | 'none'",
+      options: 'jsonb',
+      estimated_duration_sec: 'integer',
+      is_active: 'boolean',
+      created_at: 'timestamptz',
+    },
+    notes: 'Global catalog. To answer user-specific recommended activity questions, JOIN from emotional_support_emotion_sessions.activity_id or emotional_support_activity_attempts.activity_id and scope the user table by elder_user_id = $1.',
+  },
+
   emotional_support_emotion_sessions: {
     purpose: 'Each mood / emotion check-in the patient submitted (text, voice, emoji or multimodal).',
     userIdColumn: 'elder_user_id',
@@ -322,12 +363,15 @@ const TABLES = {
       elder_user_id: 'integer FK users.id',
       input_mode: "text 'emoji' | 'text' | 'voice' | 'multimodal'",
       check_in_type: "text 'manual' | 'scheduled' | 'triggered'",
+      intervention_id: 'uuid FK emotional_support_interventions.id (nullable)',
+      activity_id: 'uuid FK emotional_support_cognitive_activities.id (nullable)',
       detected_emotion: "text 'happy' | 'sad' | 'angry' | 'anxious' | 'lonely' | 'confused' | 'neutral'",
       sentiment_score: 'numeric (0-1)',
       stress_score: 'numeric (0-1)',
       loneliness_score: 'numeric (0-1)',
       confidence_score: 'numeric (0-1)',
       risk_level: "text 'low' | 'medium' | 'high'",
+      session_status: "text 'completed' | 'abandoned'",
       created_at: 'timestamptz',
     },
   },
@@ -344,7 +388,42 @@ const TABLES = {
       response_source: "text 'template' | 'llm' | 'hybrid' | 'response_bank'",
       trigger_emotion: 'text',
       trigger_risk_level: 'text',
+      follow_up_prompt: 'text',
       created_at: 'timestamptz',
+    },
+  },
+
+  chat_logs: {
+    purpose: 'Conversation log lines for emotional/cognitive support sessions, including elder messages and system responses.',
+    userIdColumn: 'elder_user_id',
+    columns: {
+      id: 'uuid',
+      session_id: 'uuid FK emotional_support_emotion_sessions.id',
+      elder_user_id: 'integer FK users.id',
+      actor_type: "text 'elder' | 'system'",
+      message_type: "text 'text' | 'voice_transcript' | 'emoji' | 'multimodal' | 'response'",
+      message_text: 'text',
+      detected_emotion: "text 'happy' | 'sad' | 'angry' | 'anxious' | 'lonely' | 'confused' | 'neutral'",
+      intervention_id: 'uuid FK emotional_support_interventions.id (nullable)',
+      created_at: 'timestamptz',
+    },
+    notes: 'Use for emotional support conversation history. Never select metadata.',
+  },
+
+  emotional_support_activity_attempts: {
+    purpose: 'Attempts/completions for cognitive support activities tied to an emotional support session.',
+    userIdColumn: 'elder_user_id',
+    columns: {
+      id: 'uuid',
+      elder_user_id: 'integer FK users.id',
+      session_id: 'uuid FK emotional_support_emotion_sessions.id',
+      activity_id: 'uuid FK emotional_support_cognitive_activities.id',
+      answer_text: 'text',
+      selected_option: 'text',
+      score: 'numeric',
+      completion_status: "text 'completed' | 'skipped' | 'timed_out'",
+      started_at: 'timestamptz',
+      completed_at: 'timestamptz',
     },
   },
 
@@ -410,7 +489,12 @@ const SAFE_RELATIONSHIPS = [
   'caregiver_alerts.medication_id -> user_medications.id',
   'caregiver_alerts.status_event_id -> medication_status_events.id',
   'diabetes_risk_predictions.conversation_id -> assistant_conversations.id',
+  'emotional_support_emotion_sessions.activity_id -> emotional_support_cognitive_activities.id',
   'emotional_support_interventions.session_id -> emotional_support_emotion_sessions.id',
+  'chat_logs.session_id -> emotional_support_emotion_sessions.id',
+  'chat_logs.intervention_id -> emotional_support_interventions.id',
+  'emotional_support_activity_attempts.session_id -> emotional_support_emotion_sessions.id',
+  'emotional_support_activity_attempts.activity_id -> emotional_support_cognitive_activities.id',
   'emotional_support_caregiver_alerts.session_id -> emotional_support_emotion_sessions.id',
 ];
 
@@ -451,6 +535,8 @@ const buildPromptDigest = () => {
   lines.push('# - status values for medication_status_events: taken | not-taken | remind | overdose | speak');
   lines.push('# - emotions: happy | sad | angry | anxious | lonely | confused | neutral');
   lines.push('# - allergy risk_level: Safe | Warning | Dangerous');
+  lines.push('# - emotional support risk_level: low | medium | high');
+  lines.push('# - cognitive activity completion_status: completed | skipped | timed_out');
   lines.push('# - NEVER select password_hash, email, phone, caregiver_email, caregiver_phone');
 
   return lines.join('\n');

@@ -8,16 +8,16 @@ import RoutineSetupScreen from './RoutineSetupScreen';
 import ManualEntryScreen from './ManualEntryScreen';
 import MedicineListScreen from './MedicineListScreen';
 import MedicineStockScreen from './MedicineStockScreen';
+import TabletIdentifierScreen from './TabletIdentifierScreen';
 import ScheduleBoardScreen from './ScheduleBoardScreen';
 import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
-import TabletIdentifierScreen from './TabletIdentifierScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenDiabetesPrediction, onOpenStrokePrediction, onOpenHypertensionPrediction, onOpenAssistant, onLogout, launchIntent }) => {
+const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenAssistant, onLogout, launchIntent, onLaunchIntentConsumed }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
-  const [largeTextMode, setLargeTextMode] = useState(true);
+  const [largeTextMode, setLargeTextMode] = useState(false);
   const [caregiverAlerts, setCaregiverAlerts] = useState([]);
   const [caregiverUnreadCount, setCaregiverUnreadCount] = useState(0);
   const [caregiverTimeline, setCaregiverTimeline] = useState([]);
@@ -50,47 +50,39 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
   const menuItems = [
     {
       id: 1,
-      label: 'home.reminder',
-      title: 'Medicine Reminder',
-      subtitle: 'Today schedule, medicine list, stock and safety tools.',
-      helper: 'Open',
-      icon: '🔔',
-      accentColor: '#1f6894',
-      backgroundColor: '#f4f9ff',
-      borderColor: '#b9d9f2',
+      label: 'Reminder',
+      icon: '\u{1F514}',
+      cardColor: '#e3f8ee',
+      borderColor: '#b8ead6',
+      iconBg: '#168464',
+      arrowColor: '#168464',
     },
     {
       id: 2,
-      label: 'home.allergies',
-      title: 'Allergy Notes',
-      subtitle: 'Keep important allergy information close.',
-      helper: 'Soon',
-      icon: '⚠️',
-      accentColor: '#1f6894',
-      backgroundColor: '#f4f9ff',
-      borderColor: '#d5eafa',
+      label: 'Allergy',
+      icon: '\u26A0\uFE0F',
+      cardColor: '#fff7ed',
+      borderColor: '#f3dcbf',
+      iconBg: '#985111',
+      arrowColor: '#985111',
     },
     {
       id: 3,
-      label: 'home.emotions',
-      title: 'Mood Check',
-      subtitle: 'A simple place to record how you feel.',
-      helper: 'Soon',
-      icon: '😊',
-      accentColor: '#347fa8',
-      backgroundColor: '#eef8ff',
-      borderColor: '#c9e5f5',
+      label: 'Emotions',
+      icon: '\u{1F60A}',
+      cardColor: '#f3edff',
+      borderColor: '#dccff6',
+      iconBg: '#5b3ca4',
+      arrowColor: '#5b3ca4',
     },
     {
       id: 4,
-      label: 'home.dashboard',
-      title: 'Health Dashboard',
-      subtitle: 'See your care progress in one calm view.',
-      helper: 'Soon',
-      icon: '📊',
-      accentColor: '#2b6f9d',
-      backgroundColor: '#f2f8fd',
-      borderColor: '#d5eafa',
+      label: 'Dashboard',
+      icon: '\u{1F4CA}',
+      cardColor: '#eaf7ff',
+      borderColor: '#cae3f2',
+      iconBg: '#2576a6',
+      arrowColor: '#2576a6',
     },
   ];
 
@@ -98,90 +90,87 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     {
       title: 'Schedule Board',
       subtitle: 'See today medicines',
-      helper: 'Today',
-      icon: '🗓️',
-      accentColor: '#1e6f5c',
-      backgroundColor: '#e9f7f1',
-      borderColor: '#a8dbc8',
+      icon: '\u{1F5D3}\uFE0F',
+      cardColor: '#e3f8ee',
+      borderColor: '#b8ead6',
+      iconBg: '#168464',
+      arrowColor: '#168464',
     },
     {
       title: 'Routine Setup',
       subtitle: 'Set meal times',
-      helper: 'Times',
-      icon: '⏰',
-      accentColor: '#2f65a3',
-      backgroundColor: '#edf5ff',
-      borderColor: '#b9d4f2',
+      icon: '\u23F0',
+      cardColor: '#eaf6ff',
+      borderColor: '#cae1f5',
+      iconBg: '#256da7',
+      arrowColor: '#256da7',
     },
     {
       title: 'Add Medicine',
       subtitle: 'Add new medicine',
-      helper: 'Add',
-      icon: '💊',
-      accentColor: '#8a4a17',
-      backgroundColor: '#fff4e8',
-      borderColor: '#f0cda8',
+      icon: '\u{1F48A}',
+      cardColor: '#fff7ed',
+      borderColor: '#f3dcbf',
+      iconBg: '#985111',
+      arrowColor: '#985111',
     },
     {
       title: 'Medicine List',
       subtitle: 'View medicines',
-      helper: 'List',
-      icon: '📋',
-      accentColor: '#5b4aa0',
-      backgroundColor: '#f3efff',
-      borderColor: '#cbc0f0',
+      icon: '\u{1F4CB}',
+      cardColor: '#f3edff',
+      borderColor: '#dccff6',
+      iconBg: '#5b3ca4',
+      arrowColor: '#5b3ca4',
     },
     {
       title: 'Medicine Stock',
       subtitle: 'Check medicine amount',
-      helper: 'Stock',
-      icon: '📦',
-      accentColor: '#126b7a',
-      backgroundColor: '#e9f8fb',
-      borderColor: '#a7dce4',
+      icon: '\u{1F4E6}',
+      cardColor: '#e7f8fb',
+      borderColor: '#bee9ee',
+      iconBg: '#117785',
+      arrowColor: '#117785',
     },
     {
       title: 'Tablet Identifier',
       subtitle: 'Take photo to find name',
-      helper: 'Photo',
       icon: 'ID',
-      accentColor: '#2b6f9d',
-      backgroundColor: '#eef8ff',
-      borderColor: '#c9e5f5',
+      cardColor: '#eaf7ff',
+      borderColor: '#cae3f2',
+      iconBg: '#2576a6',
+      arrowColor: '#2576a6',
+      isTextIcon: true,
     },
     {
       title: 'Safety Center',
       subtitle: 'See safety alerts',
-      helper: 'Safe',
-      icon: '🛡️',
-      accentColor: '#9b3d47',
-      backgroundColor: '#fff0f2',
-      borderColor: '#edbdc4',
+      icon: '\u{1F6E1}\uFE0F',
+      cardColor: '#fff1f4',
+      borderColor: '#efccd3',
+      iconBg: '#a93447',
+      arrowColor: '#a93447',
     },
   ];
 
   const handleButtonPress = (item) => {
-    if (item.id === 1 || item.label === 'home.reminder') {
-      setActiveReminderView('menu');
+    if (item.label === 'Allergy') {
+      onOpenAllergies();
+      return;
+    }
+
+    if (item.label === 'Reminder') {
       setShowReminderMenu(true);
+      setActiveReminderView('menu');
       return;
     }
 
-    if (item.id === 2 || item.label === 'home.allergies') {
-      setShowReminderMenu(false);
-      setActiveReminderView('menu');
-      onOpenAllergies?.();
-      return;
-    }
-
-    if (item.id === 3 || item.label === 'home.emotions') {
-      setShowReminderMenu(false);
-      setActiveReminderView('menu');
+    if (item.label === 'Emotions') {
       onOpenEmotionalSupport?.();
       return;
     }
 
-    if (item.id === 4 || item.label === 'home.dashboard') {
+    if (item.label === 'Dashboard') {
       setShowReminderMenu(false);
       setActiveReminderView('menu');
       onOpenDashboard?.();
@@ -237,17 +226,29 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
   };
 
   const textScale = largeTextMode ? 1.15 : 1;
-  const reminderTextScale = textScale;
   const isCaregiver = user?.role === 'caregiver';
+  const availableReminderMenuItems = isCaregiver
+    ? reminderMenuItems.filter((item) => item.title !== 'Schedule Board' && item.title !== 'Safety Center')
+    : reminderMenuItems;
   const criticalAlerts = caregiverAlerts.filter((item) => !item.is_read);
   const recentAlerts = caregiverAlerts.slice(0, 5);
+  const emotionalAlerts = caregiverAlerts.filter((item) => item.source === 'emotional_support');
+  const hasEmotionalConcern = emotionalAlerts.some((item) => !item.is_read) || emotionalAlerts.length > 0;
   const timelineItems = isTimelineExpanded ? caregiverTimeline : caregiverTimeline.slice(0, 4);
-  const firstName = String(user?.fullName || '').trim().split(/\s+/)[0] || 'there';
-  const todayLabel = new Date().toLocaleDateString([], {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
+  const getLaunchHighlight = (type) =>
+    launchIntent?.type === type
+      ? { ...(launchIntent.highlight || {}), nonce: launchIntent.nonce, showScreenFrame: true }
+      : null;
+  const consumeLaunchIntentForView = (view = activeReminderView) => {
+    if (launchIntent?.type === view) {
+      onLaunchIntentConsumed?.();
+    }
+  };
+
+  const leaveReminderSubView = () => {
+    consumeLaunchIntentForView();
+    setActiveReminderView('menu');
+  };
 
   const getTimelineDayKey = (value) => {
     const dateValue = new Date(value || Date.now());
@@ -352,6 +353,10 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     const rawTitle = String(alertItem?.title || '').trim();
     const message = String(alertItem?.message || '').toLowerCase();
 
+    if (alertItem?.source === 'emotional_support') {
+      return rawTitle || 'Emotional Support Alert';
+    }
+
     if (
       message.includes('please arrange a refill') ||
       message.includes('requested refill') ||
@@ -361,6 +366,12 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     }
 
     return rawTitle || 'Caregiver Alert';
+  };
+
+  const openEmotionalAssistantReview = () => {
+    onOpenAssistant?.({
+      initialPrompt: "Help me understand my elder's recent emotional patterns, mood changes, repeated concerns, and caregiver-safe interaction history.",
+    });
   };
 
   const getTimelineMeta = (status) => {
@@ -408,12 +419,31 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
 
 
   useEffect(() => {
-    if (!launchIntent || launchIntent.type !== 'schedule-board') {
+    if (!launchIntent || !launchIntent.type) {
       return;
     }
+
+    const viewByIntentType = {
+      'routine-setup': 'routine-setup',
+      'medicine-list': 'medicine-list',
+      'medicine-stock': 'medicine-stock',
+      'tablet-identifier': 'tablet-identifier',
+      'schedule-board': 'schedule-board',
+      'safety-center': 'safety-center',
+    };
+
+    const nextView = viewByIntentType[launchIntent.type];
+    if (!nextView) {
+      return;
+    }
+
+    if (isCaregiver && (nextView === 'schedule-board' || nextView === 'safety-center')) {
+      return;
+    }
+
     setShowReminderMenu(true);
-    setActiveReminderView('schedule-board');
-  }, [launchIntent && launchIntent.nonce, launchIntent && launchIntent.type]);
+    setActiveReminderView(nextView);
+  }, [launchIntent && launchIntent.nonce, launchIntent && launchIntent.type, isCaregiver]);
 
   // Android hardware back button navigation for HomeScreen
   useEffect(() => {
@@ -421,6 +451,7 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     const onBackPress = () => {
       // If in a subview, go back to main menu
       if (showReminderMenu && activeReminderView !== 'menu') {
+        consumeLaunchIntentForView(activeReminderView);
         setActiveReminderView('menu');
         return true;
       }
@@ -514,20 +545,25 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     }
   };
 
-  if (isCaregiver) {
+  if (isCaregiver && !showReminderMenu) {
     return (
-      <ScrollView style={styles.caregiverPage} contentContainerStyle={styles.caregiverContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.caregiverTopBar}>
-          <View style={styles.caregiverBrandPill}>
-            <Image source={elderMedsLogo} style={styles.caregiverBrandLogo} resizeMode="contain" />
+      <ScrollView style={styles.caregiverPage} contentContainerStyle={styles.caregiverContainer}>
+        <View style={styles.caregiverHeaderCard}>
+          <View style={styles.caregiverHeaderTextWrap}>
+            <Text style={styles.caregiverEyebrow}>Caregiver Home</Text>
+            <Text
+              style={styles.caregiverTitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.86}
+            >
+              Caregiver Alerts
+            </Text>
+            <Text style={styles.caregiverWelcome}>
+              Monitoring updates for {user?.fullName || 'your patient'}
+            </Text>
           </View>
-          <TouchableOpacity
-            style={styles.caregiverNotificationButton}
-            onPress={handleCaregiverNotificationPress}
-            accessibilityRole="button"
-            accessibilityLabel="Mark caregiver notifications as read"
-            accessibilityHint="Marks unread caregiver alerts as read"
-          >
+          <TouchableOpacity style={styles.caregiverNotificationButton} onPress={handleCaregiverNotificationPress}>
             <Text style={styles.caregiverNotificationIcon}>🔔</Text>
             {caregiverUnreadCount > 0 && (
               <View style={styles.caregiverNotificationBadge}>
@@ -537,35 +573,34 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
           </TouchableOpacity>
         </View>
 
-        <View style={styles.caregiverHeroCard}>
-          <View style={styles.caregiverHeroTextWrap}>
-            <Text style={styles.caregiverHeroEyebrow}>{todayLabel}</Text>
-            <Text style={styles.caregiverHeroTitle}>Caregiver Dashboard</Text>
-            <Text style={styles.caregiverHeroSubtitle}>Monitor medicine activity and respond quickly.</Text>
-          </View>
-          <View style={styles.caregiverHeroBadge}>
-            <Text style={styles.caregiverHeroBadgeValue}>{caregiverUnreadCount}</Text>
-            <Text style={styles.caregiverHeroBadgeLabel}>Active</Text>
-          </View>
+        <View style={styles.caregiverInfoStrip}>
+          <Text style={styles.caregiverInfoTitle}>Today's Alerts</Text>
+          <Text style={styles.caregiverInfoBadge}>{caregiverUnreadCount} Active</Text>
         </View>
 
-        <View style={styles.caregiverStatsRow}>
-          <View style={styles.caregiverStatCard}>
-            <Text style={styles.caregiverStatValue}>{caregiverUnreadCount}</Text>
-            <Text style={styles.caregiverStatLabel}>Unread alerts</Text>
+        <TouchableOpacity
+          style={styles.caregiverDashboardCard}
+          activeOpacity={0.88}
+          onPress={onOpenDashboard}
+          accessibilityRole="button"
+          accessibilityLabel="Open conversational dashboard"
+          accessibilityHint="Shows the elder's unified medication, mood, alert, stock, and routine summary"
+        >
+          <View style={styles.caregiverDashboardIconWrap}>
+            <Text style={styles.caregiverDashboardIcon}>{'\u{1F4CA}'}</Text>
           </View>
-          <View style={styles.caregiverStatCard}>
-            <Text style={styles.caregiverStatValue}>{caregiverTimeline.length}</Text>
-            <Text style={styles.caregiverStatLabel}>Timeline events</Text>
+          <View style={styles.caregiverDashboardTextWrap}>
+            <Text style={styles.caregiverDashboardTitle}>Conversational Dashboard</Text>
+            <Text style={styles.caregiverDashboardSubtitle}>
+              Review the elder's health summary, risks, alerts, stock, mood, and routines.
+            </Text>
           </View>
-        </View>
+          <Text style={styles.caregiverDashboardArrow}>{'\u203A'}</Text>
+        </TouchableOpacity>
 
         {!!criticalAlerts.length && (
           <View style={styles.caregiverCriticalCard}>
-            <View style={styles.caregiverSectionHeaderRow}>
-              <Text style={styles.caregiverSectionTitle}>Immediate Action</Text>
-              <Text style={styles.caregiverCriticalCount}>{criticalAlerts.length}</Text>
-            </View>
+            <Text style={styles.caregiverSectionTitle}>Immediate Action Required</Text>
             {criticalAlerts.slice(0, 2).map((alertItem) => (
               <View key={`critical-${alertItem.id}`} style={styles.caregiverCriticalItem}>
                 <View style={styles.caregiverCriticalHeader}>
@@ -573,31 +608,20 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
                   <Text style={styles.caregiverCriticalTime}>{formatAlertTime(alertItem.created_at)}</Text>
                 </View>
                 <Text style={styles.caregiverCriticalMessage}>{alertItem.message}</Text>
-                <TouchableOpacity
-                  style={styles.caregiverMarkReadButton}
-                  onPress={() => handleMarkSingleAlertRead(alertItem.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Mark alert as read"
-                >
-                  <Text style={styles.caregiverMarkReadText}>Mark read</Text>
-                </TouchableOpacity>
               </View>
             ))}
           </View>
         )}
 
         <View style={styles.caregiverCard}>
-          <View style={styles.caregiverSectionHeaderRow}>
-            <Text style={styles.caregiverSectionTitle}>Recent Updates</Text>
-            <Text style={styles.caregiverSectionBadge}>{recentAlerts.length}</Text>
-          </View>
+          <Text style={styles.caregiverSectionTitle}>Recent Updates</Text>
           {!recentAlerts.length ? (
             <Text style={styles.caregiverEmptyText}>No notifications yet.</Text>
           ) : (
             recentAlerts.map((alertItem) => (
               <View key={`recent-${alertItem.id}`} style={styles.caregiverRecentItem}>
                 <View style={styles.caregiverRecentDotWrap}>
-                  <View style={[styles.caregiverRecentDot, !alertItem.is_read && styles.caregiverRecentDotUnread]} />
+                  <Text style={styles.caregiverRecentDot}>{alertItem.is_read ? '○' : '●'}</Text>
                 </View>
                 <View style={styles.caregiverRecentContent}>
                   <View style={styles.caregiverRecentTopRow}>
@@ -611,10 +635,32 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
           )}
         </View>
 
+        {hasEmotionalConcern ? (
+          <TouchableOpacity
+            style={[styles.caregiverAssistantCard, styles.caregiverEmotionalAssistantCard]}
+            activeOpacity={0.88}
+            onPress={openEmotionalAssistantReview}
+            accessibilityRole="button"
+            accessibilityLabel="Ask assistant about emotional support alerts"
+            accessibilityHint="Opens the assistant to review recent mood patterns and caregiver-safe emotional history"
+          >
+            <View style={[styles.caregiverAssistantIconWrap, styles.caregiverEmotionalAssistantIconWrap]}>
+              <Text style={styles.caregiverAssistantIcon}>{'\u{1F49A}'}</Text>
+            </View>
+            <View style={styles.caregiverAssistantTextWrap}>
+              <Text style={styles.caregiverAssistantTitle}>Explore Emotional Concern</Text>
+              <Text style={styles.caregiverAssistantSubtitle}>
+                Ask about mood changes, repeated concerns, and recent support history.
+              </Text>
+            </View>
+            <Text style={styles.caregiverAssistantArrow}>{'\u203A'}</Text>
+          </TouchableOpacity>
+        ) : null}
+
         <View style={styles.caregiverCard}>
           <View style={styles.caregiverTimelineHeader}>
             <Text style={styles.caregiverSectionTitle}>Timeline View</Text>
-            <TouchableOpacity style={styles.caregiverTimelineToggle} onPress={() => setIsTimelineExpanded((prev) => !prev)}>
+            <TouchableOpacity onPress={() => setIsTimelineExpanded((prev) => !prev)}>
               <Text style={styles.caregiverTimelineLink}>{isTimelineExpanded ? 'Minimize' : 'Maximize'}</Text>
             </TouchableOpacity>
           </View>
@@ -654,60 +700,50 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.caregiverDashboardButton}
-          onPress={onOpenDashboard}
-          activeOpacity={0.86}
-          accessibilityRole="button"
-          accessibilityLabel="Open elder summary dashboard"
-          accessibilityHint="Shows medication, mood, alert, stock, and routine summaries"
-        >
-          <View style={styles.caregiverDashboardTextWrap}>
-            <Text style={styles.caregiverDashboardTitle}>Summary Dashboard</Text>
-            <Text style={styles.caregiverDashboardSubtitle}>
-              Review medicine adherence, missed doses, mood, alerts, stock, and routine in one place.
-            </Text>
+        <View style={styles.caregiverCard}>
+          <Text style={styles.caregiverSectionTitle}>Caregiver Tools</Text>
+          <Text style={styles.caregiverToolsSubtitle}>Open the same medicine screens the elder uses, plus tablet identification.</Text>
+          <View style={styles.caregiverToolsGrid}>
+            {availableReminderMenuItems.map((item) => (
+              <TouchableOpacity
+                key={`caregiver-tool-${item.title}`}
+                style={styles.caregiverToolButton}
+                activeOpacity={0.88}
+                onPress={() => {
+                  setShowReminderMenu(true);
+                  setActiveReminderView(
+                    item.title === 'Tablet Identifier'
+                      ? 'tablet-identifier'
+                      : item.title === 'Routine Setup'
+                        ? 'routine-setup'
+                        : item.title === 'Add Medicine'
+                          ? 'add-medicine'
+                          : item.title === 'Scan Pharmacy Receipt'
+                            ? 'scan-receipt'
+                            : item.title === 'Medicine List'
+                              ? 'medicine-list'
+                              : item.title === 'Medicine Stock'
+                                ? 'medicine-stock'
+                                : 'menu'
+                  );
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                accessibilityHint={item.subtitle}
+              >
+                <Text style={styles.caregiverToolIcon}>{item.icon}</Text>
+                <Text style={styles.caregiverToolLabel}>{item.title}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <Text style={styles.caregiverDashboardArrow}>{'>'}</Text>
-        </TouchableOpacity>
+        </View>
 
         <View style={styles.quickActionRow}>
-          <TouchableOpacity
-            style={styles.caregiverDiabetesButton}
-            onPress={onOpenDiabetesPrediction}
-            activeOpacity={0.86}
-            accessibilityRole="button"
-            accessibilityLabel="Open diabetes risk prediction"
-          >
-            <Text style={styles.caregiverDiabetesButtonText}>Diabetes Risk Prediction</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.caregiverStrokeButton}
-            onPress={onOpenStrokePrediction}
-            activeOpacity={0.86}
-            accessibilityRole="button"
-            accessibilityLabel="Open stroke risk prediction"
-          >
-            <Text style={styles.caregiverDiabetesButtonText}>Stroke Risk Prediction</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.caregiverHypertensionButton}
-            onPress={onOpenHypertensionPrediction}
-            activeOpacity={0.86}
-            accessibilityRole="button"
-            accessibilityLabel="Open blood pressure risk prediction"
-          >
-            <Text style={styles.caregiverDiabetesButtonText}>BP Risk Prediction</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
             <Text style={styles.profileButtonText}>View Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.caregiverLogoutButton} onPress={onLogout}>
-            <View style={styles.caregiverLogoutIconFrame}>
-              <View style={styles.caregiverLogoutDoor} />
-              <Text style={styles.caregiverLogoutArrow}>→</Text>
-            </View>
-            <Text style={styles.caregiverLogoutButtonText}>Logout</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+            <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -716,7 +752,12 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
 
   if (showReminderMenu) {
     if (activeReminderView === 'routine-setup') {
-      return <RoutineSetupScreen onBackToMenu={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+      return (
+        <RoutineSetupScreen
+          onBackToMenu={leaveReminderSubView}
+          highlight={getLaunchHighlight('routine-setup')}
+        />
+      );
     }
 
     if (activeReminderView === 'add-medicine') {
@@ -731,18 +772,12 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
             >
               <Text style={styles.addMedicineBackIcon}>‹</Text>
             </TouchableOpacity>
-            <Text style={[styles.addMedicineTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>💊 Add Medicine</Text>
+            <Text style={styles.addMedicineTitle}>Add Medicine</Text>
             <View style={styles.addMedicineHeaderSpacer} />
           </View>
 
           <View style={styles.addMedicineHintCard}>
-            <View style={styles.addMedicineHintIconWrap}>
-              <Text style={styles.addMedicineHintIcon}>➕</Text>
-            </View>
-            <View style={styles.addMedicineHintTextWrap}>
-              <Text style={[styles.addMedicineHintTitle, { fontSize: 24 * textScale, lineHeight: 30 * textScale }]}>Choose how to add</Text>
-              <Text style={[styles.addMedicineHintText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Pick the easiest way.</Text>
-            </View>
+            <Text style={styles.addMedicineHintTitle}>How would you like to add your medicine today?</Text>
           </View>
 
           <TouchableOpacity
@@ -756,10 +791,9 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
               <Text style={styles.addMedicineOptionIcon}>📷</Text>
             </View>
             <View style={styles.addMedicineOptionTextWrap}>
-              <Text style={[styles.addMedicineOptionTitle, { fontSize: 21 * textScale, lineHeight: 27 * textScale }]}>Scan Receipt</Text>
-              <Text style={[styles.addMedicineOptionSubtitle, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Use camera. Fast way.</Text>
+              <Text style={styles.addMedicineOptionTitle}>Scan Pharmacy Receipt</Text>
+              <Text style={styles.addMedicineOptionSubtitle}>Capture your pharmacy receipt details</Text>
             </View>
-            <Text style={styles.addMedicineOptionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -775,14 +809,13 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
             accessibilityLabel="Manual Entry"
             accessibilityHint="Type medicine details manually"
           >
-            <View style={[styles.addMedicineOptionIconWrap, styles.addMedicineOptionIconWrapManual]}>
+            <View style={styles.addMedicineOptionIconWrap}>
               <Text style={styles.addMedicineOptionIcon}>⌨️</Text>
             </View>
             <View style={styles.addMedicineOptionTextWrap}>
-              <Text style={[styles.addMedicineOptionTitle, { fontSize: 21 * textScale, lineHeight: 27 * textScale }]}>Type Details</Text>
-              <Text style={[styles.addMedicineOptionSubtitle, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>Enter by yourself.</Text>
+              <Text style={styles.addMedicineOptionTitle}>Manual Entry</Text>
+              <Text style={styles.addMedicineOptionSubtitle}>Type in the details yourself</Text>
             </View>
-            <Text style={styles.addMedicineOptionArrow}>›</Text>
           </TouchableOpacity>
         </ScrollView>
       );
@@ -795,7 +828,6 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
 
       return (
         <ManualEntryScreen
-          reminderTextScale={reminderTextScale}
           initialData={currentDraft}
           onBack={() => {
             if (capturedMedicines.length) {
@@ -842,7 +874,6 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     if (activeReminderView === 'scan-receipt') {
       return (
         <ReceiptScanScreen
-          reminderTextScale={reminderTextScale}
           onBack={() => setActiveReminderView('add-medicine')}
           initialDetectedMedicines={capturedMedicines}
           onCapturedListChange={(list) => {
@@ -873,76 +904,91 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     }
 
     if (activeReminderView === 'medicine-list') {
-      return <MedicineListScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+      return (
+        <MedicineListScreen
+          onBack={leaveReminderSubView}
+          highlight={getLaunchHighlight('medicine-list')}
+        />
+      );
     }
 
     if (activeReminderView === 'medicine-stock') {
-      return <MedicineStockScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+      return (
+        <MedicineStockScreen
+          onBack={leaveReminderSubView}
+          highlight={getLaunchHighlight('medicine-stock')}
+        />
+      );
     }
 
     if (activeReminderView === 'tablet-identifier') {
-      return <TabletIdentifierScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+      return <TabletIdentifierScreen onBack={leaveReminderSubView} />;
     }
 
     if (activeReminderView === 'schedule-board') {
-      return <ScheduleBoardScreen user={user} onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+      return <ScheduleBoardScreen user={user} onBack={leaveReminderSubView} />;
     }
 
     if (activeReminderView === 'safety-center') {
-      return <SafetyCenterScreen onBack={() => setActiveReminderView('menu')} reminderTextScale={reminderTextScale} />;
+      return <SafetyCenterScreen onBack={leaveReminderSubView} />;
     }
 
     return (
-      <ScrollView contentContainerStyle={styles.reminderContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.reminderScroll}
+        contentContainerStyle={styles.reminderContainer}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.reminderTopBar}>
-          <View style={styles.reminderTopLeft}>
-            <View style={styles.reminderTopTitleWrap}>
-              <View style={styles.reminderBrandPill}>
-                <Image source={elderMedsLogo} style={styles.reminderBrandLogo} resizeMode="contain" />
-              </View>
-              <Text style={styles.reminderTopLabel}>Reminder Menu</Text>
-            </View>
+          <View style={styles.reminderLogoPill}>
+            <Image source={elderMedsLogo} style={styles.reminderLogo} resizeMode="contain" />
           </View>
+
           <View style={styles.reminderTopActions}>
             <TouchableOpacity
-              style={styles.reminderProfileButton}
-              onPress={onOpenProfile}
+              style={[styles.reminderTopIconButton, styles.reminderProfileButton]}
+              onPress={() => onOpenProfile?.()}
+              activeOpacity={0.86}
               accessibilityRole="button"
               accessibilityLabel="Open profile"
-              accessibilityHint="Opens your user profile"
+              accessibilityHint="Opens your ElderMeds profile"
             >
-              <Text style={styles.reminderProfileButtonIcon}>👤</Text>
+              <Text style={styles.reminderTopIcon}>{'\u{1F464}'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.reminderHomeButton}
+              style={[styles.reminderTopIconButton, styles.reminderHomeButton]}
               onPress={() => {
                 setShowReminderMenu(false);
                 setActiveReminderView('menu');
               }}
+              activeOpacity={0.86}
               accessibilityRole="button"
               accessibilityLabel="Back to home"
               accessibilityHint="Returns to the main home menu"
             >
-              <Text style={styles.reminderHomeButtonIcon}>🏠</Text>
+              <Text style={styles.reminderTopIcon}>{'\u{1F3E0}'}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.reminderHeaderCard}>
-          <View style={styles.reminderHeaderIconWrap}>
-            <Text style={styles.reminderHeaderIcon}>🔔</Text>
+        <Text style={styles.reminderMenuHeading}>Reminder Menu</Text>
+
+        <View style={styles.reminderHeroBanner}>
+          <View style={styles.reminderHeroIconTile}>
+            <Text style={styles.reminderHeroIcon}>{'\u{1F514}'}</Text>
           </View>
-          <View style={styles.reminderHeaderTextWrap}>
-            <Text style={[styles.reminderTitle, { fontSize: 34 * textScale, lineHeight: 40 * textScale }]}>
-              Medicine{`\n`}Reminder
-            </Text>
-          </View>
+          <Text
+            style={[styles.reminderTitle, { fontSize: 34 * textScale, lineHeight: 42 * textScale }]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            Medicine{`\n`}Reminder
+          </Text>
         </View>
 
-        <View style={styles.reminderSectionHeader}>
-          <View style={styles.reminderSectionCopy}>
-            <Text style={styles.reminderInfoText}>Choose Action</Text>
-          </View>
+        <View style={styles.reminderActionHeader}>
+          <Text style={styles.reminderInfoText}>Choose Action</Text>
           <View style={styles.textModeRow}>
             <Text style={styles.textModeLabel}>Text</Text>
             <TouchableOpacity
@@ -967,13 +1013,13 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
         </View>
 
         <View style={styles.reminderButtonList}>
-          {reminderMenuItems.map((item) => (
+          {availableReminderMenuItems.map((item) => (
             <TouchableOpacity
               key={item.title}
               style={[
                 styles.reminderButton,
                 {
-                  backgroundColor: item.backgroundColor,
+                  backgroundColor: item.cardColor,
                   borderColor: item.borderColor,
                 },
               ]}
@@ -983,19 +1029,31 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
               accessibilityLabel={item.title}
               accessibilityHint={item.subtitle}
             >
-              <View style={[styles.reminderButtonIconWrap, { backgroundColor: item.accentColor }]}>
-                <Text style={styles.reminderButtonIcon}>{item.icon}</Text>
+              <View style={[styles.reminderButtonIconWrap, { backgroundColor: item.iconBg }]}>
+                <Text style={[styles.reminderButtonIcon, item.isTextIcon && styles.reminderButtonTextIcon]}>
+                  {item.icon}
+                </Text>
               </View>
               <View style={styles.reminderButtonTextWrap}>
-                <View style={styles.reminderButtonTitleRow}>
-                  <Text style={[styles.reminderButtonText, { fontSize: 21 * textScale }]}>{item.title}</Text>
-                </View>
-                <Text style={[styles.reminderButtonSubText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>
+                <Text
+                  style={[styles.reminderButtonText, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  style={[styles.reminderButtonSubText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
                   {item.subtitle}
                 </Text>
               </View>
               <View style={[styles.reminderButtonArrowWrap, { borderColor: item.borderColor }]}>
-                <Text style={[styles.reminderButtonArrow, { color: item.accentColor }]}>›</Text>
+                <Text style={[styles.reminderButtonArrow, { color: item.arrowColor }]}>{'\u203A'}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -1004,10 +1062,19 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
     );
   }
 
+  const todayLabel = new Date().toLocaleDateString([], {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+  const firstName = String(user?.fullName || '').trim().split(/\s+/)[0] || 'there';
+
   return (
     <ScrollView style={styles.homeScroll} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
       <View style={styles.homeTopBar}>
-        <Image source={elderMedsLogo} style={styles.homeBrandLogo} resizeMode="contain" />
+        <View style={styles.homeLogoPill}>
+          <Image source={elderMedsLogo} style={styles.homeBrandLogo} resizeMode="contain" />
+        </View>
         <View style={styles.homeTopActions}>
           <TouchableOpacity
             style={styles.homeTopProfileButton}
@@ -1037,7 +1104,14 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
       <View style={styles.homeHeroCard}>
         <View style={styles.homeHeroTextWrap}>
           <Text style={styles.homeDateText}>{todayLabel}</Text>
-          <Text style={styles.homeHeroTitle}>Good day, {firstName}</Text>
+          <Text
+            style={styles.homeHeroTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            Good day, {firstName}
+          </Text>
           <Text style={styles.homeHeroSubtitle}>Your medicine care is ready when you are.</Text>
         </View>
         <View style={styles.homeHeroBadge}>
@@ -1045,6 +1119,15 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
           <Text style={styles.homeHeroBadgeText}>Care</Text>
         </View>
       </View>
+
+      {isLocalMode ? (
+        <View style={styles.localModeBanner}>
+          <Text style={styles.localModeTitle}>Saved On This Device</Text>
+          <Text style={styles.localModeText}>
+            The shared database is unavailable right now, so this account and its new changes are being stored on this phone.
+          </Text>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         style={styles.homePrimaryAction}
@@ -1059,8 +1142,15 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
         </View>
         <View style={styles.homePrimaryTextWrap}>
           <Text style={styles.homePrimaryEyebrow}>Main action</Text>
-          <Text style={styles.homePrimaryTitle}>Medicine Reminder</Text>
-          <Text style={styles.homePrimarySubtitle}>Open today schedule and medicine tools.</Text>
+          <Text
+            style={styles.homePrimaryTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            Medicine Reminder
+          </Text>
+          <Text style={styles.homePrimarySubtitle} numberOfLines={2}>Open today schedule and medicine tools.</Text>
         </View>
         <View style={styles.homePrimaryArrowWrap}>
           <Text style={styles.homePrimaryArrow}>›</Text>
@@ -1081,28 +1171,36 @@ const HomeScreen = ({ user, onOpenProfile, onOpenAllergies, onOpenMedicine, onOp
             style={[
               styles.homeActionCard,
               {
-                backgroundColor: item.backgroundColor,
+                backgroundColor: item.cardColor,
                 borderColor: item.borderColor,
               },
             ]}
             activeOpacity={0.88}
             onPress={() => handleButtonPress(item)}
             accessibilityRole="button"
-            accessibilityLabel={item.title}
-            accessibilityHint={item.subtitle}
+            accessibilityLabel={item.label}
+            accessibilityHint="Medicine care option"
           >
-            <View style={[styles.homeActionIconWrap, { backgroundColor: item.accentColor }]}>
+            <View style={[styles.homeActionIconWrap, { backgroundColor: item.iconBg }]}>
               <Text style={styles.homeActionIcon}>{item.icon}</Text>
             </View>
             <View style={styles.homeActionTextWrap}>
-              <Text style={styles.homeActionTitle}>{item.title}</Text>
-              <Text style={styles.homeActionSubtitle}>{item.subtitle}</Text>
+              <Text
+                style={styles.homeActionTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {item.label}
+              </Text>
+              <Text style={styles.homeActionSubtitle} numberOfLines={1}>Care option</Text>
             </View>
-            <Text style={[styles.homeActionHelper, { color: item.accentColor }]}>{item.helper}</Text>
+            <View style={[styles.homeActionArrowWrap, { borderColor: item.borderColor }]}>
+              <Text style={[styles.homeActionHelper, { color: item.arrowColor }]}>{'\u203A'}</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
-
     </ScrollView>
   );
 };
@@ -1115,43 +1213,61 @@ const styles = StyleSheet.create({
   },
   homeScroll: {
     flex: 1,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#f7efe4',
   },
   homeContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 30,
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 28 : 22,
+    paddingBottom: 128,
   },
   homeTopBar: {
-    minHeight: 56,
+    minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
+  homeLogoPill: {
+    width: '44%',
+    minWidth: 132,
+    maxWidth: 172,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fffdf7',
+    borderWidth: 1,
+    borderColor: '#eadfcd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#8d7355',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
   homeBrandLogo: {
-    width: 132,
-    height: 40,
+    width: 82,
+    height: 34,
     flexShrink: 1,
   },
   homeTopActions: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 8,
+    flexShrink: 0,
   },
   homeTopProfileButton: {
     width: 50,
     height: 50,
     borderRadius: 18,
-    backgroundColor: '#fbfdff',
+    backgroundColor: '#fffdf8',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#ace1ce',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.12,
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.14,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
@@ -1164,15 +1280,15 @@ const styles = StyleSheet.create({
     minWidth: 104,
     minHeight: 50,
     borderRadius: 18,
-    backgroundColor: '#fbfdff',
+    backgroundColor: '#fffdf8',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#f2d47a',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.12,
+    shadowColor: '#6f604b',
+    shadowOpacity: 0.14,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
@@ -1192,36 +1308,36 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 3,
     borderWidth: 2,
-    borderColor: '#1f6894',
+    borderColor: '#2f6654',
     borderRightWidth: 0,
   },
   homeTopLogoutArrow: {
     position: 'absolute',
     right: 0,
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 19,
     lineHeight: 23,
     fontWeight: '900',
   },
   homeTopLogoutText: {
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '900',
   },
   homeHeroCard: {
-    minHeight: 150,
+    minHeight: 154,
     borderRadius: 24,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#2f6654',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#e5c44f',
     paddingHorizontal: 18,
     paddingVertical: 18,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.2,
+    shadowColor: '#725e25',
+    shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
     elevation: 5,
@@ -1231,7 +1347,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   homeDateText: {
-    color: '#eaf5ff',
+    color: '#fff4b8',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '900',
@@ -1245,7 +1361,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   homeHeroSubtitle: {
-    color: '#f3f9ff',
+    color: '#ecfff6',
     fontSize: 17,
     lineHeight: 24,
     fontWeight: '700',
@@ -1254,46 +1370,46 @@ const styles = StyleSheet.create({
     width: 78,
     minHeight: 92,
     borderRadius: 24,
-    backgroundColor: '#fbfdff',
+    backgroundColor: '#fff4b8',
     borderWidth: 2,
-    borderColor: '#d5eafa',
+    borderColor: '#fff9d8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homeHeroBadgeIcon: {
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 28,
     lineHeight: 32,
     fontWeight: '900',
   },
   homeHeroBadgeText: {
-    color: '#1f6894',
+    color: '#2f6654',
     fontSize: 13,
     fontWeight: '900',
     marginTop: 4,
   },
   homePrimaryAction: {
     minHeight: 118,
-    borderRadius: 22,
-    backgroundColor: '#fbfdff',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#e3f8ee',
+    borderWidth: 1,
+    borderColor: '#b8ead6',
+    paddingHorizontal: 18,
     paddingVertical: 14,
     marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
   },
   homePrimaryIconWrap: {
     width: 66,
     height: 66,
-    borderRadius: 22,
-    backgroundColor: '#1f6894',
+    borderRadius: 20,
+    backgroundColor: '#168464',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -1304,23 +1420,24 @@ const styles = StyleSheet.create({
   },
   homePrimaryTextWrap: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 8,
   },
   homePrimaryEyebrow: {
-    color: '#4c6d82',
+    color: '#2f6654',
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   homePrimaryTitle: {
-    color: '#12354d',
+    color: '#18352f',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   homePrimarySubtitle: {
-    color: '#4c6d82',
+    color: '#3d3833',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -1330,14 +1447,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#fffefa',
     borderWidth: 1,
-    borderColor: '#b9d9f2',
+    borderColor: '#b8ead6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homePrimaryArrow: {
-    color: '#1f6894',
+    color: '#168464',
     fontSize: 32,
     lineHeight: 36,
     fontWeight: '900',
@@ -1346,13 +1463,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   homeSectionTitle: {
-    color: '#12354d',
+    color: '#27231f',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   homeSectionSubtitle: {
-    color: '#4c6d82',
+    color: '#5e5143',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -1362,14 +1479,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   homeActionCard: {
-    minHeight: 102,
+    minHeight: 106,
     borderRadius: 20,
-    borderWidth: 2,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    marginBottom: 13,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.1,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   homeActionIconWrap: {
     width: 58,
@@ -1380,31 +1502,61 @@ const styles = StyleSheet.create({
     marginRight: 13,
   },
   homeActionIcon: {
+    color: '#ffffff',
     fontSize: 28,
     lineHeight: 32,
   },
   homeActionTextWrap: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 8,
   },
   homeActionTitle: {
-    color: '#12354d',
+    color: '#18352f',
     fontSize: 20,
     lineHeight: 26,
     fontWeight: '900',
   },
   homeActionSubtitle: {
-    color: '#4c6d82',
+    color: '#3d3833',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '700',
     marginTop: 4,
   },
   homeActionHelper: {
-    minWidth: 46,
-    textAlign: 'right',
-    fontSize: 13,
+    fontSize: 34,
+    lineHeight: 36,
     fontWeight: '900',
+  },
+  homeActionArrowWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#fffefa',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  localModeBanner: {
+    backgroundColor: '#fff6da',
+    borderColor: '#efd28a',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  localModeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#7b5700',
+  },
+  localModeText: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6d5a24',
   },
   title: {
     fontSize: 28,
@@ -1412,256 +1564,45 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
-  caregiverDiabetesButton: {
-    width: '48%',
-    minHeight: 66,
-    backgroundColor: '#0F766E',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  caregiverStrokeButton: {
-    width: '48%',
-    minHeight: 66,
-    backgroundColor: '#7C3AED',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  caregiverHypertensionButton: {
-    width: '48%',
-    minHeight: 66,
-    backgroundColor: '#B91C1C',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  caregiverDiabetesButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+  welcome: {
     fontSize: 16,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  caregiverDashboardButton: {
-    width: '100%',
-    minHeight: 108,
-    backgroundColor: '#12354D',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  caregiverDashboardTextWrap: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  caregiverDashboardTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  caregiverDashboardSubtitle: {
-    color: '#DCEBFF',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '700',
-  },
-  caregiverDashboardArrow: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    lineHeight: 30,
-    fontWeight: '900',
-  },
-  homeHeroCard: {
-    minHeight: 150,
-    borderRadius: 24,
-    backgroundColor: '#1f6894',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 5,
-  },
-  homeHeroTextWrap: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  homeDateText: {
-    color: '#eaf5ff',
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '900',
+    color: '#666',
     marginBottom: 6,
   },
-  homeHeroTitle: {
-    color: '#ffffff',
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  homeHeroSubtitle: {
-    color: '#f3f9ff',
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '700',
-  },
-  homeHeroBadge: {
-    width: 78,
-    minHeight: 92,
-    borderRadius: 24,
-    backgroundColor: '#fbfdff',
-    borderWidth: 2,
-    borderColor: '#d5eafa',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  homeHeroBadgeIcon: {
-    color: '#1f6894',
-    fontSize: 28,
-    lineHeight: 32,
-    fontWeight: '900',
-  },
-  homeHeroBadgeText: {
-    color: '#1f6894',
-    fontSize: 15,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  homePrimaryAction: {
-    minHeight: 118,
-    borderRadius: 22,
-    backgroundColor: '#fbfdff',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  },
-  homePrimaryIconWrap: {
-    width: 66,
-    height: 66,
-    borderRadius: 22,
-    backgroundColor: '#1f6894',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  homePrimaryIcon: {
-    fontSize: 32,
-    lineHeight: 36,
-  },
-  homePrimaryTextWrap: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  homePrimaryEyebrow: {
-    color: '#4c6d82',
+  userName: {
     fontSize: 14,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  homePrimaryTitle: {
-    color: '#12354d',
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '900',
-  },
-  homePrimarySubtitle: {
-    color: '#4c6d82',
-    fontSize: 16,
-    lineHeight: 23,
-    fontWeight: '700',
-    marginTop: 5,
-  },
-  homePrimaryArrowWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#eaf4ff',
-    borderWidth: 1,
-    borderColor: '#b9d9f2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  homePrimaryArrow: {
     color: '#1f6894',
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: '900',
-  },
-  homeSectionHeader: {
+    fontWeight: '600',
     marginBottom: 12,
   },
   quickActionRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
   profileButton: {
-    width: '48%',
-    minHeight: 58,
+    flex: 1,
     backgroundColor: '#1f6894',
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginRight: 0,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginRight: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   profileButtonText: {
     color: '#fff',
-    fontWeight: '900',
-    fontSize: 16,
+    fontWeight: '700',
   },
   logoutButton: {
-    width: '48%',
-    minHeight: 58,
+    flex: 1,
     backgroundColor: '#dd4d4d',
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginLeft: 0,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginLeft: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   logoutButtonText: {
     color: '#fff',
-    fontWeight: '900',
-    fontSize: 16,
+    fontWeight: '700',
   },
   grid: {
     flexDirection: 'row',
@@ -1695,72 +1636,87 @@ const styles = StyleSheet.create({
   reminderContainer: {
     flexGrow: 1,
     backgroundColor: '#f7efe4',
-    paddingTop: 22,
-    paddingBottom: 34,
-    paddingHorizontal: 16,
-    position: 'relative',
+    paddingTop: Platform.OS === 'android' ? 28 : 22,
+    paddingBottom: 118,
+    paddingHorizontal: 22,
   },
   caregiverPage: {
     flex: 1,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#EEF7F8',
   },
   caregiverContainer: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 30,
-    backgroundColor: '#eaf4ff',
+    paddingTop: Platform.OS === 'android' ? 38 : 24,
+    paddingBottom: 132,
+    backgroundColor: '#EEF7F8',
   },
-  caregiverTopBar: {
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  caregiverBrandPill: {
-    minHeight: 50,
+  caregiverHeaderCard: {
+    minHeight: 118,
+    backgroundColor: '#FFFFFF',
     borderRadius: 22,
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 1,
-  },
-  caregiverBrandLogo: {
-    width: 132,
-    height: 40,
-  },
-  caregiverHeaderRow: {
+    borderWidth: 1,
+    borderColor: '#D6EEF3',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
+    shadowColor: '#0F5E73',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 3,
+  },
+  caregiverHeaderTextWrap: {
+    flex: 1,
+    paddingRight: 14,
+  },
+  caregiverEyebrow: {
+    color: '#0F766E',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+    marginBottom: 4,
+  },
+  caregiverTitle: {
+    color: '#102A3A',
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '900',
+  },
+  caregiverWelcome: {
+    marginTop: 6,
+    color: '#587083',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
   },
   caregiverNotificationButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFF7D6',
+    borderWidth: 1,
+    borderColor: '#F5D56B',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.12,
+    shadowColor: '#B7791F',
+    shadowOpacity: 0.14,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   caregiverNotificationBadge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#dd4d4d',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1768,127 +1724,114 @@ const styles = StyleSheet.create({
   },
   caregiverNotificationBadgeText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  caregiverNotificationIcon: {
-    fontSize: 24,
-  },
-  caregiverCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 18,
-    lineHeight: 28,
-  },
-  caregiverHeroCard: {
-    minHeight: 156,
-    borderRadius: 24,
-    backgroundColor: '#1f6894',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 18,
-    paddingVertical: 20,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 5,
-  },
-  caregiverHeroTextWrap: {
-    flex: 1,
-    paddingRight: 14,
-  },
-  caregiverHeroEyebrow: {
-    color: '#d8ecfb',
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
-  caregiverHeroTitle: {
-    color: '#ffffff',
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  caregiverHeroSubtitle: {
-    color: '#eef8ff',
-    fontSize: 16,
-    lineHeight: 23,
+    fontSize: 10,
     fontWeight: '700',
   },
-  caregiverHeroBadge: {
-    width: 86,
-    minHeight: 100,
-    borderRadius: 24,
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#d5eafa',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  caregiverHeroBadgeValue: {
-    color: '#1f6894',
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: '900',
-  },
-  caregiverHeroBadgeLabel: {
-    color: '#4c6d82',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-  },
-  caregiverStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  caregiverStatCard: {
-    width: '48.5%',
-    minHeight: 88,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  caregiverStatValue: {
-    color: '#1f6894',
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '900',
-  },
-  caregiverStatLabel: {
-    color: '#4c6d82',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-    marginTop: 2,
+  caregiverNotificationIcon: {
+    fontSize: 26,
   },
   caregiverCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 22,
+    borderRadius: 18,
     padding: 16,
-    marginBottom: 14,
-    borderWidth: 2,
-    borderColor: '#d5eafa',
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E3EDF1',
+    shadowColor: '#0F5E73',
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 2,
+  },
+  caregiverToolsSubtitle: {
+    marginTop: -4,
+    marginBottom: 12,
+    fontSize: 12,
+    color: '#5e7183',
+    fontWeight: '600',
+    lineHeight: 17,
+  },
+  caregiverToolsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  caregiverAssistantCard: {
+    minHeight: 88,
+    backgroundColor: '#eaf4ff',
+    borderWidth: 1,
+    borderColor: '#bfd8ef',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  caregiverEmotionalAssistantCard: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  caregiverAssistantIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: '#1f6894',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  caregiverEmotionalAssistantIconWrap: {
+    backgroundColor: '#15803D',
+  },
+  caregiverAssistantIcon: {
+    fontSize: 20,
+  },
+  caregiverAssistantTextWrap: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  caregiverAssistantTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#21455f',
+    lineHeight: 22,
+  },
+  caregiverAssistantSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#5e7183',
+    lineHeight: 17,
+  },
+  caregiverAssistantArrow: {
+    fontSize: 28,
+    lineHeight: 32,
+    color: '#1f6894',
+    fontWeight: '900',
+  },
+  caregiverToolButton: {
+    width: '48%',
+    minHeight: 92,
+    backgroundColor: '#f4f9ff',
+    borderWidth: 1,
+    borderColor: '#bfd8ef',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  caregiverToolIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  caregiverToolLabel: {
+    textAlign: 'center',
+    color: '#21455f',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   caregiverCardTitle: {
     color: '#4c6d82',
@@ -1908,84 +1851,103 @@ const styles = StyleSheet.create({
   caregiverInfoStrip: {
     backgroundColor: '#ffffff',
     borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#DCEBED',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   caregiverInfoTitle: {
     fontSize: 16,
-    color: '#2d3c49',
+    lineHeight: 22,
+    color: '#223848',
     fontWeight: '900',
   },
   caregiverInfoBadge: {
-    backgroundColor: '#e9f1ff',
-    color: '#2161a8',
-    fontSize: 14,
+    backgroundColor: '#E6F3FF',
+    color: '#1769A6',
+    fontSize: 13,
     fontWeight: '900',
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  caregiverSectionTitle: {
-    fontSize: 17,
-    lineHeight: 23,
-    color: '#12354d',
-    fontWeight: '900',
-  },
-  caregiverSectionHeaderRow: {
+  caregiverDashboardCard: {
+    minHeight: 108,
+    backgroundColor: '#E8F8FA',
+    borderWidth: 1,
+    borderColor: '#92DCE9',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    shadowColor: '#0F7490',
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 3,
+  },
+  caregiverDashboardIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: '#0F7490',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  caregiverDashboardIcon: {
+    fontSize: 26,
+  },
+  caregiverDashboardTextWrap: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  caregiverDashboardTitle: {
+    fontSize: 20,
+    lineHeight: 26,
+    color: '#10384A',
+    fontWeight: '900',
+  },
+  caregiverDashboardSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#486B79',
+    fontWeight: '700',
+  },
+  caregiverDashboardArrow: {
+    fontSize: 32,
+    lineHeight: 36,
+    color: '#0F7490',
+    fontWeight: '900',
+  },
+  caregiverSectionTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#243848',
+    fontWeight: '900',
     marginBottom: 12,
-  },
-  caregiverSectionBadge: {
-    minWidth: 34,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: '#eaf4ff',
-    color: '#1f6894',
-    textAlign: 'center',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  caregiverCriticalCount: {
-    minWidth: 34,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: '#ffe7eb',
-    color: '#b0293f',
-    textAlign: 'center',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '900',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    textTransform: 'uppercase',
   },
   caregiverCriticalCard: {
-    backgroundColor: '#fff8f9',
-    borderColor: '#f0c7cf',
-    borderWidth: 2,
-    borderRadius: 22,
-    padding: 16,
+    backgroundColor: '#fff4f5',
+    borderColor: '#f5ccd1',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 14,
-    shadowColor: '#b71c1c',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
   },
   caregiverCriticalItem: {
     borderLeftColor: '#d64054',
-    borderLeftWidth: 4,
-    paddingLeft: 12,
-    paddingVertical: 8,
-    marginBottom: 6,
+    borderLeftWidth: 3,
+    paddingLeft: 10,
+    marginBottom: 10,
   },
   caregiverCriticalHeader: {
     flexDirection: 'row',
@@ -1995,95 +1957,70 @@ const styles = StyleSheet.create({
   },
   caregiverCriticalLabel: {
     color: '#b0293f',
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '900',
-    flex: 1,
-    paddingRight: 10,
+    fontSize: 14,
+    fontWeight: '700',
   },
   caregiverCriticalTime: {
     color: '#8e5a63',
     fontSize: 12,
-    fontWeight: '800',
   },
   caregiverCriticalMessage: {
     color: '#4a2d33',
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  caregiverMarkReadButton: {
-    alignSelf: 'flex-start',
-    minHeight: 38,
-    borderRadius: 15,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#f0c7cf',
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  caregiverMarkReadText: {
-    color: '#b0293f',
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '900',
+    marginBottom: 2,
   },
   caregiverRecentItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#edf5fc',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF3F5',
   },
   caregiverRecentDotWrap: {
-    width: 22,
+    width: 28,
     alignItems: 'center',
-    paddingTop: 5,
+    paddingTop: 4,
   },
   caregiverRecentDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#c8d7e3',
-  },
-  caregiverRecentDotUnread: {
-    backgroundColor: '#1f6894',
+    color: '#0F7490',
+    fontSize: 14,
   },
   caregiverRecentContent: {
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 4,
   },
   caregiverRecentTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 3,
+    alignItems: 'flex-start',
+    marginBottom: 5,
   },
   caregiverRecentTitle: {
-    color: '#12354d',
+    color: '#203646',
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: 20,
     fontWeight: '900',
     flexShrink: 1,
     marginRight: 8,
   },
   caregiverRecentTime: {
-    color: '#6f8292',
+    color: '#6A8290',
     fontSize: 12,
-    fontWeight: '800',
+    lineHeight: 17,
+    fontWeight: '700',
   },
   caregiverRecentMessage: {
-    color: '#4c6d82',
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '700',
+    color: '#4A6070',
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '600',
   },
   caregiverEmptyText: {
-    color: '#4c6d82',
+    color: '#687f90',
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   caregiverTimelineHeader: {
     flexDirection: 'row',
@@ -2092,32 +2029,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   caregiverTimelineDayLabel: {
-    marginTop: 10,
+    marginTop: 12,
     marginBottom: 6,
-    color: '#4c6d82',
+    color: '#607684',
     fontSize: 12,
+    lineHeight: 17,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  caregiverTimelineToggle: {
-    minHeight: 36,
-    borderRadius: 14,
-    backgroundColor: '#eaf4ff',
-    borderWidth: 1,
-    borderColor: '#b9d9f2',
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   caregiverTimelineLink: {
-    color: '#1f6894',
-    fontSize: 12,
+    color: '#0F7490',
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: '900',
   },
   caregiverTimelineItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginTop: 8,
+    marginTop: 10,
   },
   caregiverTimelineMarkerCol: {
     width: 28,
@@ -2129,7 +2058,7 @@ const styles = StyleSheet.create({
     top: 22,
     width: 2,
     bottom: -8,
-    backgroundColor: '#d5eafa',
+    backgroundColor: '#d7dde3',
   },
   caregiverTimelineDotCircle: {
     width: 22,
@@ -2161,498 +2090,356 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   caregiverTimelineTime: {
-    color: '#1f6894',
+    color: '#4a5c69',
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   caregiverTimelineText: {
-    color: '#12354d',
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
+    color: '#324B5A',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
     marginTop: 2,
   },
   caregiverTimelineExpandButton: {
-    marginTop: 8,
+    marginTop: 4,
     alignSelf: 'flex-start',
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: '#eaf4ff',
-    borderWidth: 1,
-    borderColor: '#b9d9f2',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#edf4fb',
   },
   caregiverTimelineExpandButtonText: {
-    color: '#1f6894',
-    fontSize: 13,
-    fontWeight: '900',
+    color: '#2b72b8',
+    fontSize: 12,
+    fontWeight: '700',
   },
-  caregiverActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  caregiverProfileButton: {
-    width: '48.5%',
-    minHeight: 56,
-    borderRadius: 18,
-    backgroundColor: '#1f6894',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  },
-  caregiverProfileButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '900',
-  },
-  caregiverLogoutButton: {
-    width: '48.5%',
-    minHeight: 56,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-  },
-  caregiverLogoutIconFrame: {
-    width: 24,
-    height: 24,
-    marginRight: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  caregiverLogoutDoor: {
-    position: 'absolute',
-    left: 2,
-    width: 11,
-    height: 18,
-    borderRadius: 3,
-    borderWidth: 2,
-    borderColor: '#1f6894',
-    borderRightWidth: 0,
-  },
-  caregiverLogoutArrow: {
-    position: 'absolute',
-    right: 0,
-    color: '#1f6894',
-    fontSize: 19,
-    lineHeight: 23,
-    fontWeight: '900',
-  },
-  caregiverLogoutButtonText: {
-    color: '#1f6894',
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '900',
+  reminderScroll: {
+    flex: 1,
+    backgroundColor: '#f7efe4',
   },
   reminderTopBar: {
-    minHeight: 54,
-    marginBottom: 14,
-    paddingHorizontal: 2,
+    minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  reminderTopLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 10,
-  },
-  reminderTopTitleWrap: {
-    flex: 1,
-  },
-  reminderBrandPill: {
-    alignSelf: 'flex-start',
-    minHeight: 42,
-    borderRadius: 18,
-    backgroundColor: '#fffdf8',
+  reminderLogoPill: {
+    width: '44%',
+    minWidth: 132,
+    maxWidth: 172,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fffdf7',
     borderWidth: 1,
-    borderColor: '#eadcca',
-    paddingHorizontal: 10,
+    borderColor: '#eadfcd',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    shadowColor: '#8d7355',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
-  reminderBrandLogo: {
-    width: 126,
+  reminderLogo: {
+    width: 82,
     height: 34,
   },
   reminderTopActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 8,
+    flexShrink: 0,
   },
-  reminderProfileButton: {
+  reminderTopIconButton: {
     width: 54,
     height: 54,
     borderRadius: 27,
     backgroundColor: '#fffdf8',
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    borderWidth: 2,
-    borderColor: '#a8dbc8',
-    shadowColor: '#17382f',
+    marginLeft: 8,
+    shadowColor: '#6f604b',
     shadowOpacity: 0.14,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
+    elevation: 4,
   },
-  reminderProfileButtonIcon: {
-    fontSize: 27,
-    lineHeight: 31,
-    fontWeight: '900',
-  },
-  reminderTopLabel: {
-    marginTop: 2,
-    fontSize: 24,
-    lineHeight: 30,
-    color: '#2d241d',
-    fontWeight: '800',
+  reminderProfileButton: {
+    borderColor: '#ace1ce',
   },
   reminderHomeButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#fffdf8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#f4cf75',
-    shadowColor: '#17382f',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
+    borderColor: '#f2d47a',
   },
-  reminderHomeButtonIcon: {
+  reminderTopIcon: {
     fontSize: 27,
     lineHeight: 31,
-    fontWeight: '900',
   },
-  reminderHeaderCard: {
-    width: '100%',
-    minHeight: 126,
-    borderRadius: 24,
-    backgroundColor: '#2f5d50',
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#f4cf75',
-    shadowColor: '#20382f',
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
-  },
-  reminderHeaderIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    backgroundColor: '#f8d978',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: '#fff4c6',
-  },
-  reminderHeaderIcon: {
-    fontSize: 36,
-  },
-  reminderHeaderTextWrap: {
-    flex: 1,
-  },
-  reminderTitle: {
-    fontSize: 34,
-    fontWeight: '900',
-    lineHeight: 40,
-    color: '#ffffff',
-  },
-  reminderSectionHeader: {
-    marginBottom: 12,
-    paddingHorizontal: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  reminderSectionCopy: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  textModeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  textModeLabel: {
-    marginRight: 8,
-    color: '#5e5045',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  textModeButton: {
-    minWidth: 44,
-    height: 38,
-    paddingHorizontal: 9,
-    borderRadius: 12,
-    backgroundColor: '#fffdf8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
-    borderWidth: 1,
-    borderColor: '#d8c9b7',
-  },
-  textModeButtonActive: {
-    backgroundColor: '#2f5d50',
-    borderColor: '#2f5d50',
-  },
-  textModeButtonText: {
-    color: '#5e5045',
-    fontWeight: '900',
-    fontSize: 14,
-  },
-  textModeButtonTextActive: {
-    color: '#ffffff',
-  },
-  reminderInfoText: {
-    fontSize: 21,
-    lineHeight: 26,
-    color: '#2d241d',
-    fontWeight: '900',
-    letterSpacing: 0,
-  },
-  reminderButtonList: {
-    width: '100%',
-  },
-  reminderButton: {
-    borderRadius: 18,
-    minHeight: 104,
-    marginBottom: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    shadowColor: '#5c4a39',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  },
-  reminderButtonIconWrap: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  reminderButtonIcon: {
+  reminderMenuHeading: {
+    color: '#27231f',
     fontSize: 27,
-  },
-  reminderButtonTextWrap: {
-    flex: 1,
-    paddingRight: 6,
-  },
-  reminderButtonTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  reminderButtonText: {
-    fontSize: 21,
-    lineHeight: 27,
+    lineHeight: 33,
     fontWeight: '900',
-    color: '#24352f',
-    marginRight: 8,
+    marginBottom: 20,
   },
-  reminderButtonSubText: {
-    marginTop: 7,
-    fontSize: 15,
-    lineHeight: 21,
-    color: '#4d473f',
-    fontWeight: '700',
-  },
-  reminderButtonArrowWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.78)',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reminderButtonArrow: {
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '900',
-  },
-  addMedicineContainer: {
-    flexGrow: 1,
-    backgroundColor: '#f7efe4',
-    paddingTop: 26,
-    paddingHorizontal: 14,
-    paddingBottom: 30,
-  },
-  addMedicineHeader: {
-    minHeight: 58,
-    borderRadius: 22,
-    backgroundColor: '#2f5d50',
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  reminderHeroBanner: {
+    minHeight: 156,
+    borderRadius: 24,
+    backgroundColor: '#2f6654',
     borderWidth: 2,
-    borderColor: '#f4cf75',
-    marginBottom: 14,
-    shadowColor: '#20382f',
+    borderColor: '#e5c44f',
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#725e25',
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
     elevation: 5,
   },
-  addMedicineBackButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  reminderHeroIconTile: {
+    width: 82,
+    height: 82,
+    borderRadius: 24,
+    backgroundColor: '#fee48a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 22,
+    borderWidth: 1,
+    borderColor: '#fff5be',
+  },
+  reminderHeroIcon: {
+    fontSize: 46,
+    lineHeight: 50,
+  },
+  reminderTitle: {
+    flex: 1,
+    color: '#ffffff',
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  reminderActionHeader: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  reminderInfoText: {
+    flexShrink: 1,
+    color: '#28231f',
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: '900',
+  },
+  textModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    marginLeft: 10,
+  },
+  textModeLabel: {
+    marginRight: 8,
+    color: '#493f35',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  textModeButton: {
+    minWidth: 50,
+    height: 50,
+    paddingHorizontal: 11,
+    borderRadius: 13,
     backgroundColor: '#fffdf8',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 7,
     borderWidth: 1,
-    borderColor: '#fff4c6',
+    borderColor: '#e3d6c3',
   },
-  addMedicineBackIcon: {
-    fontSize: 32,
-    lineHeight: 36,
-    color: '#2f5d50',
-    marginTop: -3,
-    fontWeight: '900',
+  textModeButtonActive: {
+    backgroundColor: '#2f6654',
+    borderColor: '#2f6654',
   },
-  addMedicineTitle: {
-    fontSize: 22,
-    lineHeight: 28,
+  textModeButtonText: {
+    color: '#42372e',
     fontWeight: '900',
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  textModeButtonTextActive: {
     color: '#ffffff',
   },
-  addMedicineHeaderSpacer: {
-    width: 46,
-    height: 46,
+  reminderButtonList: {
+    width: '100%',
   },
-  addMedicineHintCard: {
-    backgroundColor: '#fffdf8',
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#eadcca',
-    padding: 14,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addMedicineHintIconWrap: {
-    width: 58,
-    height: 58,
-    borderRadius: 19,
-    backgroundColor: '#f8d978',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  addMedicineHintIcon: {
-    fontSize: 27,
-  },
-  addMedicineHintTextWrap: {
-    flex: 1,
-  },
-  addMedicineHintTitle: {
-    fontSize: 24,
-    lineHeight: 30,
-    color: '#2d241d',
-    fontWeight: '900',
-  },
-  addMedicineHintText: {
-    marginTop: 4,
-    fontSize: 15,
-    lineHeight: 21,
-    color: '#74665b',
-    fontWeight: '700',
-  },
-  addMedicineOptionCard: {
+  reminderButton: {
     minHeight: 108,
-    backgroundColor: '#f3efff',
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#cbc0f0',
-    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginBottom: 16,
+    paddingHorizontal: 18,
     paddingVertical: 14,
-    marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#6b4b2d',
-    shadowOpacity: 0.09,
+    borderWidth: 1,
+    shadowColor: '#7a674f',
+    shadowOpacity: 0.12,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
   },
-  addMedicineOptionCardPrimary: {
-    borderColor: '#a8dbc8',
-    backgroundColor: '#e9f7f1',
-  },
-  addMedicineOptionIconWrap: {
-    width: 62,
-    height: 62,
+  reminderButtonIconWrap: {
+    width: 68,
+    height: 68,
     borderRadius: 20,
-    backgroundColor: '#5b4aa0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 18,
+  },
+  reminderButtonIcon: {
+    color: '#ffffff',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '900',
+  },
+  reminderButtonTextIcon: {
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: 0,
+  },
+  reminderButtonTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
+  },
+  reminderButtonText: {
+    color: '#18352f',
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  reminderButtonSubText: {
+    marginTop: 5,
+    color: '#3d3833',
+    fontWeight: '800',
+  },
+  reminderButtonArrowWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fffefa',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    flexShrink: 0,
+  },
+  reminderButtonArrow: {
+    fontSize: 40,
+    lineHeight: 42,
+    fontWeight: '900',
+  },
+  addMedicineContainer: {
+    flexGrow: 1,
+    backgroundColor: '#f4f6f8',
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 24,
+  },
+  addMedicineHeader: {
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#e7ebef',
+    marginBottom: 12,
+  },
+  addMedicineBackButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f0f5fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMedicineBackIcon: {
+    fontSize: 24,
+    color: '#4c6175',
+    marginTop: -2,
+  },
+  addMedicineTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e2a35',
+  },
+  addMedicineHeaderSpacer: {
+    width: 34,
+    height: 34,
+  },
+  addMedicineHintCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e6eaef',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  addMedicineHintTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+    color: '#2a3c4c',
+    fontWeight: '600',
+  },
+  addMedicineOptionCard: {
+    minHeight: 90,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e0e5ea',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addMedicineOptionCardPrimary: {
+    borderColor: '#3c98d6',
+    backgroundColor: '#f4fbff',
+  },
+  addMedicineOptionIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: '#f2f4f7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   addMedicineOptionIconWrapPrimary: {
-    backgroundColor: '#1e6f5c',
-  },
-  addMedicineOptionIconWrapManual: {
-    backgroundColor: '#5b4aa0',
+    backgroundColor: '#2f8fd0',
   },
   addMedicineOptionIcon: {
-    fontSize: 29,
+    fontSize: 22,
   },
   addMedicineOptionTextWrap: {
     flex: 1,
   },
   addMedicineOptionTitle: {
-    fontSize: 21,
-    lineHeight: 27,
-    fontWeight: '900',
-    color: '#24352f',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1c2b36',
   },
   addMedicineOptionSubtitle: {
-    marginTop: 6,
-    fontSize: 15,
-    lineHeight: 21,
-    color: '#4d473f',
-    fontWeight: '700',
-  },
-  addMedicineOptionArrow: {
-    width: 40,
-    fontSize: 32,
-    lineHeight: 36,
-    color: '#2f5d50',
-    fontWeight: '900',
-    textAlign: 'right',
+    marginTop: 2,
+    fontSize: 16,
+    color: '#556472',
   },
 });
 

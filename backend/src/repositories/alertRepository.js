@@ -1,13 +1,32 @@
 const { query } = require('../db/postgres');
 
 async function createAlertsForCaregivers({ elderId, caregiverIds, sessionId, alertPayload, explanation }) {
-  if (!Array.isArray(caregiverIds) || caregiverIds.length === 0 || !alertPayload) {
+  if (!alertPayload) {
+    return [];
+  }
+
+  const normalizedCaregiverIds = Array.from(
+    new Set(
+      (Array.isArray(caregiverIds) ? caregiverIds : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )
+  );
+
+  if (normalizedCaregiverIds.length === 0) {
+    const fallbackCaregiverId = Number(elderId);
+    if (Number.isInteger(fallbackCaregiverId) && fallbackCaregiverId > 0) {
+      normalizedCaregiverIds.push(fallbackCaregiverId);
+    }
+  }
+
+  if (normalizedCaregiverIds.length === 0) {
     return [];
   }
 
   const created = [];
 
-  for (const caregiverId of caregiverIds) {
+  for (const caregiverId of normalizedCaregiverIds) {
     const result = await query(
       `
         INSERT INTO emotional_support_caregiver_alerts (
@@ -74,7 +93,7 @@ async function getCaregiverAlerts(caregiverId, status = 'open') {
         acknowledged_at AS "acknowledgedAt",
         resolved_at AS "resolvedAt"
       FROM emotional_support_caregiver_alerts
-      WHERE caregiver_user_id = $1
+      WHERE (caregiver_user_id = $1 OR elder_user_id = $1)
       ${statusFilter}
       ORDER BY created_at DESC
     `,
@@ -92,7 +111,7 @@ async function acknowledgeAlert(alertId, caregiverId) {
         status = 'acknowledged',
         acknowledged_at = NOW()
       WHERE id = $1
-        AND caregiver_user_id = $2
+        AND (caregiver_user_id = $2 OR elder_user_id = $2)
       RETURNING
         id AS "alertId",
         caregiver_user_id AS "caregiverId",

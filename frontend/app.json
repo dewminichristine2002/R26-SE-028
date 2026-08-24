@@ -14,7 +14,6 @@
       "**/*"
     ],
     "plugins": [
-      "expo-speech-recognition",
       [
         "expo-notifications",
         {
@@ -33,8 +32,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "ElderMeds uses your microphone to capture medicine names for allergy checks.",
-          "speechRecognitionPermission": "ElderMeds converts your speech to medicine names for allergy checks."
+          "microphonePermission": "ElderMeds uses your microphone so you can talk to the health assistant.",
+          "speechRecognitionPermission": "ElderMeds converts your speech into assistant chat messages."
         }
       ]
     ],
@@ -43,8 +42,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "ElderMeds reads prescription photos to help check medicine safety.",
         "NSCameraUsageDescription": "ElderMeds can use the camera to capture a prescription for safety checking.",
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to convert speech into assistant chat messages.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone for voice assistant input."
       }
     },
     "android": {

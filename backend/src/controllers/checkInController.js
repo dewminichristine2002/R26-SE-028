@@ -74,6 +74,7 @@ async function createCheckIn(req, res) {
         detectedEmotion: analysis.detectedEmotion,
         stressScore: analysis.stressScore,
         lonelinessScore: analysis.lonelinessScore,
+        concernSummary: alertPayload?.concernSummary || null,
       },
     });
 

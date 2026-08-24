@@ -9,6 +9,7 @@ web-build/
 coverage/
 
 # Android local build artifacts
+android.local-backup-*/
 android/.gradle/
 android/build/
 android/app/build/
@@ -31,6 +32,7 @@ ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 .expo/
 .expo-shared/
 .metro-cache/
+.npm-cache/
 
 # Logs
 *.log
