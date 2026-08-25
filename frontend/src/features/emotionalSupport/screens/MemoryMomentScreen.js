@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from 'react-native-datetimepicker/datetimepicker';
 import {
   getReminiscencePrompt,
   previewReminiscenceTopic,
@@ -49,17 +48,12 @@ export default function MemoryMomentScreen({ navigation, route }) {
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [photoUri, setPhotoUri] = useState(null);
   const [memoryDate, setMemoryDate] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [category, setCategory] = useState('');
+    const [category, setCategory] = useState('');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const topicCategories = ['Hobby','Family','Work','Place','Music','Food','Travel','Pets','Other'];
 
   useEffect(() => () => { setPhotoUri(null); }, []);
 
-  function onDateChange(event, selectedDate) {
-    setShowDatePicker(false);
-    if (selectedDate) setMemoryDate(selectedDate.toISOString().slice(0,10));
-  }
 
   function openCategoryPicker() { setShowCategoryPicker(true); }
   function selectCategory(c) { setCategory(c); setShowCategoryPicker(false); }
@@ -212,13 +206,16 @@ export default function MemoryMomentScreen({ navigation, route }) {
                 </Pressable>
 
                 <Text style={[s.label, { marginTop: 12 }]}>Date (optional)</Text>
-                <Pressable onPress={() => setShowDatePicker(true)} style={{ paddingVertical: 8 }}>
-                  <Text style={{ ...type.card }}>{memoryDate || 'Choose a date'}</Text>
-                </Pressable>
-
-                {showDatePicker ? (
-                  <DateTimePicker value={memoryDate ? new Date(memoryDate) : new Date()} mode="date" display="default" onChange={onDateChange} />
-                ) : null}
+                <TextInput
+                  accessibilityLabel="Memory date"
+                  style={[s.input, { minHeight: 40 }]}
+                  value={memoryDate || ''}
+                  onChangeText={setMemoryDate}
+                  editable={!saving}
+                  placeholder="Choose a date"
+                  placeholderTextColor={colors.secondary}
+                />
+                <Text style={{ ...type.card, marginTop: 6 }}>{memoryDate || 'Choose a date'}</Text>
 
                 {showCategoryPicker ? (
                   <Modal transparent visible animationType="slide">
