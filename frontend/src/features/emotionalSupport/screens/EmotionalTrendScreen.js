@@ -16,12 +16,15 @@ export default function EmotionalTrendScreen({ navigation }) {
   useEffect(() => { load(); }, [load]);
   async function toggleSummary() { if (summary) return setSummary(null); try { setSummaryLoading(true); setSummary(await getWellnessSummary(elderId, period)); } catch { setError(true); } finally { setSummaryLoading(false); } }
   const emotional = data?.emotional || {}; const activities = data?.activities || {}; const cognitive = data?.cognitive_engagement || {};
+  // Gentle engagement tracking: factual counts only (no streaks, ranks or scores).
+  const differentActivities = new Set((activities.recent_activity_log || []).map((item) => String(item.activity_type || item.activity_code || '').replace(/_(easy|medium)$/i, ''))).size;
   return <SafeAreaView style={s.safe}><WellnessBackdrop /><ScrollView contentContainerStyle={s.container}>
     <ScreenHeader navigation={navigation} title="Your Wellness" subtitle="Your recent check-ins and engagement activity." />
     <View style={s.tabs}>{[['7d', '7 Days'], ['30d', '30 Days']].map(([value, text]) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: period === value }} key={value} onPress={() => setPeriod(value)} style={[s.tab, period === value && s.tabActive]}><Text style={[s.tabText, period === value && s.tabTextActive]}>{text}</Text></Pressable>)}</View>
     <InlineState loading={loading} error={error} onRetry={load} emptyText="Loading your trends…" />
     {!loading && !error && data ? <>
-      <View style={s.summaryRow}><MetricCard value={emotional.total_checkins || 0} label="Check-ins" /><MetricCard value={activities.total_completed || 0} label="Activities" /></View>
+      <View style={s.summaryRow}><MetricCard value={emotional.total_checkins || 0} label="Check-ins" /><MetricCard value={activities.total_completed || 0} label="Activities" /><MetricCard value={differentActivities} label="Different ones tried" /></View>
+      {activities.reminiscence?.completed_count ? <Card style={s.frequent}><Text style={s.meta}>Memory moments this period</Text><Text style={s.frequentValue}>{activities.reminiscence.completed_count}</Text></Card> : null}
       <Card style={s.frequent}><Text style={s.meta}>Most Frequent State</Text><Text style={s.frequentValue}>{emotional.total_checkins ? label(emotional.most_frequent_emotion) : 'No check-ins yet'}</Text></Card>
       <Section title="Emotional Check-Ins">
         {emotional.total_checkins ? emotional.distribution?.filter((x) => x.count).map((item) => <EmotionBar key={item.emotion} item={item} />) : <Empty title="No check-ins yet" text="Complete a short check-in to begin building your wellness history." />}

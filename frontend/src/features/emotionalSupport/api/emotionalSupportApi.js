@@ -78,4 +78,18 @@ export const getWellnessSummary = (userId, period = '30d') =>
 export const getAdaptiveCaregiverAlerts = (userId, period = '30d') =>
   withComponent4ErrorHandling(() => emotionalSupportApi.get(`/caregiver-alerts/${Number(userId)}`, { params: { period } }));
 
+// Consent-based personalized reminiscence topics.
+export const previewReminiscenceTopic = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-topics/preview', payload));
+export const saveReminiscenceTopic = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-topics', payload));
+export const getReminiscenceTopics = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-topics/${Number(userId)}`));
+export const deleteReminiscenceTopic = (topicId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-topics/${topicId}`, { data: { user_id: Number(userId) } }));
+export const clearReminiscenceTopics = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-topics/user/${Number(userId)}`));
+export const getReminiscencePrompt = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-prompt/${Number(userId)}`));
+
 export default emotionalSupportApi;

@@ -1,4 +1,4 @@
-const { buildTaskSnapshot, findActiveAttempt, findActiveSelfSelectedAttempt, listSelfSelectableActivities } = require('../../repositories/activityExecutionRepository');
+const { buildTaskSnapshot, findActiveAttempt, findActiveSelfSelectedAttempt, getAttemptForUpdate, listSelfSelectableActivities } = require('../../repositories/activityExecutionRepository');
 
 describe('activity attempt ownership', () => {
   test('active-attempt reuse is scoped to user, session, and activity', async () => {
@@ -25,6 +25,15 @@ describe('activity attempt ownership', () => {
     expect(sql).toContain('FROM support_activities');
     expect(sql).toContain("category = 'cognitive_engagement'");
     expect(sql).toContain('is_active = TRUE');
+  });
+
+  test('submission locks only the attempt row when the adaptive session join is nullable', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+    await getAttemptForUpdate(client, 'attempt-1', 9);
+    const [sql, values] = client.query.mock.calls[0];
+    expect(sql).toContain('LEFT JOIN adaptive_chat_sessions');
+    expect(sql).toContain('FOR UPDATE OF attempt');
+    expect(values).toEqual(['attempt-1', 9]);
   });
 });
 

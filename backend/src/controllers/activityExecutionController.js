@@ -78,6 +78,9 @@ async function submitActivity(req, res) {
     return res.json({ success: true, completed: true, attempt_id: result.attemptId, activity_code: result.activityCode, activity_type: result.activityType, activity_source: result.activitySource || 'recommended', category: result.category, difficulty: result.difficulty, accuracy: result.accuracy, is_correct: result.isCorrect, response_time_ms: result.responseTimeMs, duration_seconds: Number((result.responseTimeMs / 1000).toFixed(1)), completion_status: result.completionStatus, next_difficulty: result.nextDifficulty, completed_items: completedItems, total_items: completedItems, feedback: result.accuracy == null ? 'Activity complete. Thank you for taking part.' : result.isCorrect ? 'Nice work! You completed every activity item.' : "Good try. You've completed the activity." });
   } catch (error) {
     const status = error.status || (/valid|supported|required/i.test(error.message) ? 400 : 500);
+    if (status === 500) console.error('Activity submission failed:', {
+      attemptId: req.params.attemptId, userId, code: error.code, message: error.message,
+    });
     return res.status(status).json({ success: false, error: status === 500 ? 'Failed to complete activity.' : error.message });
   }
 }

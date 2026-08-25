@@ -37,6 +37,9 @@ function determineAnswerPolarity(answerText, { detectedEmotion = 'neutral' } = {
   if (/^(no|nope|nah|not really|not today|nothing much|nothing special)\b/i.test(text)) {
     return hasPositiveEvidence && !hasNegativeEvidence ? 'positive' : 'negative';
   }
+  if (/^nothing\b.*\b(comfort|comfortable|connected|connection|enjoy|pleasant|helpful|helped)\b/i.test(text)) {
+    return 'negative';
+  }
   if (/^(yes|yeah|yep|certainly|very much)\b/i.test(text)) {
     return hasNegativeEvidence ? 'negative' : 'positive';
   }

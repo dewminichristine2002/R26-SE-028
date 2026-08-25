@@ -180,6 +180,19 @@ describe('adaptiveQuestionSelector', () => {
     expect(result.selectionReason.targetSource).toBe('current_answer');
   });
 
+  test('explicit anger evidence selects a curated anger assessment without repetition', async () => {
+    const angerQuestions = [
+      question('anger_frustration', 'anger', 'clarification', { questionId: 30 }),
+      question('anger_calm', 'anger', 'positive_protective_factor', { questionId: 31 }),
+    ];
+    const result = await selectNextAdaptiveQuestion(nextContext({
+      detectedEmotion: 'anger', confidence: 1,
+      askedQuestionIds: [31], askedQuestionCodes: ['anger_calm'],
+    }), repositoryFor([...bank, ...angerQuestions]));
+    expect(result.question.questionCode).toBe('anger_frustration');
+    expect(result.selectionReason.targetSource).toBe('current_answer');
+  });
+
   test('recent opening questions receive deterministic cross-session penalties', async () => {
     const alternateOpening = question('open_alternate', 'neutral', 'general_wellbeing', { questionId: 21, phase: 'opening', priority: 2 });
     const repo = repositoryFor([...bank, alternateOpening]);
@@ -198,5 +211,6 @@ describe('answer polarity', () => {
     expect(determineAnswerPolarity('Yes, my daughter called and I felt much better.')).toBe('positive');
     expect(determineAnswerPolarity('Yes, someone called, but I still felt very lonely.', { detectedEmotion: 'loneliness' })).toBe('negative');
     expect(determineAnswerPolarity('No, but I was happy spending time reading.')).toBe('positive');
+    expect(determineAnswerPolarity('Nothing brought me comfort today.')).toBe('negative');
   });
 });

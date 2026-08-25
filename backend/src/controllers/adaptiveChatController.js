@@ -3,6 +3,8 @@ const { determineAnswerPolarity } = require('../services/answerPolarityService')
 const { interpretContextualAnswer } = require('../services/contextualAnswerInterpretationService');
 const { aggregateAdaptiveSessionResult } = require('../services/adaptiveResultAggregator');
 const { recommendActivity } = require('../services/activityRecommendationService');
+const { buildAcknowledgement } = require('../services/conversationAcknowledgementService');
+const { buildPreferenceProfile, normalizeFamily } = require('../services/activityPreferenceService');
 const { getRecentConcernCount } = require('../repositories/narrativeRepository');
 const { getProfileByElderId } = require('../repositories/profileRepository');
 const { createAlertsForCaregivers } = require('../repositories/alertRepository');
@@ -19,6 +21,7 @@ const { getQuestionById } = require('../repositories/adaptiveQuestionBankReposit
 const {
   getActiveRoutableActivities,
   getLatestRecommendedCognitiveDifficulty,
+  getRecentActivityAttemptHistory,
   getRecentRecommendedActivityCodes,
 } = require('../repositories/activityRecommendationRepository');
 const {
@@ -95,6 +98,27 @@ function deriveCognitiveEngagementStatus({ detectedState, supportActivityKey, ri
   if (riskLevel === 'high') return 'reduced_engagement';
   if (['positive_journal', 'conversation_prompt'].includes(supportActivityKey)) return 'engaged';
   return 'stable';
+}
+
+/**
+ * Merge recommended-session activity codes with actual attempt history
+ * (recommended AND self-selected) so variety penalties reflect everything
+ * the elder recently played, not only session recommendations.
+ */
+function buildRecentActivityCodes(recommendedCodes, attemptHistory) {
+  const merged = [];
+  const seenFamilies = new Set();
+  const pushCode = (code) => {
+    const value = String(code || '').trim();
+    if (!value) return;
+    const family = normalizeFamily(value);
+    if (seenFamilies.has(family)) return;
+    seenFamilies.add(family);
+    merged.push(value);
+  };
+  (attemptHistory || []).forEach((attempt) => pushCode(attempt.activityCode));
+  (recommendedCodes || []).forEach((code) => pushCode(code));
+  return merged;
 }
 
 function publicSupportDirective(supportDirective) {
@@ -178,7 +202,21 @@ async function respondAdaptiveChat(req, res) {
       previousInterpretedEmotion,
     });
     const detectedState = normalizeState(interpretation.interpretedEmotion);
-    const interpretedEvidenceConfidence = interpretation.contextualEvidenceWeight ?? analysis.confidenceScore;
+    const interpretedEvidenceConfidence = interpretation.explicitEvidenceWeight
+      ?? interpretation.contextualEvidenceWeight
+      ?? analysis.confidenceScore;
+    // Safe micro-conversation acknowledgement for this turn. Uses only
+    // polarity, interpreted direction, dimension and turn number — never an
+    // LLM, never a diagnosis.
+    const previousAcknowledgement = existingTurns.at(-1)?.analysisMetadata?.acknowledgement?.message || null;
+    const acknowledgement = buildAcknowledgement({
+      answerPolarity,
+      detectedState,
+      isExplicit: Boolean(interpretation.explicitEvidenceWeight),
+      questionDimension: question.assessmentDimension,
+      turnNumber: questionNumber,
+      previousAcknowledgement,
+    });
     const recentLogs = await getRecentCompletedAdaptiveEmotionHistory(userId, HISTORY_DAYS, HISTORY_LIMIT);
     const recentSameConcernCount = await getRecentConcernCount({
       userId,
@@ -246,6 +284,7 @@ async function respondAdaptiveChat(req, res) {
           rawMlConfidence: interpretation.rawMlConfidence,
           rawDetectionSource: interpretation.rawDetectionSource,
           rawTurnEmotion: rawTurnState,
+          acknowledgement,
         },
         selectionMetadata: nextSelection?.selectionReason || { completedAfterQuestion: TOTAL_ADAPTIVE_QUESTIONS },
       });
@@ -279,9 +318,10 @@ async function respondAdaptiveChat(req, res) {
       });
       const aggregateRiskLevel = riskAssessment.finalRisk;
       const { supportActivityKey, supportDirective } = getSupportDirective(aggregateState);
-      const [activities, recentActivityHistory, recommendedDifficulty] = await Promise.all([
+      const [activities, recentActivityHistory, attemptHistory, recommendedDifficulty] = await Promise.all([
         getActiveRoutableActivities(client),
         getRecentRecommendedActivityCodes(userId, 5, client),
+        getRecentActivityAttemptHistory(userId, 20, client),
         getLatestRecommendedCognitiveDifficulty(userId, client),
       ]);
       const activitySelection = recommendActivity({
@@ -290,7 +330,8 @@ async function respondAdaptiveChat(req, res) {
         finalConfidence: aggregation.finalConfidence,
         riskLevel: aggregateRiskLevel,
         conversationEngagement: aggregation.conversationEngagement,
-        recentActivityHistory,
+        recentActivityHistory: buildRecentActivityCodes(recentActivityHistory, attemptHistory),
+        preferenceProfile: buildPreferenceProfile(attemptHistory),
         recommendedDifficulty,
         recentEmotionHistory: recentLogs,
         activities,
@@ -358,6 +399,7 @@ async function respondAdaptiveChat(req, res) {
         answer_polarity: responsePayload.turn.answerPolarity,
         detection_source: responsePayload.turn.detectionSource,
         model_version: responsePayload.turn.modelVersion,
+        acknowledgement: responsePayload.turn.analysisMetadata?.acknowledgement?.message || null,
         next_question: mapQuestionForResponse(responsePayload.nextQuestion),
       });
     }
@@ -403,6 +445,7 @@ async function respondAdaptiveChat(req, res) {
       risk_level: responsePayload.session.riskLevel,
       conversation_engagement: responsePayload.session.conversationEngagement,
       recommended_activity: responsePayload.activitySelection.recommendation,
+      alternative_recommendation: responsePayload.activitySelection.alternative_recommendation,
       detection_source: 'adaptive_aggregate',
       model_version: null,
       support_directive: publicSupportDirective(responsePayload.session.supportDirective),

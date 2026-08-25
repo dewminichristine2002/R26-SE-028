@@ -9,6 +9,10 @@ import SupportResultScreen from './screens/SupportResultScreen';
 import CognitiveActivityScreen from './screens/CognitiveActivityScreen';
 import CalmingActivityScreen from './screens/CalmingActivityScreen';
 import CognitiveActivityLibraryScreen from './screens/CognitiveActivityLibraryScreen';
+import ReminiscenceHubScreen from './screens/ReminiscenceHubScreen';
+import MemoryMomentScreen from './screens/MemoryMomentScreen';
+import PhotoMemoryScreen from './screens/PhotoMemoryScreen';
+import RememberedTopicsScreen from './screens/RememberedTopicsScreen';
 
 const routes = {
   ElderHome: ElderHomeScreen,
@@ -20,6 +24,10 @@ const routes = {
   CalmingActivityScreen,
   CognitiveActivityLibraryScreen,
   EmotionalTrendScreen,
+  ReminiscenceHubScreen,
+  MemoryMomentScreen,
+  PhotoMemoryScreen,
+  RememberedTopicsScreen,
 };
 
 export default function EmotionalSupportNavigator({ user }) {
