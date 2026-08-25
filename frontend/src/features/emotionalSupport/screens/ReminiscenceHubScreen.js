@@ -16,14 +16,25 @@ export default function ReminiscenceHubScreen({ navigation }) {
   return (
     <SafeAreaView style={s.safe}><WellnessBackdrop variant="warm" />
       <ScrollView contentContainerStyle={s.container}>
-        <ScreenHeader navigation={navigation} eyebrow="REMEMBER SOMETHING NICE" title="A Gentle Memory Moment" subtitle="Recall something pleasant, at your own pace." />
+        <ScreenHeader navigation={navigation} eyebrow="REMEMBER SOMETHING NICE" title="Take a moment with memories that matter to you." subtitle="" />
 
-        <Pressable accessibilityRole="button" accessibilityLabel="Suggested memory prompt" onPress={() => navigation.navigate('MemoryMomentScreen', {})} style={({ pressed }) => pressed && s.pressed}>
-          <Card style={[s.optionCard, s.promptCard]}>
-            <OrganicIcon color="#9A654C" soft="#FFFFFF88" label="PROMPT" />
+        <Pressable accessibilityRole="button" accessibilityLabel="My Life Book" onPress={() => navigation.navigate('MyLifeBook')} style={({ pressed }) => pressed && s.pressed}>
+          <Card style={[s.optionCard, s.lifeBookCard]}>
+            <OrganicIcon color="#397668" soft="#FFFFFF88" label="LIFE" />
             <View style={s.copy}>
-              <Text style={s.title}>Suggested Memory Prompt</Text>
-              <Text style={s.text}>We'll offer a warm question to get you started.</Text>
+              <Text style={s.title}>My Life Book</Text>
+              <Text style={s.text}>Keep the stories of your life.</Text>
+            </View>
+            <Text style={s.chevron}>›</Text>
+          </Card>
+        </Pressable>
+
+        <Pressable accessibilityRole="button" accessibilityLabel="My Good Deeds / Pin Potha" onPress={() => navigation.navigate('GoodDeeds')} style={({ pressed }) => pressed && s.pressed}>
+          <Card style={[s.optionCard, s.goodDeedsCard]}>
+            <OrganicIcon color="#9A654C" soft="#FFFFFF88" label="PIN" />
+            <View style={s.copy}>
+              <Text style={s.title}>My Good Deeds / Pin Potha</Text>
+              <Text style={s.text}>Keep meaningful moments with a date, photo, and short note.</Text>
             </View>
             <Text style={s.chevron}>›</Text>
           </Card>
@@ -31,21 +42,10 @@ export default function ReminiscenceHubScreen({ navigation }) {
 
         <Pressable accessibilityRole="button" accessibilityLabel="My remembered topics" onPress={() => navigation.navigate('RememberedTopicsScreen')} style={({ pressed }) => pressed && s.pressed}>
           <Card style={[s.optionCard, s.topicsCard]}>
-            <OrganicIcon color="#397668" soft="#FFFFFF88" label="TOPICS" />
+            <OrganicIcon color="#89691F" soft="#FFFFFF88" label="TOPICS" />
             <View style={s.copy}>
-              <Text style={s.title}>My Remembered Topics</Text>
-              <Text style={s.text}>Topics you asked us to remember for future prompts.</Text>
-            </View>
-            <Text style={s.chevron}>›</Text>
-          </Card>
-        </Pressable>
-
-        <Pressable accessibilityRole="button" accessibilityLabel="Remember with a photo" onPress={() => navigation.navigate('PhotoMemoryScreen')} style={({ pressed }) => pressed && s.pressed}>
-          <Card style={[s.optionCard, s.photoCard]}>
-            <OrganicIcon color="#89691F" soft="#FFFFFF88" label="PHOTO" />
-            <View style={s.copy}>
-              <Text style={s.title}>Remember with a Photo</Text>
-              <Text style={s.text}>Choose a photo yourself and tell us what it brings to mind.</Text>
+              <Text style={s.title}>Remembered Topics</Text>
+              <Text style={s.text}>Save and revisit memories that matter to you.</Text>
             </View>
             <Text style={s.chevron}>›</Text>
           </Card>
@@ -61,9 +61,9 @@ const s = StyleSheet.create({
   safe: { backgroundColor: '#FFF9F3', flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
   optionCard: { alignItems: 'center', flexDirection: 'row', marginBottom: spacing.md },
-  promptCard: { backgroundColor: '#FFF0E6' },
+  lifeBookCard: { backgroundColor: '#FFF4EC' },
+  goodDeedsCard: { backgroundColor: '#FFF8F0' },
   topicsCard: { backgroundColor: '#EDF6F1' },
-  photoCard: { backgroundColor: '#FDF6E3' },
   copy: { flex: 1, marginLeft: spacing.md, minWidth: 0 },
   title: { ...type.card, color: colors.text, fontSize: 19, lineHeight: 25 },
   text: { ...type.meta, color: colors.secondary, marginTop: spacing.xs },

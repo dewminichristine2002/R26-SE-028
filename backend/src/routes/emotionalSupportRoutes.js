@@ -46,4 +46,9 @@ router.delete('/reminiscence-topics/user/:userId', reminiscenceMemoryController.
 router.delete('/reminiscence-topics/:topicId', reminiscenceMemoryController.deleteTopic);
 router.get('/reminiscence-prompt/:userId', reminiscenceMemoryController.getPrompt);
 
+// Memory entries for Life Book and Good Deeds (no photo upload)
+router.post('/reminiscence-entries', reminiscenceMemoryController.createEntry);
+router.get('/reminiscence-entries/:userId', reminiscenceMemoryController.listEntries);
+router.delete('/reminiscence-entries/:entryId', reminiscenceMemoryController.deleteEntry);
+
 module.exports = router;

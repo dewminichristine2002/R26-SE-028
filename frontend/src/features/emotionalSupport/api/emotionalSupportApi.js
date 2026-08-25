@@ -92,4 +92,14 @@ export const clearReminiscenceTopics = (userId) =>
 export const getReminiscencePrompt = (userId) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-prompt/${Number(userId)}`));
 
+// Memory entries (Life Book, Good Deeds) — photos remain local-only and are not uploaded.
+export const createMemoryEntry = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-entries', payload));
+export const listMemoryEntries = (userId, entryType = null) =>
+  withComponent4ErrorHandling(() =>
+    emotionalSupportApi.get(`/reminiscence-entries/${Number(userId)}`, { params: entryType ? { entry_type: entryType } : {} })
+  );
+export const deleteMemoryEntry = (entryId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-entries/${entryId}`, { data: { user_id: Number(userId) } }));
+
 export default emotionalSupportApi;

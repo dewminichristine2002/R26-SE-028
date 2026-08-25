@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from 'react-native-datetimepicker/datetimepicker';
 import {
   getReminiscencePrompt,
   previewReminiscenceTopic,
@@ -45,6 +47,40 @@ export default function MemoryMomentScreen({ navigation, route }) {
   const [savedMessage, setSavedMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [photoUri, setPhotoUri] = useState(null);
+  const [memoryDate, setMemoryDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [category, setCategory] = useState('');
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const topicCategories = ['Hobby','Family','Work','Place','Music','Food','Travel','Pets','Other'];
+
+  useEffect(() => () => { setPhotoUri(null); }, []);
+
+  function onDateChange(event, selectedDate) {
+    setShowDatePicker(false);
+    if (selectedDate) setMemoryDate(selectedDate.toISOString().slice(0,10));
+  }
+
+  function openCategoryPicker() { setShowCategoryPicker(true); }
+  function selectCategory(c) { setCategory(c); setShowCategoryPicker(false); }
+
+  async function choosePhoto() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission?.granted) {
+        setError('Photo access is unavailable. You can still share a memory with words.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7 });
+      if (!result.canceled && result.assets?.[0]?.uri) setPhotoUri(result.assets[0].uri);
+    } catch {
+      setError('We could not open your photos just now.');
+    }
+  }
+
+  function removePhoto() {
+    setPhotoUri(null);
+  }
 
   const handleTranscript = useCallback((transcript) => {
     setMemory(transcript);
@@ -96,13 +132,17 @@ export default function MemoryMomentScreen({ navigation, route }) {
     try {
       setSaving(true);
       setError('');
-      await saveReminiscenceTopic({
-        user_id: elderId,
-        topic_type: derivedTopic.topic_type,
-        topic_label: derivedTopic.topic_label,
-        safe_detail: derivedTopic.safe_detail,
-        consent: true,
-      });
+      // Compose safe_detail to include optional category and date (kept concise)
+        const extra = [category || null, memoryDate || null].filter(Boolean).join(' | ');
+        const safeDetail = [derivedTopic.safe_detail || null, extra || null].filter(Boolean).join(' | ').slice(0,120) || null;
+
+        await saveReminiscenceTopic({
+          user_id: elderId,
+          topic_type: derivedTopic.topic_type,
+          topic_label: derivedTopic.topic_label,
+          safe_detail: safeDetail,
+          consent: true,
+        });
       setSavedMessage('Saved. We can gently revisit this topic in future memory activities.');
       setConsentAsked(false);
     } catch {
@@ -153,6 +193,50 @@ export default function MemoryMomentScreen({ navigation, route }) {
                   placeholderTextColor={colors.secondary}
                 />
                 <VoiceStatus audioState={voice.audioState} error={voice.voiceError} transcript={voiceTranscript} />
+
+                <Text style={[s.helper, { marginTop: 12 }]}>Photo (optional)</Text>
+                {!photoUri ? (
+                  <View style={{ marginTop: 6 }}>
+                    <Button label="Choose a Photo" onPress={choosePhoto} />
+                  </View>
+                ) : (
+                  <View style={{ marginTop: 8 }}>
+                    <Image source={{ uri: photoUri }} style={{ width: '100%', height: 160, borderRadius: 10 }} resizeMode="cover" />
+                    <Button variant="secondary" label="Remove photo" onPress={removePhoto} style={{ marginTop: 8 }} />
+                  </View>
+                )}
+
+                <Text style={[s.label, { marginTop: 12 }]}>Category (optional)</Text>
+                <Pressable onPress={openCategoryPicker} style={{ paddingVertical: 8 }}>
+                  <Text style={{ ...type.card }}>{category || 'Choose a category'}</Text>
+                </Pressable>
+
+                <Text style={[s.label, { marginTop: 12 }]}>Date (optional)</Text>
+                <Pressable onPress={() => setShowDatePicker(true)} style={{ paddingVertical: 8 }}>
+                  <Text style={{ ...type.card }}>{memoryDate || 'Choose a date'}</Text>
+                </Pressable>
+
+                {showDatePicker ? (
+                  <DateTimePicker value={memoryDate ? new Date(memoryDate) : new Date()} mode="date" display="default" onChange={onDateChange} />
+                ) : null}
+
+                {showCategoryPicker ? (
+                  <Modal transparent visible animationType="slide">
+                    <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000066' }}>
+                      <View style={{ backgroundColor: '#FFF', padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                        {topicCategories.map((c) => (
+                          <Pressable key={c} onPress={() => selectCategory(c)} style={{ paddingVertical: 12 }}>
+                            <Text style={{ ...type.card }}>{c}</Text>
+                          </Pressable>
+                        ))}
+                        <View style={{ marginTop: 8 }}>
+                          <Button variant="secondary" label="Cancel" onPress={() => setShowCategoryPicker(false)} />
+                        </View>
+                      </View>
+                    </View>
+                  </Modal>
+                ) : null}
+
               </Card>
 
               <View style={[s.actions, s.actionsRow]}>

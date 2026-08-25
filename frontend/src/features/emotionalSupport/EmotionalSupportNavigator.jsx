@@ -13,6 +13,8 @@ import ReminiscenceHubScreen from './screens/ReminiscenceHubScreen';
 import MemoryMomentScreen from './screens/MemoryMomentScreen';
 import PhotoMemoryScreen from './screens/PhotoMemoryScreen';
 import RememberedTopicsScreen from './screens/RememberedTopicsScreen';
+import MyLifeBook from './screens/MyLifeBookScreen';
+import GoodDeeds from './screens/GoodDeedsScreen';
 
 const routes = {
   ElderHome: ElderHomeScreen,
@@ -28,6 +30,8 @@ const routes = {
   MemoryMomentScreen,
   PhotoMemoryScreen,
   RememberedTopicsScreen,
+  MyLifeBook,
+  GoodDeeds,
 };
 
 export default function EmotionalSupportNavigator({ user }) {

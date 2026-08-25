@@ -46,12 +46,12 @@ describe('reminiscence hub + consent flow', () => {
   const topics = read('screens/RememberedTopicsScreen.js');
 
   test('hub offers exactly three gentle entry points after entering Reminiscence', () => {
-    expect(hub).toContain('Suggested Memory Prompt');
-    expect(hub).toContain('My Remembered Topics');
-    expect(hub).toContain('Remember with a Photo');
-    expect(hub).toContain("navigate('MemoryMomentScreen'");
+    expect(hub).toContain('My Life Book');
+    expect(hub).toContain('My Good Deeds / Pin Potha');
+    expect(hub).toContain('Remembered Topics');
+    expect(hub).toContain("navigate('MyLifeBook')");
+    expect(hub).toContain("navigate('GoodDeeds')");
     expect(hub).toContain("navigate('RememberedTopicsScreen')");
-    expect(hub).toContain("navigate('PhotoMemoryScreen')");
   });
 
   test('consent question uses non-manipulative wording with explicit Yes/Not now', () => {

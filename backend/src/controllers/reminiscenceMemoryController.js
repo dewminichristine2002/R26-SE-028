@@ -1,4 +1,5 @@
 const repository = require('../repositories/reminiscenceMemoryRepository');
+const entryRepository = require('../repositories/reminiscenceMemoryEntryRepository');
 const {
   buildGenericPrompt,
   buildTopicPrompt,
@@ -158,4 +159,85 @@ async function getPrompt(req, res) {
   }
 }
 
-module.exports = { clearTopics, deleteTopic, getPrompt, listTopics, previewTopic, saveTopic };
+async function createEntry(req, res) {
+  try {
+    const userId = Number(req.body?.user_id);
+    const entryType = String(req.body?.entry_type || '').trim().toLowerCase();
+    const title = String(req.body?.title || '').trim().slice(0, 200);
+    if (validateUserId(userId)) {
+      return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
+    }
+    if (!entryType) {
+      return res.status(400).json({ success: false, error: 'entry_type is required.' });
+    }
+    if (!title) {
+      return res.status(400).json({ success: false, error: 'title is required.' });
+    }
+    const category = String(req.body?.category || '').trim().slice(0, 80) || null;
+    const story = String(req.body?.story || '').trim() || null;
+    const memoryDate = req.body?.memory_date || null; // accept ISO date or null
+    // Photo handling: spec requires photo to be local-only; do not accept raw photo upload here.
+    const photoReference = null;
+    const consentStatus = req.body?.consent === true || false;
+
+    const entry = await entryRepository.createEntry({
+      userId,
+      entryType,
+      title,
+      category,
+      story,
+      memoryDate,
+      photoReference,
+      consentStatus,
+    });
+    return res.status(201).json({ success: true, entry });
+  } catch (_error) {
+    return res.status(500).json({ success: false, error: 'Failed to save memory entry.' });
+  }
+}
+
+async function listEntries(req, res) {
+  try {
+    const userId = Number(req.params.userId);
+    const entryType = req.query?.entry_type ? String(req.query.entry_type).trim().toLowerCase() : null;
+    if (validateUserId(userId)) {
+      return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
+    }
+    const entries = await entryRepository.listEntriesForUser(userId, entryType);
+    return res.json({ success: true, count: entries.length, entries });
+  } catch (_error) {
+    return res.status(500).json({ success: false, error: 'Failed to load memory entries.' });
+  }
+}
+
+async function deleteEntry(req, res) {
+  try {
+    const userId = Number(req.body?.user_id ?? req.query?.user_id);
+    const entryId = String(req.params.entryId || '').trim();
+    if (validateUserId(userId)) {
+      return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
+    }
+    if (!entryId) {
+      return res.status(400).json({ success: false, error: 'An entry id is required.' });
+    }
+    const removed = await entryRepository.deleteEntry(entryId, userId);
+    if (!removed) {
+      return res.status(404).json({ success: false, error: 'Memory entry was not found.' });
+    }
+    return res.json({ success: true, removed_entry: removed });
+  } catch (_error) {
+    return res.status(500).json({ success: false, error: 'Failed to remove the memory entry.' });
+  }
+}
+
+module.exports = {
+  clearTopics,
+  deleteTopic,
+  getPrompt,
+  listTopics,
+  previewTopic,
+  saveTopic,
+  createEntry,
+  listEntries,
+  deleteEntry,
+};
