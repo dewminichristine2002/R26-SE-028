@@ -1,6 +1,8 @@
 const repository = require('../repositories/activityExecutionRepository');
 const { scoreObjectiveResponse } = require('../services/cognitiveActivityScoringService');
 const { recommendNextDifficulty } = require('../services/cognitiveDifficultyService');
+const { buildPreferenceProfile } = require('../services/activityPreferenceService');
+const { recommendActivity } = require('../services/activityRecommendationService');
 
 function publicTask(attempt) {
   const task = attempt.taskSnapshot;
@@ -37,20 +39,68 @@ async function listCognitiveActivities(req, res) {
   try {
     const userId = Number(req.query?.user_id);
     if (!Number.isInteger(userId) || userId <= 0) return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
-    const [activities, recommendedDifficulty] = await Promise.all([
+    const [activities, recommendedDifficulty, recentAttempts] = await Promise.all([
       repository.listSelfSelectableActivities(),
       repository.getSelfSelectedDifficulty(userId),
+      repository.getRecentCognitiveAttempts(userId, 20),
     ]);
-    return res.json({ success: true, count: activities.length, activities: activities.map((activity) => ({
-      activity_code: activity.activityCode,
+    const normalizedActivities = activities.map((activity) => ({
+      activityCode: activity.activityCode,
       title: activity.title,
       description: activity.description,
       instructions: activity.instructions,
-      supported_difficulties: activity.supportedDifficulties,
-      recommended_difficulty: activity.supportedDifficulties.includes(recommendedDifficulty) ? recommendedDifficulty : 'easy',
-      estimated_duration_minutes: activity.estimatedDurationMinutes,
+      supportedDifficulties: activity.supportedDifficulties,
+      difficulty: activity.supportedDifficulties.includes(recommendedDifficulty) ? recommendedDifficulty : 'easy',
+      estimatedDurationMinutes: activity.estimatedDurationMinutes,
       category: 'cognitive_engagement',
-    })) });
+      activityType: activity.activityCode,
+    }));
+    const profile = buildPreferenceProfile((Array.isArray(recentAttempts) ? recentAttempts : []).map((attempt) => ({
+      activityType: attempt.activityType || attempt.activityCode,
+      activityCode: attempt.activityCode,
+      activitySource: attempt.activitySource || 'self_selected',
+      completionStatus: attempt.completionStatus || 'completed',
+      startedAt: attempt.startedAt,
+      completedAt: attempt.completedAt,
+    })));
+    const recentActivityHistory = (Array.isArray(recentAttempts) ? recentAttempts : [])
+      .map((attempt) => attempt.activityType || attempt.activityCode)
+      .filter(Boolean)
+      .slice(0, 8);
+    const recommendation = recommendActivity({
+      finalEmotionalState: 'neutral',
+      finalConfidence: 0.8,
+      riskLevel: 'low',
+      conversationEngagement: 'engaged',
+      recentActivityHistory,
+      preferenceProfile: profile,
+      activities: normalizedActivities,
+    });
+    const recommendedActivity = recommendation?.recommendation || null;
+    return res.json({
+      success: true,
+      count: activities.length,
+      recommended_activity: recommendedActivity ? {
+        activity_code: recommendedActivity.activity_code,
+        activity_type: recommendedActivity.activity_type,
+        title: recommendedActivity.title,
+        description: recommendedActivity.description,
+        instructions: recommendedActivity.instructions,
+        recommended_difficulty: recommendedActivity.difficulty,
+        estimated_duration_minutes: recommendedActivity.estimated_duration_minutes,
+        category: recommendedActivity.category,
+      } : null,
+      activities: activities.map((activity) => ({
+        activity_code: activity.activityCode,
+        title: activity.title,
+        description: activity.description,
+        instructions: activity.instructions,
+        supported_difficulties: activity.supportedDifficulties,
+        recommended_difficulty: activity.supportedDifficulties.includes(recommendedDifficulty) ? recommendedDifficulty : 'easy',
+        estimated_duration_minutes: activity.estimatedDurationMinutes,
+        category: 'cognitive_engagement',
+      })),
+    });
   } catch (_error) {
     return res.status(500).json({ success: false, error: 'Failed to load cognitive activities.' });
   }
