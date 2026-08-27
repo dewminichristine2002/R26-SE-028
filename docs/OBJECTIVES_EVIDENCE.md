@@ -2,9 +2,9 @@
 
 **Project:** ElderMeds (RTAD-MSM)  
 **Constraint:** No database schema changes  
-**Audit date:** June 2026 — aligned with production artifacts in `backend/ml/models/` and `backend/src/config/hybridScoring.js`
+**Audit date:** August 2026 — aligned with production artifacts in `backend/ml/models/` and `backend/src/config/hybridScoring.js`
 
-> **Footnote:** This document was revised in **June 2026** to match the implemented system: **three** ML algorithms in `compare_models.py` (Random Forest, XGBoost, Logistic Regression), **production thresholds 20/55** (not legacy 25/60), and **FAERS-first** training (`faers_adrs.csv`, n ≈ 11,868). Older references to five algorithms or 25/60 thresholds are obsolete.
+> **Footnote:** This document was revised in **August 2026** to match the implemented system: **three** ML algorithms in `compare_models.py` (Random Forest, XGBoost, Logistic Regression), final hybrid defaults **α=0.5, β=0.5, Warning=15, Dangerous=50**, and **FAERS-first** training (`faers_adrs.csv`, n ≈ 11,868). Older references to five algorithms, 25/60 thresholds, or legacy 0.6/0.4 defaults are obsolete.
 
 ---
 
@@ -103,13 +103,13 @@
 
 | Item | Evidence |
 |------|----------|
-| Formula α=0.6, β=0.4 | `hybridScoring.js`, `applyMlPrediction` |
-| **Production thresholds** | **Warning ≥ 20, Dangerous ≥ 55** (`hybridScoring.js`, `selected_hybrid_thresholds.json`) |
-| Threshold selection | Min FNR_D s.t. Precision_D ≥ 0.99 → **20/55** (`evaluate_thresholds.py`) |
+| Formula α=0.5, β=0.5 | `hybridScoring.js`, `applyMlPrediction` |
+| **Production thresholds** | **Warning ≥ 15, Dangerous ≥ 50** (`hybridScoring.js`, `selected_hybrid_thresholds.json`) |
+| Final operating configuration | **α=0.5, β=0.5, T_C=15, T_D=50** (validated in controller-level system scenarios) |
 | Ablation (rule/ML/hybrid) | `hybrid_weight_ablation.json` |
 | Explainable breakdown | `dataUsed.hybridBreakdown` in API + app UI |
 
-**Note:** Weight ablation CV may favour α=0.9/β=0.1; **0.6/0.4** retained as design-proposed blend (document in dissertation).
+**Note:** Offline proxy calibration explored multiple blends, but the final deployed configuration is **0.5/0.5 + 15/50**, retained only after controller-level validation with live rule overrides and clean-case guardrails.
 
 **Run:** `npm run ml:hybrid-ablation` and `npm run ml:thresholds`
 
@@ -125,7 +125,7 @@
 | ROC-AUC | `baseline_metrics.json` | **0.984** |
 | Brier (calibration) | `baseline_metrics.json` | **0.048** |
 | Algorithm comparison | `compare_models_results.json` | **3 algorithms** |
-| Hybrid thresholds | `selected_hybrid_thresholds.json` | **20 / 55** |
+| Hybrid thresholds | `selected_hybrid_thresholds.json` | **15 / 50** |
 
 **Run:** `npm run ml:evaluate-all`
 
@@ -173,4 +173,4 @@ Produces/updates JSON artifacts under `backend/ml/models/`.
 1. **FAERS proxy labels** for Warning/Safe — not clinician-validated (see [DISSERTATION_LIMITATIONS.md](DISSERTATION_LIMITATIONS.md)).
 2. **SUS** must be completed with elderly/caregiver participants before claiming full O6.
 3. **Barcode** excluded; modalities: manual, OCR, voice.
-4. **Hybrid Dangerous recall** on proxy 3-class labels (~48% at 20/55) ≠ binary severe-ADR recall (~95%).
+4. **Hybrid Dangerous recall** on proxy 3-class labels from offline calibration is not the same as binary severe-ADR recall (~95%), and final deployment weights/thresholds were confirmed in a separate controller-level validation stage.

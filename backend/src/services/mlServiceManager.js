@@ -51,6 +51,60 @@ const checkMlHealth = async () => {
 const repoRoot = () => path.resolve(__dirname, '../../..');
 const mlServiceDir = () => path.join(repoRoot(), 'ml-service');
 
+const readVenvConfig = (venvDir) => {
+  const configPath = path.join(venvDir, 'pyvenv.cfg');
+  if (!fs.existsSync(configPath)) {
+    return null;
+  }
+
+  const entries = {};
+  const raw = fs.readFileSync(configPath, 'utf8');
+  for (const line of raw.split(/\r?\n/)) {
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim().toLowerCase();
+    const value = line.slice(separatorIndex + 1).trim();
+    if (key) {
+      entries[key] = value;
+    }
+  }
+
+  return entries;
+};
+
+const isUsableVirtualenvPython = (pythonPath) => {
+  if (!fs.existsSync(pythonPath)) {
+    return false;
+  }
+
+  const venvDir = path.dirname(path.dirname(pythonPath));
+  const config = readVenvConfig(venvDir);
+  if (!config) {
+    return true;
+  }
+
+  const configuredExecutable = config.executable;
+  if (configuredExecutable && !fs.existsSync(configuredExecutable)) {
+    console.warn(
+      `[ML service] ignoring local virtualenv at ${venvDir} because its base interpreter is missing: ${configuredExecutable}`,
+    );
+    return false;
+  }
+
+  const configuredHome = config.home;
+  if (configuredHome && !fs.existsSync(configuredHome)) {
+    console.warn(
+      `[ML service] ignoring local virtualenv at ${venvDir} because its Python home is missing: ${configuredHome}`,
+    );
+    return false;
+  }
+
+  return true;
+};
+
 const pickPythonExecutable = () => {
   if (process.env.ML_SERVICE_PYTHON) {
     return process.env.ML_SERVICE_PYTHON;
@@ -60,7 +114,7 @@ const pickPythonExecutable = () => {
     ? path.join(mlServiceDir(), '.venv', 'Scripts', 'python.exe')
     : path.join(mlServiceDir(), '.venv', 'bin', 'python');
 
-  if (fs.existsSync(localVenv)) {
+  if (isUsableVirtualenvPython(localVenv)) {
     return localVenv;
   }
 

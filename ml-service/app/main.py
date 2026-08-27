@@ -7,6 +7,7 @@ from app.routers import (
     predict_diabetes,
     predict_fusion,
     predict_hypertension,
+    predict_medicine_safety,
     predict_stroke,
     predict_text,
     predict_voice,
@@ -22,4 +23,5 @@ app.include_router(predict_fusion.router)
 app.include_router(predict_diabetes.router)
 app.include_router(predict_stroke.router)
 app.include_router(predict_hypertension.router)
+app.include_router(predict_medicine_safety.router)
 app.include_router(assistant.router)

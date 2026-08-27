@@ -660,7 +660,7 @@ def main() -> None:
             "normalization": "RxNorm RXNCONSO",
             "features": "DDInter all-pair co-administration + SIDER side-effect counts + patient/drug flags",
             "model": "RandomForest (train_baseline.py)",
-            "runtime_risk": "hybrid 0.6 rule + 0.4 ML -> thresholds 25/60",
+            "runtime_risk": "hybrid 0.5 rule + 0.5 ML -> thresholds 15/50",
             "rules": "clinical rule engine (not trained)",
         },
     }

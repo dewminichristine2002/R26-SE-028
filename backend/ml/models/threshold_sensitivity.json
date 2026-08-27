@@ -26,7 +26,7 @@
   },
   "evaluation_scope": {
     "includes": [
-      "Production XGBoost adr_risk_probability \u00d7 100 as mlDangerScore",
+      "Tuned Logistic Regression Serious-class probability \u00d7 100 as mlDangerScore",
       "Hybrid score: round(0.6 \u00d7 ruleScore + 0.4 \u00d7 mlDangerScore)",
       "Threshold banding into Safe / Warning / Dangerous"
     ],
@@ -39,42 +39,52 @@
     "rule_score_source": "risk_score column if present, else FAERS feature-derived proxy (not live rule engine output)",
     "interpretation": "Dangerous recall here measures offline hybrid+threshold alignment with proxy labels \u2014 NOT the same as binary severe-ADR detection (see baseline_metrics.json) and NOT full deployed-system recall with clinical overrides."
   },
+  "ml_model_artifact": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S2\\R26-SE-028 (1)\\R26-SE-028\\backend\\ml\\models\\fda_serious_baselines\\logistic_regression_tuned.joblib",
+  "fda_feature_projection": {
+    "source_dataset": "FAERS/OMOP proxy hybrid-evaluation dataset",
+    "target_schema": "FDA serious vs non-serious Logistic Regression feature schema",
+    "numeric_caps": {
+      "num_reactions": 0.0,
+      "num_drugs": 23.0,
+      "report_age_days": 0.0
+    }
+  },
   "configurations": [
     {
       "configuration": "delta_minus_10",
       "delta_from_proposed": -10,
       "warning_threshold": 15,
       "dangerous_threshold": 50,
-      "f1_weighted": 0.622338238394735,
-      "f1_macro": 0.5038795166982871,
-      "dangerous_recall": 0.4931506849315068,
-      "dangerous_precision": 0.966824644549763,
-      "dangerous_false_negative_rate": 0.5068493150684932,
-      "dangerous_false_negatives": 629,
+      "f1_weighted": 0.6191006534073206,
+      "f1_macro": 0.5346209811620058,
+      "dangerous_recall": 0.25624496373892025,
+      "dangerous_precision": 1.0,
+      "dangerous_false_negative_rate": 0.7437550362610797,
+      "dangerous_false_negatives": 923,
       "dangerous_support": 1241,
       "clinical_impact": {
         "primary_metric": "dangerous_false_negative_rate",
         "description": "Fraction of true Dangerous cases misclassified as Safe or Warning (safety-critical misses).",
-        "false_negatives": 629,
-        "false_negative_rate": 0.5068493150684932
+        "false_negatives": 923,
+        "false_negative_rate": 0.7437550362610797
       },
       "per_class": {
         "Safe": {
-          "precision": 0.8980322003577818,
-          "recall": 0.5306553911205074,
-          "f1": 0.667109634551495,
+          "precision": 0.9507537688442211,
+          "recall": 1.0,
+          "f1": 0.9747552807831015,
           "support": 946
         },
         "Warning": {
-          "precision": 0.11082910321489002,
-          "recall": 0.7005347593582888,
-          "f1": 0.19138056975894813,
+          "precision": 0.13006597549481622,
+          "recall": 0.7379679144385026,
+          "f1": 0.22115384615384615,
           "support": 187
         },
         "Dangerous": {
-          "precision": 0.966824644549763,
-          "recall": 0.4931506849315068,
-          "f1": 0.6531483457844184,
+          "precision": 1.0,
+          "recall": 0.25624496373892025,
+          "f1": 0.4079538165490699,
           "support": 1241
         }
       }
@@ -84,36 +94,36 @@
       "delta_from_proposed": -5,
       "warning_threshold": 20,
       "dangerous_threshold": 55,
-      "f1_weighted": 0.7213210041566884,
-      "f1_macro": 0.6100398504420678,
-      "dangerous_recall": 0.47784045124899277,
-      "dangerous_precision": 0.9916387959866221,
-      "dangerous_false_negative_rate": 0.5221595487510072,
-      "dangerous_false_negatives": 648,
+      "f1_weighted": 0.6027685319559033,
+      "f1_macro": 0.5203018953754129,
+      "dangerous_recall": 0.23529411764705882,
+      "dangerous_precision": 1.0,
+      "dangerous_false_negative_rate": 0.7647058823529411,
+      "dangerous_false_negatives": 949,
       "dangerous_support": 1241,
       "clinical_impact": {
         "primary_metric": "dangerous_false_negative_rate",
         "description": "Fraction of true Dangerous cases misclassified as Safe or Warning (safety-critical misses).",
-        "false_negatives": 648,
-        "false_negative_rate": 0.5221595487510072
+        "false_negatives": 949,
+        "false_negative_rate": 0.7647058823529411
       },
       "per_class": {
         "Safe": {
-          "precision": 0.92,
-          "recall": 0.8995771670190275,
-          "f1": 0.9096739711384286,
+          "precision": 0.945054945054945,
+          "recall": 1.0,
+          "f1": 0.9717514124293786,
           "support": 946
         },
         "Warning": {
-          "precision": 0.16803760282021152,
-          "recall": 0.7647058823529411,
-          "f1": 0.27552986512524086,
+          "precision": 0.12210915818686402,
+          "recall": 0.7058823529411765,
+          "f1": 0.2082018927444795,
           "support": 187
         },
         "Dangerous": {
-          "precision": 0.9916387959866221,
-          "recall": 0.47784045124899277,
-          "f1": 0.644915715062534,
+          "precision": 1.0,
+          "recall": 0.23529411764705882,
+          "f1": 0.38095238095238093,
           "support": 1241
         }
       }
@@ -123,36 +133,36 @@
       "delta_from_proposed": 0,
       "warning_threshold": 25,
       "dangerous_threshold": 60,
-      "f1_weighted": 0.70872874459519,
-      "f1_macro": 0.5938543774409428,
-      "dangerous_recall": 0.4528605962933118,
-      "dangerous_precision": 0.9982238010657194,
-      "dangerous_false_negative_rate": 0.5471394037066881,
-      "dangerous_false_negatives": 679,
+      "f1_weighted": 0.5728212231657643,
+      "f1_macro": 0.48898744186666177,
+      "dangerous_recall": 0.20386784850926673,
+      "dangerous_precision": 1.0,
+      "dangerous_false_negative_rate": 0.7961321514907332,
+      "dangerous_false_negatives": 988,
       "dangerous_support": 1241,
       "clinical_impact": {
         "primary_metric": "dangerous_false_negative_rate",
         "description": "Fraction of true Dangerous cases misclassified as Safe or Warning (safety-critical misses).",
-        "false_negatives": 679,
-        "false_negative_rate": 0.5471394037066881
+        "false_negatives": 988,
+        "false_negative_rate": 0.7961321514907332
       },
       "per_class": {
         "Safe": {
-          "precision": 0.8786692759295499,
-          "recall": 0.9492600422832981,
-          "f1": 0.9126016260162602,
+          "precision": 0.9229268292682927,
+          "recall": 1.0,
+          "f1": 0.9599188229325215,
           "support": 946
         },
         "Warning": {
-          "precision": 0.1520912547528517,
-          "recall": 0.6417112299465241,
-          "f1": 0.2459016393442623,
+          "precision": 0.09854014598540146,
+          "recall": 0.5775401069518716,
+          "f1": 0.16835541699142634,
           "support": 187
         },
         "Dangerous": {
-          "precision": 0.9982238010657194,
-          "recall": 0.4528605962933118,
-          "f1": 0.623059866962306,
+          "precision": 1.0,
+          "recall": 0.20386784850926673,
+          "f1": 0.3386880856760375,
           "support": 1241
         }
       }
@@ -162,36 +172,36 @@
       "delta_from_proposed": 5,
       "warning_threshold": 30,
       "dangerous_threshold": 65,
-      "f1_weighted": 0.6987062127561717,
-      "f1_macro": 0.5849709858888401,
-      "dangerous_recall": 0.44399677679290894,
+      "f1_weighted": 0.5475100304167123,
+      "f1_macro": 0.4585443783052512,
+      "dangerous_recall": 0.18291700241740533,
       "dangerous_precision": 1.0,
-      "dangerous_false_negative_rate": 0.5560032232070911,
-      "dangerous_false_negatives": 690,
+      "dangerous_false_negative_rate": 0.8170829975825946,
+      "dangerous_false_negatives": 1014,
       "dangerous_support": 1241,
       "clinical_impact": {
         "primary_metric": "dangerous_false_negative_rate",
         "description": "Fraction of true Dangerous cases misclassified as Safe or Warning (safety-critical misses).",
-        "false_negatives": 690,
-        "false_negative_rate": 0.5560032232070911
+        "false_negatives": 1014,
+        "false_negative_rate": 0.8170829975825946
       },
       "per_class": {
         "Safe": {
-          "precision": 0.8343891402714932,
-          "recall": 0.9746300211416491,
-          "f1": 0.8990736226231106,
+          "precision": 0.8941398865784499,
+          "recall": 1.0,
+          "f1": 0.9441117764471058,
           "support": 946
         },
         "Warning": {
-          "precision": 0.15181058495821728,
-          "recall": 0.5828877005347594,
-          "f1": 0.2408839779005525,
+          "precision": 0.07162534435261708,
+          "recall": 0.41711229946524064,
+          "f1": 0.12225705329153605,
           "support": 187
         },
         "Dangerous": {
           "precision": 1.0,
-          "recall": 0.44399677679290894,
-          "f1": 0.6149553571428571,
+          "recall": 0.18291700241740533,
+          "f1": 0.30926430517711173,
           "support": 1241
         }
       }
@@ -201,36 +211,36 @@
       "delta_from_proposed": 10,
       "warning_threshold": 35,
       "dangerous_threshold": 70,
-      "f1_weighted": 0.5375663174158107,
-      "f1_macro": 0.4631562064709797,
-      "dangerous_recall": 0.2062852538275584,
+      "f1_weighted": 0.4783316349074599,
+      "f1_macro": 0.4019572394326325,
+      "dangerous_recall": 0.10717163577759871,
       "dangerous_precision": 1.0,
-      "dangerous_false_negative_rate": 0.7937147461724416,
-      "dangerous_false_negatives": 985,
+      "dangerous_false_negative_rate": 0.8928283642224013,
+      "dangerous_false_negatives": 1108,
       "dangerous_support": 1241,
       "clinical_impact": {
         "primary_metric": "dangerous_false_negative_rate",
         "description": "Fraction of true Dangerous cases misclassified as Safe or Warning (safety-critical misses).",
-        "false_negatives": 985,
-        "false_negative_rate": 0.7937147461724416
+        "false_negatives": 1108,
+        "false_negative_rate": 0.8928283642224013
       },
       "per_class": {
         "Safe": {
-          "precision": 0.7657142857142857,
-          "recall": 0.9915433403805497,
-          "f1": 0.8641179180101336,
+          "precision": 0.8694852941176471,
+          "recall": 1.0,
+          "f1": 0.9301868239921337,
           "support": 946
         },
         "Warning": {
-          "precision": 0.11086226203807391,
-          "recall": 0.5294117647058824,
-          "f1": 0.18333333333333332,
+          "precision": 0.047701647875108416,
+          "recall": 0.29411764705882354,
+          "f1": 0.08208955223880597,
           "support": 187
         },
         "Dangerous": {
           "precision": 1.0,
-          "recall": 0.2062852538275584,
-          "f1": 0.3420173680694723,
+          "recall": 0.10717163577759871,
+          "f1": 0.19359534206695778,
           "support": 1241
         }
       }
@@ -251,18 +261,18 @@
   },
   "selected_operating_point": {
     "warning_threshold": 20,
-    "dangerous_threshold": 55,
-    "configuration": "delta_minus_5",
-    "dangerous_false_negative_rate": 0.5221595487510072,
-    "dangerous_false_negatives": 648,
-    "dangerous_recall": 0.47784045124899277,
-    "dangerous_precision": 0.9916387959866221,
-    "f1_weighted": 0.7213210041566884,
+    "dangerous_threshold": 50,
+    "configuration": "grid_20_50",
+    "dangerous_false_negative_rate": 0.7437550362610797,
+    "dangerous_false_negatives": 923,
+    "dangerous_recall": 0.25624496373892025,
+    "dangerous_precision": 1.0,
+    "f1_weighted": 0.6172267543243973,
     "selection_rule": {
       "objective": "minimize Dangerous false-negative rate (FNR_D)",
       "constraint": "Precision_D >= 0.99",
       "latex": "T_D^* = \\arg\\min_T FNR_D(T) \\text{ s.t. } Precision_D(T) \\geq 0.99",
-      "warning_rationale": "After selecting T_D*=55, Warning threshold T_W=20 was set to preserve an interpretable intermediate-risk band (preferred T_W=20 when feasible)."
+      "warning_rationale": "After selecting T_D*=50, Warning threshold T_W=20 was set to preserve an interpretable intermediate-risk band (preferred T_W=20 when feasible)."
     },
     "production_defaults_updated": true
   },
@@ -270,16 +280,16 @@
     "legacy_candidate_25_60": {
       "warning_threshold": 25,
       "dangerous_threshold": 60,
-      "dangerous_recall": 0.4528605962933118,
-      "dangerous_precision": 0.9982238010657194,
-      "dangerous_false_negative_rate": 0.5471394037066881
+      "dangerous_recall": 0.20386784850926673,
+      "dangerous_precision": 1.0,
+      "dangerous_false_negative_rate": 0.7961321514907332
     },
     "sensitivity_delta_minus_5_20_55": {
       "warning_threshold": 20,
       "dangerous_threshold": 55,
-      "dangerous_recall": 0.47784045124899277,
-      "dangerous_precision": 0.9916387959866221,
-      "dangerous_false_negative_rate": 0.5221595487510072
+      "dangerous_recall": 0.23529411764705882,
+      "dangerous_precision": 1.0,
+      "dangerous_false_negative_rate": 0.7647058823529411
     }
   },
   "precision_recall_tradeoff": {
@@ -289,472 +299,397 @@
       "proposed_dangerous_threshold": 60,
       "operating_point_at_proposed": {
         "score_threshold": 60.0,
-        "precision": 0.998220640569395,
-        "recall": 0.4520547945205479
+        "precision": 1.0,
+        "recall": 0.1990330378726833
       },
       "curve_points": [
         {
-          "score_threshold": 0.0,
-          "precision": 0.5251798561151079,
-          "recall": 1.0
-        },
-        {
-          "score_threshold": 1.0,
-          "precision": 0.5314775160599572,
-          "recall": 1.0
-        },
-        {
           "score_threshold": 2.0,
-          "precision": 0.5342524773804395,
-          "recall": 0.9991941982272361
+          "precision": 0.5240709459459459,
+          "recall": 1.0
         },
         {
           "score_threshold": 3.0,
-          "precision": 0.5393649412788168,
-          "recall": 0.9991941982272361
+          "precision": 0.5400348128807659,
+          "recall": 1.0
         },
         {
           "score_threshold": 4.0,
-          "precision": 0.5514018691588785,
-          "recall": 0.9983883964544722
+          "precision": 0.6289913836796757,
+          "recall": 1.0
         },
         {
           "score_threshold": 5.0,
-          "precision": 0.5591155234657039,
-          "recall": 0.9983883964544722
+          "precision": 0.703514739229025,
+          "recall": 1.0
         },
         {
           "score_threshold": 6.0,
-          "precision": 0.5673076923076923,
-          "recall": 0.9983883964544722
+          "precision": 0.789440203562341,
+          "recall": 1.0
         },
         {
           "score_threshold": 7.0,
-          "precision": 0.5699769053117782,
-          "recall": 0.9943593875906527
+          "precision": 0.8207671957671958,
+          "recall": 1.0
         },
         {
           "score_threshold": 8.0,
-          "precision": 0.5727611940298507,
-          "recall": 0.9895245769540693
+          "precision": 0.8396481732070366,
+          "recall": 1.0
         },
         {
           "score_threshold": 9.0,
-          "precision": 0.6452293094359515,
-          "recall": 0.9863013698630136
+          "precision": 0.8546831955922864,
+          "recall": 1.0
         },
         {
           "score_threshold": 10.0,
-          "precision": 0.6488063660477453,
-          "recall": 0.9854955680902499
+          "precision": 0.8745595489781536,
+          "recall": 1.0
         },
         {
           "score_threshold": 11.0,
-          "precision": 0.650345928685471,
-          "recall": 0.984689766317486
+          "precision": 0.8876967095851216,
+          "recall": 1.0
         },
         {
           "score_threshold": 12.0,
-          "precision": 0.6585760517799353,
-          "recall": 0.983883964544722
+          "precision": 0.896028880866426,
+          "recall": 1.0
         },
         {
           "score_threshold": 13.0,
-          "precision": 0.66,
-          "recall": 0.983883964544722
+          "precision": 0.8973246565437455,
+          "recall": 1.0
         },
         {
           "score_threshold": 14.0,
-          "precision": 0.6716253443526171,
-          "recall": 0.9822723609991942
+          "precision": 0.8999274836838289,
+          "recall": 1.0
         },
         {
           "score_threshold": 15.0,
-          "precision": 0.6731301939058172,
-          "recall": 0.9790491539081386
+          "precision": 0.9005805515239478,
+          "recall": 1.0
         },
         {
           "score_threshold": 16.0,
-          "precision": 0.6746384872080089,
-          "recall": 0.9774375503626108
+          "precision": 0.9018895348837209,
+          "recall": 1.0
         },
         {
           "score_threshold": 17.0,
-          "precision": 0.6776720761052043,
-          "recall": 0.975825946817083
-        },
-        {
-          "score_threshold": 18.0,
-          "precision": 0.8293351610692254,
-          "recall": 0.9750201450443191
+          "precision": 0.9025454545454545,
+          "recall": 1.0
         },
         {
           "score_threshold": 19.0,
-          "precision": 0.8322981366459627,
-          "recall": 0.9717969379532635
+          "precision": 0.9038601602330663,
+          "recall": 1.0
         },
         {
           "score_threshold": 20.0,
-          "precision": 0.8369337979094077,
-          "recall": 0.967767929089444
+          "precision": 0.9084919472913616,
+          "recall": 1.0
         },
         {
           "score_threshold": 21.0,
-          "precision": 0.8524590163934426,
-          "recall": 0.9637389202256245
+          "precision": 0.9118295371050698,
+          "recall": 1.0
         },
         {
           "score_threshold": 22.0,
-          "precision": 0.8547925608011445,
-          "recall": 0.9629331184528606
+          "precision": 0.9131714495952906,
+          "recall": 1.0
         },
         {
           "score_threshold": 23.0,
-          "precision": 0.8722466960352423,
-          "recall": 0.9572925060435133
+          "precision": 0.9165435745937962,
+          "recall": 1.0
         },
         {
           "score_threshold": 24.0,
-          "precision": 0.875,
-          "recall": 0.9532634971796938
+          "precision": 0.9199406968124537,
+          "recall": 1.0
         },
         {
           "score_threshold": 25.0,
-          "precision": 0.8769574944071589,
-          "recall": 0.9476228847703465
+          "precision": 0.9268110530246453,
+          "recall": 1.0
         },
         {
           "score_threshold": 26.0,
-          "precision": 0.8820861678004536,
-          "recall": 0.9403706688154714
+          "precision": 0.9302848575712144,
+          "recall": 1.0
         },
         {
           "score_threshold": 27.0,
-          "precision": 0.8836501901140684,
-          "recall": 0.9363416599516519
+          "precision": 0.932381667918858,
+          "recall": 1.0
         },
         {
           "score_threshold": 28.0,
-          "precision": 0.8934681181959565,
-          "recall": 0.9258662369057212
+          "precision": 0.9358490566037736,
+          "recall": 0.9991941982272361
         },
         {
           "score_threshold": 29.0,
-          "precision": 0.8951930654058313,
-          "recall": 0.9153908138597905
+          "precision": 0.9407294832826748,
+          "recall": 0.9975825946817083
         },
         {
           "score_threshold": 30.0,
-          "precision": 0.8978451715881883,
-          "recall": 0.9065269943593876
+          "precision": 0.9450381679389313,
+          "recall": 0.9975825946817083
         },
         {
           "score_threshold": 31.0,
-          "precision": 0.9035656401944895,
-          "recall": 0.8984689766317486
+          "precision": 0.9457186544342507,
+          "recall": 0.9967767929089444
         },
         {
           "score_threshold": 32.0,
-          "precision": 0.9048800661703887,
-          "recall": 0.8815471394037067
+          "precision": 0.9478927203065134,
+          "recall": 0.9967767929089444
         },
         {
           "score_threshold": 33.0,
-          "precision": 0.9069373942470389,
-          "recall": 0.8638195004029009
+          "precision": 0.9493476592478894,
+          "recall": 0.9967767929089444
         },
         {
           "score_threshold": 34.0,
-          "precision": 0.906875543951262,
-          "recall": 0.8396454472199839
+          "precision": 0.9572317262830482,
+          "recall": 0.991941982272361
         },
         {
           "score_threshold": 35.0,
-          "precision": 0.9100623330365093,
-          "recall": 0.8235294117647058
+          "precision": 0.9697211155378486,
+          "recall": 0.9806607574536664
         },
         {
           "score_threshold": 36.0,
-          "precision": 0.9063670411985019,
-          "recall": 0.7800161160354553
+          "precision": 0.9726468222043443,
+          "recall": 0.9742143432715552
         },
         {
           "score_threshold": 37.0,
-          "precision": 0.9113300492610837,
-          "recall": 0.7453666398066076
+          "precision": 0.9725806451612903,
+          "recall": 0.9717969379532635
         },
         {
           "score_threshold": 38.0,
-          "precision": 0.9245076586433261,
-          "recall": 0.6809024979854955
+          "precision": 0.9684684684684685,
+          "recall": 0.6929895245769541
         },
         {
           "score_threshold": 39.0,
-          "precision": 0.9205219454329775,
-          "recall": 0.6253021756647864
+          "precision": 0.9542124542124543,
+          "recall": 0.41982272360999195
         },
         {
           "score_threshold": 40.0,
-          "precision": 0.9185282522996058,
-          "recall": 0.5632554391619662
+          "precision": 0.9574074074074074,
+          "recall": 0.41659951651893634
         },
         {
           "score_threshold": 41.0,
-          "precision": 0.917900403768506,
-          "recall": 0.5495568090249798
+          "precision": 0.9596774193548387,
+          "recall": 0.3835616438356164
         },
         {
           "score_threshold": 42.0,
-          "precision": 0.9291666666666667,
-          "recall": 0.5390813859790492
+          "precision": 0.966903073286052,
+          "recall": 0.3295729250604351
         },
         {
           "score_threshold": 43.0,
-          "precision": 0.9320113314447592,
-          "recall": 0.5302175664786463
+          "precision": 0.9770408163265306,
+          "recall": 0.30862207896857374
         },
         {
           "score_threshold": 44.0,
-          "precision": 0.931185944363104,
-          "recall": 0.5124899274778405
+          "precision": 0.9884393063583815,
+          "recall": 0.2755842062852538
         },
         {
           "score_threshold": 45.0,
-          "precision": 0.9404761904761905,
-          "recall": 0.5092667203867849
+          "precision": 0.9882352941176471,
+          "recall": 0.27074939564867045
         },
         {
           "score_threshold": 46.0,
-          "precision": 0.942684766214178,
-          "recall": 0.5036261079774376
+          "precision": 0.9911504424778761,
+          "recall": 0.27074939564867045
         },
         {
           "score_threshold": 47.0,
-          "precision": 0.9598145285935085,
-          "recall": 0.500402900886382
+          "precision": 0.996969696969697,
+          "recall": 0.26510878323932313
         },
         {
           "score_threshold": 48.0,
-          "precision": 0.9611801242236024,
-          "recall": 0.49879129734085415
+          "precision": 1.0,
+          "recall": 0.2586623690572119
         },
         {
           "score_threshold": 49.0,
-          "precision": 0.966824644549763,
-          "recall": 0.4931506849315068
+          "precision": 1.0,
+          "recall": 0.25624496373892025
         },
         {
           "score_threshold": 50.0,
-          "precision": 0.9712460063897763,
-          "recall": 0.48992747784045126
+          "precision": 1.0,
+          "recall": 0.25302175664786464
         },
         {
           "score_threshold": 51.0,
-          "precision": 0.9711538461538461,
-          "recall": 0.48831587429492346
+          "precision": 1.0,
+          "recall": 0.25141015310233683
         },
         {
           "score_threshold": 52.0,
-          "precision": 0.9741100323624595,
-          "recall": 0.48509266720386784
+          "precision": 1.0,
+          "recall": 0.24899274778404512
         },
         {
           "score_threshold": 53.0,
-          "precision": 0.9756493506493507,
-          "recall": 0.48428686543110394
+          "precision": 1.0,
+          "recall": 0.23932312651087834
         },
         {
           "score_threshold": 54.0,
-          "precision": 0.9916387959866221,
-          "recall": 0.47784045124899277
+          "precision": 1.0,
+          "recall": 0.23529411764705882
         },
         {
           "score_threshold": 55.0,
-          "precision": 0.9915824915824916,
-          "recall": 0.47461724415793716
+          "precision": 1.0,
+          "recall": 0.23448831587429492
         },
         {
           "score_threshold": 56.0,
-          "precision": 0.9932432432432432,
-          "recall": 0.47381144238517325
+          "precision": 1.0,
+          "recall": 0.23207091055600323
         },
         {
           "score_threshold": 57.0,
-          "precision": 0.9932088285229203,
-          "recall": 0.47139403706688154
-        },
-        {
-          "score_threshold": 58.0,
-          "precision": 0.9948096885813149,
-          "recall": 0.46333601933924257
-        },
-        {
-          "score_threshold": 59.0,
-          "precision": 0.9982238010657194,
-          "recall": 0.4528605962933118
-        },
-        {
-          "score_threshold": 60.0,
-          "precision": 0.998220640569395,
-          "recall": 0.4520547945205479
-        },
-        {
-          "score_threshold": 61.0,
-          "precision": 0.9982142857142857,
-          "recall": 0.45044319097502017
-        },
-        {
-          "score_threshold": 62.0,
-          "precision": 0.9981949458483754,
-          "recall": 0.44560838033843675
-        },
-        {
-          "score_threshold": 64.0,
-          "precision": 1.0,
-          "recall": 0.44399677679290894
-        },
-        {
-          "score_threshold": 65.0,
-          "precision": 1.0,
-          "recall": 0.4399677679290894
-        },
-        {
-          "score_threshold": 66.0,
-          "precision": 1.0,
-          "recall": 0.43513295729250606
-        },
-        {
-          "score_threshold": 67.0,
-          "precision": 1.0,
-          "recall": 0.25382755842062854
-        },
-        {
-          "score_threshold": 68.0,
           "precision": 1.0,
           "recall": 0.22884770346494762
         },
         {
+          "score_threshold": 58.0,
+          "precision": 1.0,
+          "recall": 0.20467365028203063
+        },
+        {
+          "score_threshold": 59.0,
+          "precision": 1.0,
+          "recall": 0.20386784850926673
+        },
+        {
+          "score_threshold": 60.0,
+          "precision": 1.0,
+          "recall": 0.1990330378726833
+        },
+        {
+          "score_threshold": 61.0,
+          "precision": 1.0,
+          "recall": 0.19339242546333602
+        },
+        {
+          "score_threshold": 63.0,
+          "precision": 1.0,
+          "recall": 0.18694601128122482
+        },
+        {
+          "score_threshold": 64.0,
+          "precision": 1.0,
+          "recall": 0.18291700241740533
+        },
+        {
+          "score_threshold": 65.0,
+          "precision": 1.0,
+          "recall": 0.17647058823529413
+        },
+        {
+          "score_threshold": 66.0,
+          "precision": 1.0,
+          "recall": 0.1724415793714746
+        },
+        {
+          "score_threshold": 67.0,
+          "precision": 1.0,
+          "recall": 0.1587429492344883
+        },
+        {
+          "score_threshold": 68.0,
+          "precision": 1.0,
+          "recall": 0.10797743755036261
+        },
+        {
           "score_threshold": 69.0,
           "precision": 1.0,
-          "recall": 0.2062852538275584
+          "recall": 0.10717163577759871
         },
         {
           "score_threshold": 70.0,
           "precision": 1.0,
-          "recall": 0.15954875100725222
+          "recall": 0.10072522159548751
         },
         {
           "score_threshold": 71.0,
           "precision": 1.0,
-          "recall": 0.14907332796132153
+          "recall": 0.0821917808219178
         },
         {
           "score_threshold": 72.0,
           "precision": 1.0,
-          "recall": 0.1361804995970991
+          "recall": 0.08138597904915391
         },
         {
           "score_threshold": 73.0,
           "precision": 1.0,
-          "recall": 0.13295729250604352
+          "recall": 0.0781627719580983
         },
         {
           "score_threshold": 74.0,
           "precision": 1.0,
-          "recall": 0.1297340854149879
+          "recall": 0.05962933118452861
         },
         {
           "score_threshold": 75.0,
           "precision": 1.0,
-          "recall": 0.11845286059629331
+          "recall": 0.016116035455278
         },
         {
           "score_threshold": 76.0,
           "precision": 1.0,
-          "recall": 0.0781627719580983
-        },
-        {
-          "score_threshold": 77.0,
-          "precision": 1.0,
-          "recall": 0.07413376309427881
+          "recall": 0.015310233682514102
         },
         {
           "score_threshold": 78.0,
           "precision": 1.0,
-          "recall": 0.0717163577759871
+          "recall": 0.007252215954875101
         },
         {
           "score_threshold": 79.0,
           "precision": 1.0,
-          "recall": 0.06688154713940371
+          "recall": 0.0064464141821112
         },
         {
           "score_threshold": 80.0,
           "precision": 1.0,
-          "recall": 0.0652699435938759
+          "recall": 0.0040290088638195
         },
         {
           "score_threshold": 81.0,
           "precision": 1.0,
-          "recall": 0.05962933118452861
+          "recall": 0.0008058017727639
         },
         {
           "score_threshold": 82.0,
-          "precision": 1.0,
-          "recall": 0.055600322320709106
-        },
-        {
-          "score_threshold": 83.0,
-          "precision": 1.0,
-          "recall": 0.0547945205479452
-        },
-        {
-          "score_threshold": 84.0,
-          "precision": 1.0,
-          "recall": 0.052377115229653506
-        },
-        {
-          "score_threshold": 86.0,
-          "precision": 1.0,
-          "recall": 0.048348106365834004
-        },
-        {
-          "score_threshold": 89.0,
-          "precision": 1.0,
-          "recall": 0.0427074939564867
-        },
-        {
-          "score_threshold": 91.0,
-          "precision": 1.0,
-          "recall": 0.040290088638195005
-        },
-        {
-          "score_threshold": 92.0,
-          "precision": 1.0,
-          "recall": 0.0394842868654311
-        },
-        {
-          "score_threshold": 93.0,
-          "precision": 1.0,
-          "recall": 0.035455278001611606
-        },
-        {
-          "score_threshold": 94.0,
-          "precision": 1.0,
-          "recall": 0.0346494762288477
-        },
-        {
-          "score_threshold": 96.0,
-          "precision": 1.0,
-          "recall": 0.019339242546333603
-        },
-        {
-          "score_threshold": 99.0,
-          "precision": 1.0,
-          "recall": 0.011281224818694601
-        },
-        {
-          "score_threshold": 100.0,
           "precision": 1.0,
           "recall": 0.0
         }
@@ -764,37 +699,37 @@
       {
         "configuration": "delta_minus_10",
         "delta": -10,
-        "dangerous_precision": 0.966824644549763,
-        "dangerous_recall": 0.4931506849315068,
-        "dangerous_false_negative_rate": 0.5068493150684932
+        "dangerous_precision": 1.0,
+        "dangerous_recall": 0.25624496373892025,
+        "dangerous_false_negative_rate": 0.7437550362610797
       },
       {
         "configuration": "delta_minus_5",
         "delta": -5,
-        "dangerous_precision": 0.9916387959866221,
-        "dangerous_recall": 0.47784045124899277,
-        "dangerous_false_negative_rate": 0.5221595487510072
+        "dangerous_precision": 1.0,
+        "dangerous_recall": 0.23529411764705882,
+        "dangerous_false_negative_rate": 0.7647058823529411
       },
       {
         "configuration": "proposed",
         "delta": 0,
-        "dangerous_precision": 0.9982238010657194,
-        "dangerous_recall": 0.4528605962933118,
-        "dangerous_false_negative_rate": 0.5471394037066881
+        "dangerous_precision": 1.0,
+        "dangerous_recall": 0.20386784850926673,
+        "dangerous_false_negative_rate": 0.7961321514907332
       },
       {
         "configuration": "delta_plus_5",
         "delta": 5,
         "dangerous_precision": 1.0,
-        "dangerous_recall": 0.44399677679290894,
-        "dangerous_false_negative_rate": 0.5560032232070911
+        "dangerous_recall": 0.18291700241740533,
+        "dangerous_false_negative_rate": 0.8170829975825946
       },
       {
         "configuration": "delta_plus_10",
         "delta": 10,
         "dangerous_precision": 1.0,
-        "dangerous_recall": 0.2062852538275584,
-        "dangerous_false_negative_rate": 0.7937147461724416
+        "dangerous_recall": 0.10717163577759871,
+        "dangerous_false_negative_rate": 0.8928283642224013
       }
     ],
     "clinical_primary_metric": "dangerous_false_negative_rate"
@@ -802,12 +737,12 @@
   "proposed_operating_point": {
     "warning_threshold": 25,
     "dangerous_threshold": 60,
-    "dangerous_false_negative_rate": 0.5471394037066881,
-    "dangerous_false_negatives": 679,
-    "dangerous_recall": 0.4528605962933118,
-    "dangerous_precision": 0.9982238010657194
+    "dangerous_false_negative_rate": 0.7961321514907332,
+    "dangerous_false_negatives": 988,
+    "dangerous_recall": 0.20386784850926673,
+    "dangerous_precision": 1.0
   },
-  "note": "Hybrid score = round(0.6 * ruleScore + 0.4 * mlDangerScore). Ground truth: risk_label_eval (FAERS) or risk_level (legacy). Rule scores: risk_score column or FAERS feature-derived proxy. FNR = 1 \u2212 Dangerous recall (true Dangerous cases predicted Safe or Warning).",
+  "note": "Hybrid score = round(0.6 * ruleScore + 0.4 * mlDangerScore). Ground truth: risk_label_eval (FAERS) or risk_level (legacy). Rule scores: risk_score column or FAERS feature-derived proxy. mlDangerScore is the tuned Logistic Regression probability of the Serious class \u00d7 100 on a projected FDA-style feature frame. FNR = 1 \u2212 Dangerous recall (true Dangerous cases predicted Safe or Warning).",
   "ground_truth_column": "risk_label_eval",
   "rule_score_source": "faers_feature_proxy"
 }

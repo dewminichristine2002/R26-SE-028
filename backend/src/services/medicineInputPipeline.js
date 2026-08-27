@@ -4,16 +4,41 @@ const { resolveDrugClass } = require('./drugClassLookupService');
 /**
  * Documents Objective 1 pipeline stages for API audit / dissertation evidence.
  */
-const buildPipelineReport = ({
+const buildPipelineReport = async ({
   inputMethod = 'manual',
   rawInput = '',
   medicineName = '',
   normalizedDrugName = '',
   medicationKnowledge = {},
 }) => {
-  const resolved = resolveMedication(medicineName || normalizedDrugName);
+  const resolved = await resolveMedication(medicineName || normalizedDrugName);
+  const interactions = Array.isArray(medicationKnowledge?.interactions)
+    ? medicationKnowledge.interactions
+    : [];
+  const interactionCount = interactions.length;
+  const maxInteractionSeverity = interactions.some((item) => item?.severity === 'high')
+    ? 'high'
+    : interactions.some((item) => item?.severity === 'medium')
+      ? 'medium'
+      : interactions.some((item) => item?.severity === 'low')
+        ? 'low'
+        : 'none';
+  const effectiveNormalizedDrugName =
+    medicationKnowledge.normalizedDrugName || normalizedDrugName || resolved.normalizedName;
+  const effectiveNormalizationSource =
+    medicationKnowledge.normalizationSource ||
+    resolved.normalizationSource ||
+    (resolved.matched ? 'LOCAL_EXACT' : 'UNRESOLVED_FALLBACK');
+  const effectiveNormalizationConfidence =
+    typeof medicationKnowledge.normalizationConfidence === 'number'
+      ? medicationKnowledge.normalizationConfidence
+      : typeof resolved.normalizationConfidence === 'number'
+        ? resolved.normalizationConfidence
+        : 0;
+  const effectiveNormalizationAudit =
+    medicationKnowledge.normalizationAudit || resolved.normalizationAudit || null;
   const atcRecord = resolveDrugClass(
-    normalizedDrugName || resolved.normalizedName,
+    effectiveNormalizedDrugName,
     medicationKnowledge.ingredientName || resolved.ingredientName,
     medicineName
   );
@@ -61,15 +86,12 @@ const buildPipelineReport = ({
         status: resolved.matched !== false ? 'complete' : 'review_required',
         detail: {
           medicineName,
-          normalizedDrugName: normalizedDrugName || resolved.normalizedName,
+          normalizedDrugName: effectiveNormalizedDrugName,
           rxnormCui: medicationKnowledge.rxnormCui || resolved.rxnormCui,
-          matchType: resolved.matchType || 'unknown',
-          confidence:
-            resolved.matchType === 'exact' || resolved.matchType === 'lowercase'
-              ? 'high'
-              : resolved.matchType === 'fuzzy'
-                ? 'medium'
-                : 'low',
+          matchType: medicationKnowledge.matchType || resolved.matchType || 'unknown',
+          normalizationSource: effectiveNormalizationSource,
+          normalizationConfidence: effectiveNormalizationConfidence,
+          normalizationAudit: effectiveNormalizationAudit,
         },
       },
       {
@@ -91,14 +113,19 @@ const buildPipelineReport = ({
         status: knowledgeSources.length > 0 ? 'complete' : 'partial',
         detail: {
           sourcesQueried: knowledgeSources.length ? knowledgeSources : ['RxNorm'],
-          sideEffectCount: medicationKnowledge.sideEffectCount || 0,
-          interactionCount: medicationKnowledge.interactionCount || 0,
+          sideEffectCount: Array.isArray(medicationKnowledge.sideEffectMatches)
+            ? medicationKnowledge.sideEffectMatches.length
+            : medicationKnowledge.sideEffectCount || 0,
+          interactionCount,
+          maxInteractionSeverity,
         },
       },
     ],
     outputs: {
       canonicalMedicineName: medicationKnowledge.rxnormMatchedName || resolved.displayName || medicineName,
-      normalizedDrugName: normalizedDrugName || resolved.normalizedName,
+      normalizedDrugName: effectiveNormalizedDrugName,
+      normalizationSource: effectiveNormalizationSource,
+      normalizationConfidence: effectiveNormalizationConfidence,
       knowledgeSources,
     },
   };

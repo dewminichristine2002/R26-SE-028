@@ -164,6 +164,121 @@ const buildMlFeaturePayload = ({ analysisPayload, profile, questionnaireAnswers 
   };
 };
 
+const countReactionItems = (value) => {
+  const text = normalizeText(value);
+  if (!text || ['none', 'no', 'n/a', 'na', 'nil', 'unknown'].includes(text)) {
+    return 0;
+  }
+  return text
+    .replace(/[;/|]+/g, ',')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean).length;
+};
+
+const normalizePatientSex = (value) => {
+  const text = normalizeText(value);
+  if (['m', 'male'].includes(text)) {
+    return 'Male';
+  }
+  if (['f', 'female'].includes(text)) {
+    return 'Female';
+  }
+  return 'Unknown';
+};
+
+const getQuestionnaireMap = (questionnaireAnswers = []) =>
+  (questionnaireAnswers || []).reduce((acc, item) => {
+    acc[item.questionKey] = item.answerText;
+    return acc;
+  }, {});
+
+const cleanReactionText = (value) => {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  const [base] = text.split(': ');
+  return String(base || '').trim();
+};
+
+const getCurrentMedicineReactionSignal = ({ analysisPayload, profile, questionMap }) => {
+  const sideEffectMatch = analysisPayload?.medicationKnowledge?.sideEffectMatches?.[0];
+  if (sideEffectMatch) {
+    return cleanReactionText(sideEffectMatch);
+  }
+
+  const symptomMatch = cleanReactionText(analysisPayload?.symptomMatch);
+  if (symptomMatch) {
+    return symptomMatch;
+  }
+
+  if (analysisPayload?.hadReactionBefore === true) {
+    const notesSignal = cleanReactionText(analysisPayload?.notes);
+    if (notesSignal) {
+      return notesSignal;
+    }
+  }
+
+  const medicineNameAnswer = normalizeText(questionMap?.medicineName);
+  const currentMedicine = normalizeText(analysisPayload?.medicineName);
+  const questionnaireReaction = cleanReactionText(questionMap?.reactionSymptoms);
+  if (
+    questionnaireReaction &&
+    medicineNameAnswer &&
+    currentMedicine &&
+    medicineNameAnswer.includes(currentMedicine)
+  ) {
+    return questionnaireReaction;
+  }
+
+  return '';
+};
+
+const buildFdaSeriousFeaturePayload = ({ analysisPayload, profile, questionnaireAnswers }) => {
+  const questionMap = getQuestionnaireMap(questionnaireAnswers);
+  const now = new Date();
+  const currentReactionText = getCurrentMedicineReactionSignal({
+    analysisPayload,
+    profile,
+    questionMap,
+  });
+  const reactionText = currentReactionText || 'Unknown';
+  const numReactions = currentReactionText
+    ? Math.max(
+        Number(analysisPayload?.sideEffectMatchCount || 0),
+        countReactionItems(currentReactionText),
+        1
+      )
+    : 0;
+  const numCurrentMeds = countTextItems(profile?.currentMedicationsText);
+
+  return {
+    year: now.getUTCFullYear(),
+    month: now.getUTCMonth() + 1,
+    primary_reaction: reactionText || 'Unknown',
+    num_reactions: numReactions || 0,
+    suspect_drug:
+      analysisPayload?.normalizedDrugName ||
+      analysisPayload?.ingredientName ||
+      analysisPayload?.medicineName ||
+      'Unknown',
+    drug_route: 'Unknown',
+    drug_indication: profile?.chronicDiseasesText || 'Unknown',
+    pharm_class:
+      analysisPayload?.therapeuticClass ||
+      analysisPayload?.dataUsed?.derivedDrugClass ||
+      analysisPayload?.medicationKnowledge?.therapeuticClass ||
+      'Unknown',
+    num_drugs: Math.max(1, numCurrentMeds + 1),
+    patient_age_years: Number(profile?.age || 0),
+    patient_sex: normalizePatientSex(profile?.gender),
+    country: 'Unknown',
+    report_age_days: 0,
+  };
+};
+
 module.exports = {
   buildMlFeaturePayload,
+  buildFdaSeriousFeaturePayload,
 };
