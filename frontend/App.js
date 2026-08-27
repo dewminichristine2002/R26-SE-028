@@ -329,7 +329,7 @@ export default function App() {
     }
 
     if (activeScreen === 'emotional-support') {
-      return <EmotionalSupportNavigator />;
+      return <EmotionalSupportNavigator user={currentUser} />;
     }
 
     if (activeScreen === 'unified-dashboard') {

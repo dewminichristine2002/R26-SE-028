@@ -48,6 +48,27 @@ async function getRecentNarrativeLogs(userId, limit = 7) {
   return result.rows;
 }
 
+async function getRecentNarrativeLogsWithinDays(userId, days = 7, limit = 10) {
+  const result = await query(
+    `SELECT
+       interaction_id,
+       detected_emotional_state,
+       confidence_score::FLOAT AS confidence_score,
+       risk_level,
+       detection_source,
+       model_version,
+       logged_at
+     FROM narrative_logs
+     WHERE user_id = $1
+       AND logged_at >= NOW() - ($2::TEXT || ' days')::INTERVAL
+     ORDER BY logged_at DESC
+     LIMIT $3`,
+    [userId, String(days), limit]
+  );
+
+  return result.rows;
+}
+
 async function getEmotionCountsLast7Days(userId) {
   const result = await query(
     `
@@ -94,4 +115,5 @@ module.exports = {
   getLatestCaregiverAlerts,
   getRecentMoodCheckins,
   getRecentNarrativeLogs,
+  getRecentNarrativeLogsWithinDays,
 };

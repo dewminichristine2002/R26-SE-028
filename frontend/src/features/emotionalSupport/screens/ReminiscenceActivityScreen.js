@@ -1,206 +1,26 @@
-import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { processNarrative } from '../api/emotionalSupportApi';
+import React, { useCallback, useState } from 'react';
+import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { startAdaptiveActivity, submitAdaptiveActivity } from '../api/emotionalSupportApi';
+import { VoiceAnswerControl, VoiceStatus, ListenControl } from '../components/VoiceControls';
+import { Button, Card, InlineState, OrganicIcon, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
+import useEnglishVoice from '../voice/useEnglishVoice';
+import { colors, radius, screenInsets, spacing, type } from '../theme';
 
-const DEMO_USER_ID = 1;
-const DEMO_PROMPT_ID = 1;
-
-export default function ReminiscenceActivityScreen({ navigation }) {
-  const [transcribedNarrative, setTranscribedNarrative] = useState('');
-  const [voiceNotice, setVoiceNotice] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const canSubmit = transcribedNarrative.trim().length > 0 && !loading;
-
-  function handleVoicePlaceholder() {
-    setVoiceNotice('Voice recording will be added later. For now, please type your memory below.');
-  }
-
-  async function handleSubmit() {
-    if (!canSubmit) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setErrorMessage('');
-
-      const result = await processNarrative({
-        user_id: DEMO_USER_ID,
-        prompt_id: DEMO_PROMPT_ID,
-        transcribed_narrative: transcribedNarrative.trim(),
-      });
-
-      navigation.navigate('SupportResultScreen', {
-        detected_emotional_state: result.detected_emotional_state,
-        confidence_score: result.confidence_score,
-        risk_level: result.risk_level,
-        caregiver_notification_required: result.caregiver_notification_required,
-        support_directive: result.support_directive,
-      });
-    } catch (error) {
-      setErrorMessage(error.message || 'We could not analyze your memory right now. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.title}>Memory Activity</Text>
-            <Text style={styles.subtitle}>Share a familiar memory in your own words.</Text>
-          </View>
-
-          <View style={styles.promptCard}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.iconText}>~</Text>
-            </View>
-            <View style={styles.promptCopy}>
-              <Text style={styles.promptTitle}>Childhood Songs</Text>
-              <Text style={styles.promptText}>Tell me about a song you liked when you were young.</Text>
-            </View>
-          </View>
-
-          <Pressable style={styles.voiceButton} onPress={handleVoicePlaceholder}>
-            <Text style={styles.voiceButtonText}>Hold & Speak</Text>
-          </Pressable>
-
-          {voiceNotice ? (
-            <View style={styles.noticeBox}>
-              <Text style={styles.noticeText}>{voiceNotice}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.inputCard}>
-            <Text style={styles.inputLabel}>Type your memory here</Text>
-            <TextInput
-              style={styles.memoryInput}
-              value={transcribedNarrative}
-              onChangeText={setTranscribedNarrative}
-              multiline
-              textAlignVertical="top"
-              placeholder="For example, I remember a song my family played at home..."
-              placeholderTextColor="#7A8B9A"
-              editable={!loading}
-            />
-          </View>
-
-          {errorMessage ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          ) : null}
-
-          <Pressable style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={!canSubmit}>
-            {loading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.submitButtonText}>Analyze My Memory</Text>}
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+export default function ReminiscenceActivityScreen({ navigation, route }) {
+  const activity = route?.params?.recommended_activity || {}; const context = route?.params?.activity_context || {};
+  const [memory, setMemory] = useState(''); const [result, setResult] = useState(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [voiceTranscript, setVoiceTranscript] = useState(''); const { width } = useWindowDimensions();
+  const handleTranscript = useCallback((transcript) => { setMemory(transcript); setVoiceTranscript(transcript); }, []); const voice = useEnglishVoice({ onTranscript: handleTranscript });
+  const prompt = activity.instructions || 'Think of a place that has brought you comfort. What do you remember most about it?';
+  const canComplete = Boolean(activity.activity_code && context.session_id && context.user_id && memory.trim()) && !loading && !result && !voice.isListening;
+  async function complete() { if (!canComplete) return; try { voice.stopAll(); setLoading(true); setError(''); const attempt = await startAdaptiveActivity({ ...context, activity_code: activity.activity_code }); setResult(await submitAdaptiveActivity(attempt.attempt_id, { user_id: context.user_id, response: { narrative: memory.trim() } })); } catch { setError('Unable to save this activity.'); } finally { setLoading(false); } }
+  return <SafeAreaView style={s.safe}><WellnessBackdrop variant="warm" /><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
+    <ScreenHeader navigation={navigation} eyebrow="GENTLE REMINISCENCE" title={activity.title || 'A Pleasant Memory'} subtitle="A gentle moment to remember something meaningful." />
+    {!result ? <>
+      <Card style={s.promptCard}><View style={s.promptTop}><OrganicIcon color="#9A654C" soft="#FFFFFF88" label="MEM" /><Text style={s.promptLabel}>TODAY'S MEMORY PROMPT</Text></View><View style={s.quoteMark}><Text style={s.quoteText}>“</Text></View><Text style={s.promptText}>{prompt}</Text><ListenControl isSpeaking={voice.isSpeaking} onPress={() => voice.isSpeaking ? voice.stopSpeaking() : voice.speak(prompt)} /></Card>
+      <Card style={s.answerCard}><Text style={s.answerTitle}>Share your memory</Text><Text style={s.helper}>Share as much or as little as feels comfortable.</Text><TextInput accessibilityLabel="Your memory" style={s.input} value={memory} onChangeText={setMemory} editable={!loading} multiline textAlignVertical="top" placeholder="Type your memory..." placeholderTextColor={colors.secondary} /><VoiceStatus audioState={voice.audioState} error={voice.voiceError} transcript={voiceTranscript} /></Card>
+      <View style={[s.actions, width < 370 && s.actionsNarrow]}><VoiceAnswerControl compact audioState={voice.audioState} disabled={loading} onStart={voice.startListening} onStop={() => voice.stopListening()} /><Button style={s.actionButton} label="Complete Activity" loading={loading} disabled={!canComplete} onPress={complete} /></View>
+      {error ? <InlineState error /> : null}
+    </> : <Card style={s.complete}><View style={s.check}><Text style={s.checkText}>OK</Text></View><Text style={s.completeTitle}>Activity Complete</Text><Text style={s.completeCopy}>{result.feedback || 'Thank you for sharing your memory.'}</Text><Button label="View Trends" onPress={() => navigation.navigate('EmotionalTrendScreen')} style={s.fullButton} /><Button variant="secondary" label="Done" onPress={() => navigation.popToTop()} style={s.secondary} /></Card>}
+  </ScrollView></KeyboardAvoidingView></SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F5F8EF' },
-  keyboardView: { flex: 1 },
-  container: { paddingHorizontal: 22, paddingTop: 30, paddingBottom: 40 },
-  header: { marginBottom: 22 },
-  title: { color: '#263D2B', fontSize: 34, fontWeight: '900', lineHeight: 42 },
-  subtitle: { color: '#60735F', fontSize: 19, fontWeight: '700', lineHeight: 28, marginTop: 8 },
-  promptCard: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DDE9CF',
-    borderRadius: 22,
-    borderWidth: 2,
-    flexDirection: 'row',
-    padding: 18,
-  },
-  iconCircle: {
-    alignItems: 'center',
-    backgroundColor: '#F5D889',
-    borderRadius: 32,
-    height: 64,
-    justifyContent: 'center',
-    marginRight: 16,
-    width: 64,
-  },
-  iconText: { color: '#5B4307', fontSize: 34, fontWeight: '900' },
-  promptCopy: { flex: 1 },
-  promptTitle: { color: '#243B2A', fontSize: 24, fontWeight: '900', marginBottom: 8 },
-  promptText: { color: '#506652', fontSize: 18, fontWeight: '600', lineHeight: 27 },
-  voiceButton: {
-    alignItems: 'center',
-    backgroundColor: '#236F60',
-    borderRadius: 20,
-    justifyContent: 'center',
-    marginTop: 24,
-    minHeight: 80,
-    paddingHorizontal: 18,
-  },
-  voiceButtonText: { color: '#FFFFFF', fontSize: 23, fontWeight: '900' },
-  noticeBox: {
-    backgroundColor: '#E7F4FC',
-    borderColor: '#99CDE8',
-    borderRadius: 16,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 14,
-  },
-  noticeText: { color: '#075985', fontSize: 17, fontWeight: '800', lineHeight: 24 },
-  inputCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DDE9CF',
-    borderRadius: 22,
-    borderWidth: 2,
-    marginTop: 22,
-    padding: 18,
-  },
-  inputLabel: { color: '#243B2A', fontSize: 21, fontWeight: '900', marginBottom: 12 },
-  memoryInput: {
-    backgroundColor: '#FCFDF9',
-    borderColor: '#DDE9CF',
-    borderRadius: 16,
-    borderWidth: 1,
-    color: '#243B2A',
-    fontSize: 18,
-    minHeight: 170,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  errorBox: {
-    backgroundColor: '#FDECEC',
-    borderColor: '#F3A6A6',
-    borderRadius: 16,
-    borderWidth: 1,
-    marginTop: 18,
-    padding: 14,
-  },
-  errorText: { color: '#991B1B', fontSize: 16, fontWeight: '800', lineHeight: 23 },
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: '#236F60',
-    borderRadius: 20,
-    justifyContent: 'center',
-    marginTop: 24,
-    minHeight: 72,
-    paddingHorizontal: 18,
-  },
-  submitButtonDisabled: { backgroundColor: '#92AAA3' },
-  submitButtonText: { color: '#FFFFFF', fontSize: 21, fontWeight: '900' },
-});
+const s = StyleSheet.create({ safe: { backgroundColor: '#FFF9F3', flex: 1 }, flex: { flex: 1 }, container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl }, promptCard: { backgroundColor: '#FFF0E6', overflow: 'hidden' }, promptTop: { alignItems: 'center', flexDirection: 'row' }, promptLabel: { ...type.meta, color: '#8A5D47', flex: 1, letterSpacing: 0.8, marginLeft: spacing.md }, quoteMark: { alignItems: 'center', backgroundColor: '#FFFFFF88', borderRadius: 22, height: 44, justifyContent: 'center', position: 'absolute', right: spacing.xl, top: spacing.xl, width: 44 }, quoteText: { color: '#B67B61', fontSize: 35, lineHeight: 44 }, promptText: { ...type.question, color: colors.text, marginTop: spacing.xl }, answerCard: { marginTop: spacing.lg }, answerTitle: { ...type.card, color: colors.text }, helper: { ...type.meta, color: colors.secondary, marginTop: spacing.xs }, input: { ...type.body, backgroundColor: colors.background, borderColor: colors.border, borderRadius: 18, borderWidth: 1, color: colors.text, marginTop: spacing.md, minHeight: 118, padding: spacing.lg }, actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }, actionsNarrow: { flexDirection: 'column' }, actionButton: { flex: 1 }, complete: { alignItems: 'center', marginTop: spacing.md }, check: { alignItems: 'center', backgroundColor: colors.mint, borderRadius: 38, height: 76, justifyContent: 'center', width: 76 }, checkText: { color: colors.primary, fontSize: 15, fontWeight: '900' }, completeTitle: { ...type.section, color: colors.text, marginTop: spacing.lg }, completeCopy: { ...type.body, color: colors.secondary, marginTop: spacing.sm, textAlign: 'center' }, fullButton: { marginTop: spacing.xl, width: '100%' }, secondary: { marginTop: spacing.md, width: '100%' } });

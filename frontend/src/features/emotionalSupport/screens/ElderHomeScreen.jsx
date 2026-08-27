@@ -1,204 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { emotionalSupportApiBaseUrl, getTrendSummary } from '../api/emotionalSupportApi';
-import StatusMessage from '../components/StatusMessage';
+import { getWellnessTrends } from '../api/emotionalSupportApi';
+import { Card, Greeting, InlineState, MetaChip, OrganicIcon, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
-
-const menuCards = [
-  {
-    icon: '?',
-    title: 'Start Adaptive Check-In',
-    description: 'Dynamic questions based on how you feel',
-    route: 'AdaptiveSupportChatScreen',
-  },
-  {
-    icon: '~',
-    title: 'Reminiscence Memory Activity',
-    description: 'Share a familiar memory or activity',
-    route: 'ReminiscenceActivityScreen',
-  },
-  {
-    icon: '#',
-    title: 'View Mood & Emotion History',
-    description: 'Review mood, emotion, and support trends',
-    route: 'EmotionalTrendScreen',
-  },
-];
-
+import { activityStyles, colors, radius, screenInsets, shadows, spacing, type } from '../theme';
+import { getPersonalizedGreeting } from '../utils/personalization';
+const pretty = (value = '') => String(value).replace(/_(easy|medium)$/i, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 export default function ElderHomeScreen({ navigation }) {
-  const { elderId } = useEmotionalSupportContext();
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadSummary() {
-      try {
-        setLoading(true);
-        setError('');
-        const { data } = await getTrendSummary(elderId);
-
-        if (active) {
-          setSummary(data);
-        }
-      } catch (loadError) {
-        if (active) {
-          const status = loadError.response?.status ? `HTTP ${loadError.response.status}` : loadError.message;
-          const backendMessage = loadError.response?.data?.details || loadError.response?.data?.error || '';
-          setError(
-            [
-              'Failed to fetch trend summary.',
-              status,
-              backendMessage,
-              `${emotionalSupportApiBaseUrl}/elders/${elderId}/trends/summary`,
-            ]
-              .filter(Boolean)
-              .join('\n')
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadSummary();
-    return () => {
-      active = false;
-    };
-  }, [elderId]);
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.headerSection}>
-          <Text style={styles.title}>Emotional & Cognitive Support</Text>
-          <Text style={styles.description}>
-            Start an adaptive check-in, share memories, and review emotional trends.
-          </Text>
-        </View>
-
-        <StatusMessage loading={loading} error={error} empty={!summary} emptyText="No trend summary available yet." />
-
-        <View style={styles.cardContainer}>
-          {menuCards.map((card, index) => (
-            <React.Fragment key={card.route}>
-              <View style={[styles.actionCard, index === 0 && styles.primaryCard]}>
-                <View style={[styles.iconBox, index === 0 && styles.primaryIconBox]}>
-                  <Text style={styles.cardIcon}>{card.icon}</Text>
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>{card.title}</Text>
-                  <Text style={styles.cardDescription}>{card.description}</Text>
-                </View>
-                <Pressable style={styles.cardArrow} onPress={() => navigation.navigate(card.route)}>
-                  <Text style={styles.arrowIcon}>{'\u203A'}</Text>
-                </Pressable>
-              </View>
-
-              {index === 0 ? (
-                <Text style={styles.noteText}>
-                  This check-in uses adaptive questions and is not a medical diagnosis.
-                </Text>
-              ) : null}
-            </React.Fragment>
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  const { elderId, user } = useEmotionalSupportContext(); const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(false); const greeting = useMemo(() => getPersonalizedGreeting(user), [user]);
+  const load = useCallback(async () => { try { setLoading(true); setError(false); if (!elderId) throw new Error(); setData(await getWellnessTrends(elderId, '7d')); } catch { setError(true); } finally { setLoading(false); } }, [elderId]);
+  useEffect(() => { load(); }, [load]);
+  const recent = data?.activities?.recent_activity_log?.[0]; const key = String(recent?.activity_code || '').replace(/_(easy|medium)$/i, ''); const look = activityStyles[key] || { accent: colors.primary, soft: colors.mint, symbol: '✓' };
+  return <SafeAreaView style={s.safe}><WellnessBackdrop /><ScrollView contentContainerStyle={s.container}>
+    <Greeting text={greeting} subtitle="Ready for a short check-in?" /><ScreenHeader title="Emotional & Cognitive Support" subtitle="Check in, stay engaged, and review your wellness journey." />
+    <View style={s.hero}><View style={s.heroGlow} /><OrganicIcon color={colors.white} soft="#FFFFFF22" label="CARE" /><Text style={s.heroEyebrow}>DAILY WELLNESS</Text><Text style={s.heroTitle}>Daily Adaptive Check-In</Text><Text style={s.heroText}>A gentle moment to notice how you are feeling today.</Text><View style={s.featureRow}><MetaChip label="5 Questions" tint="#FFFFFF1F" color={colors.white} /><MetaChip label="Voice Enabled" tint="#FFFFFF1F" color={colors.white} /><MetaChip label="~3 Minutes" tint="#FFFFFF1F" color={colors.white} /></View><Pressable accessibilityRole="button" style={({ pressed }) => [s.primary, pressed && s.pressed]} onPress={() => navigation.navigate('AdaptiveSupportChatScreen')}><Text style={s.primaryText}>Start Check-In</Text><Text style={s.arrow}>›</Text></Pressable></View>
+    <Text style={s.sectionTitle}>Explore &amp; Engage</Text><View style={s.exploreRow}><Pressable accessibilityRole="button" onPress={() => navigation.navigate('CognitiveActivityLibraryScreen')} style={({ pressed }) => [s.explorePressable, pressed && s.pressed]}><Card style={[s.exploreCard, s.lavenderCard]}><OrganicIcon color="#705E9B" soft="#EEE8FA" label="PLAY" /><Text style={s.linkTitle}>Cognitive Activities</Text><Text style={s.linkText}>8 activities to choose from</Text><Text style={s.exploreArrow}>Explore ›</Text></Card></Pressable><Pressable accessibilityRole="button" onPress={() => navigation.navigate('EmotionalTrendScreen')} style={({ pressed }) => [s.explorePressable, pressed && s.pressed]}><Card style={[s.exploreCard, s.skyCard]}><OrganicIcon color={colors.info} soft={colors.sky} label="UP" /><Text style={s.linkTitle}>Wellness Trends</Text><Text style={s.linkText}>Your recent wellness journey</Text><Text style={s.exploreArrow}>View ›</Text></Card></Pressable></View>
+    <Text style={s.sectionTitle}>Recent activity</Text><InlineState loading={loading} error={error} onRetry={load} empty={!loading && !error && !recent} emptyTitle="No activities yet" emptyText="Complete a short check-in to begin building your wellness history." />
+    {recent && !loading ? <Pressable accessibilityRole="button" onPress={() => navigation.navigate('EmotionalTrendScreen')} style={({ pressed }) => pressed && s.pressed}><Card style={s.recentCard}><View style={s.recentRow}><OrganicIcon color={look.accent} soft={look.soft} label={look.symbol} /><View style={s.linkCopy}><Text style={s.linkTitle}>{pretty(recent.activity_code)}</Text><Text numberOfLines={1} style={s.linkText}>{recent.accuracy == null ? 'Completed' : `Activity Accuracy ${Math.round(recent.accuracy * 100)}%`}</Text></View><Text style={s.chevron}>›</Text></View></Card></Pressable> : null}
+    <Text style={s.disclaimer}>This feature supports wellbeing and engagement and is not a medical diagnosis.</Text>
+  </ScrollView></SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#E0F4FF' },
-  container: { paddingHorizontal: 20, paddingVertical: 24, gap: 24, paddingBottom: 40 },
-  headerSection: { marginTop: 12, marginBottom: 8 },
-  title: {
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '900',
-    color: '#0D3D56',
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#4B7A95',
-    fontWeight: '600',
-  },
-  cardContainer: { gap: 14 },
-  actionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#C7E8F7',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    shadowColor: '#1E5A7E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  primaryCard: {
-    borderColor: '#7DD3C0',
-  },
-  iconBox: {
-    backgroundColor: '#1E5A7E',
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryIconBox: {
-    backgroundColor: '#0F766E',
-  },
-  cardIcon: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: '900',
-    color: '#0D3D56',
-    marginBottom: 4,
-  },
-  cardDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#557282',
-    fontWeight: '600',
-  },
-  cardArrow: {
-    backgroundColor: '#E0F4FF',
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowIcon: {
-    fontSize: 24,
-    color: '#1E5A7E',
-    fontWeight: '900',
-  },
-  noteText: {
-    color: '#557282',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-    paddingHorizontal: 4,
-  },
-});
+const s = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.background }, container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl }, hero: { ...shadows.level3, backgroundColor: colors.primary, borderRadius: radius.hero, marginBottom: spacing.xxl, overflow: 'hidden', padding: spacing.xxl }, heroGlow: { backgroundColor: '#FFFFFF12', borderRadius: 100, height: 180, position: 'absolute', right: -45, top: -65, width: 180 }, heroEyebrow: { ...type.meta, color: '#CFEAE4', letterSpacing: 1, marginTop: spacing.lg }, heroTitle: { ...type.section, color: colors.white, fontSize: 26, marginTop: spacing.xs }, heroText: { ...type.body, color: '#EAF6F2', marginTop: spacing.sm }, featureRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg }, primary: { alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.button, flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl, minHeight: 58 }, primaryText: { ...type.button, color: colors.primary }, arrow: { color: colors.primary, fontSize: 28, marginLeft: spacing.sm }, sectionTitle: { ...type.card, color: colors.text, marginBottom: spacing.md, marginTop: spacing.xs }, exploreRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xxl }, explorePressable: { flex: 1 }, exploreCard: { minHeight: 190, padding: spacing.lg }, lavenderCard: { backgroundColor: '#F7F3FD' }, skyCard: { backgroundColor: '#F8FCFE' }, exploreArrow: { color: colors.primary, fontSize: 15, fontWeight: '900', marginTop: 'auto', paddingTop: spacing.md }, recentCard: { backgroundColor: '#FCFAFF' }, linkCopy: { flex: 1, marginLeft: spacing.md, minWidth: 0 }, linkTitle: { ...type.card, color: colors.text, marginTop: spacing.md }, linkText: { ...type.meta, color: colors.secondary, marginTop: spacing.xs }, chevron: { color: colors.primary, fontSize: 31 }, recentRow: { alignItems: 'center', flexDirection: 'row' }, disclaimer: { ...type.meta, color: colors.secondary, marginTop: spacing.xl, textAlign: 'center' }, pressed: { opacity: 0.84, transform: [{ scale: 0.988 }] } });
