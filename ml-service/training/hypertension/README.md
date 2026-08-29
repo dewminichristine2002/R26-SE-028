@@ -11,6 +11,8 @@ Expected target column:
 - `Hypertension`
 
 The trainer maps `High` to positive risk and `Low` to negative risk.
+The saved metadata also records an audit note because this source label has weak
+agreement with the BP-derived clinical indicator in the current CSV.
 
 ## Preprocessing
 
@@ -35,8 +37,16 @@ This trains and compares:
 - Decision Tree
 - Random Forest
 - XGBoost
+- Soft Voting Ensemble: Logistic Regression + Random Forest + XGBoost
 
-The best model is selected with priority: recall, then F1-score, then ROC-AUC.
+The best individual model is selected with priority: accuracy, recall, F1-score,
+and ROC-AUC.
+When metrics are effectively tied, the trainer prefers the smaller model to keep
+the saved `.pkl` artifact below GitHub's 100 MB file limit. The Random Forest is
+also depth-limited, and model artifacts are saved with joblib compression.
+The soft-voting ensemble is saved only when it is at least as strong as the best
+individual model on accuracy, recall, F1-score, and ROC-AUC, and improves at
+least one of those metrics.
 
 ## Artifacts written
 

@@ -5,8 +5,9 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -26,6 +27,9 @@ from xgboost import XGBClassifier
 RANDOM_STATE = 42
 DEFAULT_DATASET = "data/raw/healthcare-dataset-stroke-data.csv"
 DEFAULT_OUTPUT_DIR = "app/models"
+ENSEMBLE_NAME = "Soft Voting Ensemble"
+ENSEMBLE_BASE_ALGORITHMS = ["Logistic Regression", "Random Forest", "XGBoost"]
+REQUIRED_ENSEMBLE_METRICS = ("accuracy", "recall", "f1Score", "rocAuc")
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,6 +110,19 @@ def rank_key(result: dict) -> tuple:
         metrics["f1Score"],
         metrics["rocAuc"],
         metrics["accuracy"],
+    )
+
+
+def improves_required_metrics(candidate: dict, baseline: dict) -> bool:
+    candidate_metrics = candidate["metrics"]
+    baseline_metrics = baseline["metrics"]
+
+    return all(
+        candidate_metrics[metric] >= baseline_metrics[metric]
+        for metric in REQUIRED_ENSEMBLE_METRICS
+    ) and any(
+        candidate_metrics[metric] > baseline_metrics[metric]
+        for metric in REQUIRED_ENSEMBLE_METRICS
     )
 
 
@@ -191,11 +208,19 @@ def main() -> None:
             n_jobs=4,
         ),
     }
+    ensemble_model = VotingClassifier(
+        estimators=[
+            ("logistic_regression", clone(models["Logistic Regression"])),
+            ("random_forest", clone(models["Random Forest"])),
+            ("xgboost", clone(models["XGBoost"])),
+        ],
+        voting="soft",
+    )
 
     comparison = []
-    best_name = None
-    best_model = None
-    best_result = None
+    best_individual_name = None
+    best_individual_model = None
+    best_individual_result = None
 
     for name, model in models.items():
         model.fit(X_train_t, y_train)
@@ -203,10 +228,29 @@ def main() -> None:
         result = {"algorithm": name, "metrics": metrics}
         comparison.append(result)
 
-        if best_result is None or rank_key(result) > rank_key(best_result):
-            best_name = name
-            best_model = model
-            best_result = result
+        if best_individual_result is None or rank_key(result) > rank_key(best_individual_result):
+            best_individual_name = name
+            best_individual_model = model
+            best_individual_result = result
+
+    ensemble_model.fit(X_train_t, y_train)
+    ensemble_metrics = evaluate_model(ensemble_model, X_test_t, y_test)
+    ensemble_result = {
+        "algorithm": ENSEMBLE_NAME,
+        "baseAlgorithms": ENSEMBLE_BASE_ALGORITHMS,
+        "metrics": ensemble_metrics,
+    }
+    comparison.append(ensemble_result)
+
+    ensemble_selected = improves_required_metrics(ensemble_result, best_individual_result)
+    if ensemble_selected:
+        best_name = ENSEMBLE_NAME
+        best_model = ensemble_model
+        best_result = ensemble_result
+    else:
+        best_name = best_individual_name
+        best_model = best_individual_model
+        best_result = best_individual_result
 
     model_path = output_dir / "stroke_model.pkl"
     preprocessor_path = output_dir / "stroke_preprocessor.pkl"
@@ -230,6 +274,18 @@ def main() -> None:
         "classBalance": {
             "trainPositive": positive,
             "trainNegative": negative,
+        },
+        "selectionPolicy": {
+            "bestIndividualAlgorithm": best_individual_name,
+            "ensembleAlgorithm": ENSEMBLE_NAME,
+            "ensembleBaseAlgorithms": ENSEMBLE_BASE_ALGORITHMS,
+            "ensembleSelected": ensemble_selected,
+            "requiredEnsembleImprovementMetrics": list(REQUIRED_ENSEMBLE_METRICS),
+            "ensembleSelectionRule": (
+                "Select the soft-voting ensemble only when it is at least as strong as "
+                "the best individual model on every required metric and improves at "
+                "least one required metric."
+            ),
         },
         "modelComparison": comparison,
     }

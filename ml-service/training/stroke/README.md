@@ -43,8 +43,12 @@ This trains and compares:
 - Decision Tree
 - Random Forest
 - XGBoost
+- Soft Voting Ensemble: Logistic Regression + Random Forest + XGBoost
 
-The best model is selected with priority: recall, then F1-score, then ROC-AUC.
+The best individual model is selected with priority: recall, then F1-score, then ROC-AUC.
+The soft-voting ensemble is saved only when it is at least as strong as the best
+individual model on accuracy, recall, F1-score, and ROC-AUC, and improves at
+least one of those metrics.
 
 ## Artifacts written
 

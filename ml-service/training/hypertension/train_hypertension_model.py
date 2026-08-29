@@ -1,12 +1,14 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -27,6 +29,18 @@ from xgboost import XGBClassifier
 RANDOM_STATE = 42
 DEFAULT_DATASET = "data/raw/hypertension_dataset.csv"
 DEFAULT_OUTPUT_DIR = "app/models"
+ENSEMBLE_NAME = "Soft Voting Ensemble"
+ENSEMBLE_BASE_ALGORITHMS = ["Logistic Regression", "Random Forest", "XGBoost"]
+REQUIRED_ENSEMBLE_METRICS = ("accuracy", "recall", "f1Score", "rocAuc")
+JOBLIB_COMPRESS = 3
+ROC_AUC_TIE_TOLERANCE = 0.01
+MODEL_COMPLEXITY_RANK = {
+    "Logistic Regression": 0,
+    "Decision Tree": 1,
+    "XGBoost": 2,
+    "Random Forest": 3,
+    ENSEMBLE_NAME: 4,
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,7 +51,33 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_dataset(dataset_path: Path) -> pd.DataFrame:
+def _dataset_label_to_binary(series: pd.Series) -> pd.Series:
+    normalized = series.astype(str).str.strip().str.lower()
+    return normalized.isin(["high", "1", "yes"]).astype(int)
+
+
+def _build_target_metadata(df: pd.DataFrame) -> dict[str, Any]:
+    dataset_label = _dataset_label_to_binary(df["Hypertension"])
+    systolic = pd.to_numeric(df["Systolic_BP"], errors="coerce")
+    diastolic = pd.to_numeric(df["Diastolic_BP"], errors="coerce")
+    clinical_label = ((systolic >= 140) | (diastolic >= 90)).astype(int)
+
+    return {
+        "targetMode": "dataset-label",
+        "targetColumn": "Hypertension_binary",
+        "targetDefinition": "1 when the source Hypertension column is High/1/Yes; otherwise 0.",
+        "sourceHypertensionPositiveRate": float(dataset_label.mean()),
+        "clinicalBpPositiveRate": float(clinical_label.mean()),
+        "sourceClinicalAgreement": float((dataset_label == clinical_label).mean()),
+        "dataSignalWarning": (
+            "The source label has weak agreement with the BP-derived clinical indicator; "
+            "high accuracy/recall/F1 can be driven by the majority class while ROC-AUC "
+            "remains close to random."
+        ),
+    }
+
+
+def load_dataset(dataset_path: Path) -> tuple[pd.DataFrame, dict[str, Any]]:
     if not dataset_path.exists():
         raise FileNotFoundError(
             f"Dataset not found at {dataset_path}. Place hypertension_dataset.csv in data/raw."
@@ -49,9 +89,12 @@ def load_dataset(dataset_path: Path) -> pd.DataFrame:
 
     normalized = df["Hypertension"].astype(str).str.strip().str.lower()
     df = df[normalized.isin(["high", "low", "1", "0", "yes", "no"])].copy()
-    normalized = df["Hypertension"].astype(str).str.strip().str.lower()
-    df["Hypertension_binary"] = normalized.isin(["high", "1", "yes"]).astype(int)
-    return df
+    if df.empty:
+        raise ValueError("Hypertension dataset has no valid target rows after label normalization.")
+
+    df["Hypertension_binary"] = _dataset_label_to_binary(df["Hypertension"])
+    target_metadata = _build_target_metadata(df)
+    return df, target_metadata
 
 
 def build_feature_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str], list[str]]:
@@ -116,13 +159,46 @@ def evaluate_model(model, X_test, y_test) -> dict:
 
 def rank_key(result: dict) -> tuple:
     metrics = result["metrics"]
-    # Avoid selecting a model that simply predicts the majority class.
+    # Align hypertension selection with the requested headline metrics.
     return (
-        metrics["balancedAccuracy"],
-        metrics["rocAuc"],
-        metrics["f1Score"],
-        metrics["recall"],
         metrics["accuracy"],
+        metrics["recall"],
+        metrics["f1Score"],
+        metrics["rocAuc"],
+    )
+
+
+def is_better_individual(candidate: dict, baseline: dict) -> bool:
+    candidate_metrics = candidate["metrics"]
+    baseline_metrics = baseline["metrics"]
+
+    for metric in ("accuracy", "recall", "f1Score"):
+        diff = candidate_metrics[metric] - baseline_metrics[metric]
+        if abs(diff) > 1e-12:
+            return diff > 0
+
+    auc_diff = candidate_metrics["rocAuc"] - baseline_metrics["rocAuc"]
+    if abs(auc_diff) > ROC_AUC_TIE_TOLERANCE:
+        return auc_diff > 0
+
+    return MODEL_COMPLEXITY_RANK.get(candidate["algorithm"], 99) < MODEL_COMPLEXITY_RANK.get(
+        baseline["algorithm"],
+        99,
+    )
+
+
+def improves_required_metrics(candidate: dict, baseline: dict) -> bool:
+    candidate_metrics = candidate["metrics"]
+    baseline_metrics = baseline["metrics"]
+
+    return all(
+        candidate_metrics[metric] >= baseline_metrics[metric]
+        for metric in REQUIRED_ENSEMBLE_METRICS
+    ) and (
+        candidate_metrics["accuracy"] > baseline_metrics["accuracy"]
+        or candidate_metrics["recall"] > baseline_metrics["recall"]
+        or candidate_metrics["f1Score"] > baseline_metrics["f1Score"]
+        or candidate_metrics["rocAuc"] > baseline_metrics["rocAuc"] + ROC_AUC_TIE_TOLERANCE
     )
 
 
@@ -133,7 +209,7 @@ def main() -> None:
     output_dir = (project_root / args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    df = load_dataset(dataset_path)
+    df, target_metadata = load_dataset(dataset_path)
     X, y, numeric_features, categorical_features = build_feature_frame(df)
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -175,24 +251,21 @@ def main() -> None:
 
     positive = int((y_train == 1).sum())
     negative = int((y_train == 0).sum())
-    scale_pos_weight = float(negative / max(1, positive))
 
     models = {
         "Logistic Regression": LogisticRegression(
             max_iter=2000,
-            class_weight="balanced",
             random_state=RANDOM_STATE,
         ),
         "Decision Tree": DecisionTreeClassifier(
             random_state=RANDOM_STATE,
-            class_weight="balanced",
             min_samples_leaf=40,
         ),
         "Random Forest": RandomForestClassifier(
-            n_estimators=250,
+            n_estimators=80,
+            max_depth=8,
             random_state=RANDOM_STATE,
-            class_weight="balanced_subsample",
-            min_samples_leaf=5,
+            min_samples_leaf=10,
             n_jobs=-1,
         ),
         "XGBoost": XGBClassifier(
@@ -204,15 +277,22 @@ def main() -> None:
             objective="binary:logistic",
             eval_metric="logloss",
             random_state=RANDOM_STATE,
-            scale_pos_weight=scale_pos_weight,
             n_jobs=4,
         ),
     }
+    ensemble_model = VotingClassifier(
+        estimators=[
+            ("logistic_regression", clone(models["Logistic Regression"])),
+            ("random_forest", clone(models["Random Forest"])),
+            ("xgboost", clone(models["XGBoost"])),
+        ],
+        voting="soft",
+    )
 
     comparison = []
-    best_name = None
-    best_model = None
-    best_result = None
+    best_individual_name = None
+    best_individual_model = None
+    best_individual_result = None
 
     for name, model in models.items():
         model.fit(X_train_t, y_train)
@@ -220,17 +300,36 @@ def main() -> None:
         result = {"algorithm": name, "metrics": metrics}
         comparison.append(result)
 
-        if best_result is None or rank_key(result) > rank_key(best_result):
-            best_name = name
-            best_model = model
-            best_result = result
+        if best_individual_result is None or is_better_individual(result, best_individual_result):
+            best_individual_name = name
+            best_individual_model = model
+            best_individual_result = result
+
+    ensemble_model.fit(X_train_t, y_train)
+    ensemble_metrics = evaluate_model(ensemble_model, X_test_t, y_test)
+    ensemble_result = {
+        "algorithm": ENSEMBLE_NAME,
+        "baseAlgorithms": ENSEMBLE_BASE_ALGORITHMS,
+        "metrics": ensemble_metrics,
+    }
+    comparison.append(ensemble_result)
+
+    ensemble_selected = improves_required_metrics(ensemble_result, best_individual_result)
+    if ensemble_selected:
+        best_name = ENSEMBLE_NAME
+        best_model = ensemble_model
+        best_result = ensemble_result
+    else:
+        best_name = best_individual_name
+        best_model = best_individual_model
+        best_result = best_individual_result
 
     model_path = output_dir / "hypertension_model.pkl"
     preprocessor_path = output_dir / "hypertension_preprocessor.pkl"
     metadata_path = output_dir / "hypertension_model_metadata.json"
 
-    joblib.dump(best_model, model_path)
-    joblib.dump(preprocessor, preprocessor_path)
+    joblib.dump(best_model, model_path, compress=JOBLIB_COMPRESS)
+    joblib.dump(preprocessor, preprocessor_path, compress=JOBLIB_COMPRESS)
 
     numeric_defaults = {
         col: float(X_train[col].median()) if pd.notna(X_train[col].median()) else 0.0
@@ -256,9 +355,28 @@ def main() -> None:
         "numericDefaults": numeric_defaults,
         "categoricalDefaults": categorical_defaults,
         "datasetPath": str(dataset_path),
+        "target": target_metadata,
         "classBalance": {
             "trainPositive": positive,
             "trainNegative": negative,
+        },
+        "selectionPolicy": {
+            "bestIndividualAlgorithm": best_individual_name,
+            "individualSelectionPriority": ["accuracy", "recall", "f1Score", "rocAuc"],
+            "compactArtifactTieBreak": (
+                "When accuracy, recall, and F1-score are equal, ROC-AUC differences "
+                f"within {ROC_AUC_TIE_TOLERANCE} are treated as a tie and the "
+                "smaller/less complex model is preferred."
+            ),
+            "ensembleAlgorithm": ENSEMBLE_NAME,
+            "ensembleBaseAlgorithms": ENSEMBLE_BASE_ALGORITHMS,
+            "ensembleSelected": ensemble_selected,
+            "requiredEnsembleImprovementMetrics": list(REQUIRED_ENSEMBLE_METRICS),
+            "ensembleSelectionRule": (
+                "Select the soft-voting ensemble only when it is at least as strong as "
+                "the best individual model on every required metric and improves at "
+                "least one required metric."
+            ),
         },
         "modelComparison": comparison,
     }
