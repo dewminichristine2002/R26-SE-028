@@ -203,6 +203,38 @@ const getScoreSnapshot = (card, analysis = null) => {
   };
 };
 
+const formatPercentFromProbability = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return `${(numeric * 100).toFixed(1)}%`;
+};
+
+const getMlSeriousProbability = (ml) => {
+  if (!ml) return null;
+  const candidates = [
+    ml.adrRiskProbability,
+    ml.probabilityDangerous,
+    ml.probability,
+  ];
+  for (const candidate of candidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return null;
+};
+
+const getMlThreshold = (ml, dataUsed) => {
+  const directThreshold = Number(ml?.threshold);
+  if (Number.isFinite(directThreshold)) return directThreshold;
+
+  const youdenThreshold = Number(dataUsed?.hybridBreakdown?.youdensJThreshold?.optimal_threshold);
+  if (Number.isFinite(youdenThreshold)) return youdenThreshold;
+
+  return 0.55;
+};
+
 const findBestCardForHistoryItem = (historyItem, cards = []) => {
   const historyName = String(historyItem?.normalizedDrugName || historyItem?.medicineName || '').trim().toLowerCase();
   const historyRxnorm = String(historyItem?.rxnormCui || '').trim();
@@ -471,7 +503,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
   }, []);
 
   const onMedicineNameChange = (v) => {
-    setMedicineInput((m) => ({ ...m, medicineName: v, normalizedDrugName: v.toLowerCase(), inputMethod: 'manual' }));
+    setMedicineInput((m) => ({ ...m, medicineName: v, normalizedDrugName: '', inputMethod: 'manual' }));
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => runMedicationSearch(v), 350);
   };
@@ -637,7 +669,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         severity: 'mild',
         notes: buildAnalysisNotes(),
         takingOtherMedicinesNow: hasOtherMeds,
-        normalizedDrugName: medicineInput.normalizedDrugName || medicineInput.medicineName.toLowerCase(),
+        normalizedDrugName: medicineInput.normalizedDrugName || '',
       });
       setLatestResult(result);
       setCards((prev) => [result.card, ...prev.filter((item) => item.id !== result.card.id)]);
@@ -649,6 +681,21 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
       dangerAlertShown.current = false;
       setRoute('result');
     } catch (e) {
+      if (e?.response?.data?.code === 'MEDICINE_NOT_RECOGNIZED') {
+        const backendSuggestions = Array.isArray(e?.response?.data?.details?.suggestions)
+          ? e.response.data.details.suggestions
+          : [];
+        if (backendSuggestions.length) {
+          setSuggestions(backendSuggestions);
+        }
+        Alert.alert(
+          'Medicine not recognized',
+          e?.response?.data?.error ||
+            'We could not reliably identify this medicine. Please check the spelling, choose a suggested medicine, scan the prescription, or try again.'
+        );
+        setRoute('check-minimal');
+        return;
+      }
       Alert.alert('Check failed', errorText(e, 'Could not check medicine safety.'));
       setRoute('check-minimal');
     }
@@ -965,7 +1012,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     setMedicineInput({
       inputMethod: 'scan',
       medicineName: resolvedName,
-      normalizedDrugName: resolvedName.toLowerCase(),
+      normalizedDrugName: selectedCandidate.normalizedDrugName || '',
       dose: parsed.dose || '',
       frequency: parsed.displayFrequency || parsed.frequency || '',
       rawOcrText: scanRawText,
@@ -1111,7 +1158,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     setMedicineInput({
       inputMethod: 'voice',
       medicineName: parsed.medicineName || spokenText,
-      normalizedDrugName: (parsed.medicineName || spokenText).toLowerCase(),
+      normalizedDrugName: '',
       dose: parsed.dose,
       frequency: parsed.displayFrequency || parsed.frequency,
       rawOcrText: '',
@@ -1194,6 +1241,9 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
     const guidelines = report?.clinicalRecommendations?.general?.length
       ? report.clinicalRecommendations.general
       : analysis?.guidelines || card.guidelines || [];
+    const mlSeriousProbability = getMlSeriousProbability(ml);
+    const mlThreshold = getMlThreshold(ml, dataUsed);
+    const allergyEvidenceMatches = Array.isArray(dataUsed?.allergyEvidenceMatches) ? dataUsed.allergyEvidenceMatches : [];
 
     return (
       <>
@@ -1252,7 +1302,12 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
         ) : null}
 
         <View style={s.elderScoreSimple}>
-          {hasMlBlend && mlScore != null ? <Text style={s.elderScoreHint}>ML score: {mlScore} / 100 based on P(ADR) x 100</Text> : null}
+          {hasMlBlend && mlSeriousProbability != null ? (
+            <Text style={s.elderScoreHint}>
+              ML serious-event probability: {formatPercentFromProbability(mlSeriousProbability)}
+              {mlThreshold != null ? ` · threshold ${mlThreshold}` : ''}
+            </Text>
+          ) : null}
           <Text style={s.elderScoreTitle}>Safety score: {finalScore ?? '--'} out of 100</Text>
           <Text style={s.elderScoreHint}>0–19 Safe · 20–54 Warning · 55+ Dangerous</Text>
           <View style={[s.scoreRow, { marginTop: 14, marginBottom: 0 }]}>
@@ -1267,6 +1322,10 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
           <View style={s.scoreBlock}>
             <Text style={s.scoreBlockTitle}>Score breakdown</Text>
             {ruleScore != null ? <Text style={s.scoreLine}>Clinical rule score: {ruleScore} / 100</Text> : null}
+            {mlSeriousProbability != null ? (
+              <Text style={s.scoreLine}>ML serious-event probability: {formatPercentFromProbability(mlSeriousProbability)}</Text>
+            ) : null}
+            {mlThreshold != null ? <Text style={s.scoreLine}>ML threshold used: {mlThreshold}</Text> : null}
             {rawMlScore != null ? <Text style={s.scoreLine}>Raw ML score: {rawMlScore} / 100</Text> : null}
             {adjustedMlScore != null ? <Text style={s.scoreLine}>Adjusted ML score: {adjustedMlScore} / 100</Text> : null}
             {finalScore != null ? <Text style={s.scoreLine}>{hasMlBlend ? 'Final hybrid score' : 'Final clinical score'}: {finalScore} / 100</Text> : null}
@@ -1362,7 +1421,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
 
         {triggeredRules.length ? (
           <View style={s.card}>
-            <Text style={s.cardTitle}>Health factors we checked</Text>
+            <Text style={s.cardTitle}>Triggered rules and reasons</Text>
             {triggeredRules.map((rule, index) => (
               <View key={`${rule.factorType || 'rule'}-${index}`} style={s.ruleRow}>
                 <Text style={s.ruleLabel}>{rule.factorLabel}</Text>
@@ -1370,6 +1429,20 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                   Score contribution: {rule.score ?? 0} · Severity: {rule.severity || 'n/a'}
                 </Text>
                 {rule.recommendation ? <Text style={s.ruleRecommendation}>{rule.recommendation}</Text> : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {allergyEvidenceMatches.length ? (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Allergy evidence we matched</Text>
+            {allergyEvidenceMatches.map((match, index) => (
+              <View key={`${match.sourceKey || 'evidence'}-${index}`} style={s.ruleRow}>
+                <Text style={s.ruleLabel}>{match.label || match.sourceKey || 'Profile evidence'}</Text>
+                <Text style={s.helpSmall}>
+                  Matched terms: {Array.isArray(match.matchedTerms) && match.matchedTerms.length ? match.matchedTerms.join(', ') : 'None'}
+                </Text>
               </View>
             ))}
           </View>
@@ -2824,7 +2897,7 @@ export default function MedicineSafetyScreenFixed({ onBack, onLogout: _onLogout,
                 setMedicineInput((m) => ({
                   ...m,
                   medicineName: v,
-                  normalizedDrugName: v.toLowerCase(),
+                  normalizedDrugName: '',
                 }))
               }
               placeholder="Medicine name"
@@ -4718,22 +4791,22 @@ const s = StyleSheet.create({
   },
   secondaryText: { color: palette.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
-  resultMedLabel: { fontSize: 15, fontWeight: '700', color: palette.primary, marginBottom: 4 },
-  med: { fontSize: 28, fontWeight: '800', color: palette.text, marginTop: 4, marginBottom: 18 },
+  resultMedLabel: { fontSize: 14, fontWeight: '700', color: palette.primary, marginBottom: 4 },
+  med: { fontSize: 24, fontWeight: '800', color: palette.text, marginTop: 4, marginBottom: 18 },
   banner: { borderRadius: 18, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 18, ...cardShadow },
   bannerWarn: { backgroundColor: palette.warnBg, borderWidth: 2, borderColor: '#fcd34d' },
   bannerSafe: { backgroundColor: palette.safeBg, borderWidth: 2, borderColor: '#6ee7b7' },
   bannerDanger: { backgroundColor: palette.dangerBg, borderWidth: 2, borderColor: '#fca5a5' },
   riskPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
-  riskPillText: { fontSize: 16, fontWeight: '800' },
+  riskPillText: { fontSize: 14, fontWeight: '800' },
   pillSafe: { backgroundColor: '#d1fae5' },
-  pillSafeText: { color: '#065f46', fontSize: 16, fontWeight: '800' },
+  pillSafeText: { color: '#065f46', fontSize: 14, fontWeight: '800' },
   pillWarn: { backgroundColor: '#fef08a' },
-  pillWarnText: { color: '#92400e', fontSize: 16, fontWeight: '800' },
+  pillWarnText: { color: '#92400e', fontSize: 14, fontWeight: '800' },
   pillDanger: { backgroundColor: '#fee2e2' },
-  pillDangerText: { color: '#991b1b', fontSize: 16, fontWeight: '800' },
-  bannerTitle: { fontSize: 18, fontWeight: '800', color: palette.text },
-  bannerSub: { fontSize: 17, marginTop: 6, lineHeight: 26, color: palette.text, fontWeight: '600' },
+  pillDangerText: { color: '#991b1b', fontSize: 14, fontWeight: '800' },
+  bannerTitle: { fontSize: 16, fontWeight: '800', color: palette.text },
+  bannerSub: { fontSize: 15, marginTop: 6, lineHeight: 22, color: palette.text, fontWeight: '600' },
   elderScoreSimple: {
     backgroundColor: palette.surface,
     borderRadius: 18,
@@ -4743,8 +4816,8 @@ const s = StyleSheet.create({
     marginBottom: 14,
     ...cardShadow,
   },
-  elderScoreTitle: { fontSize: 20, fontWeight: '800', color: palette.text },
-  elderScoreHint: { fontSize: 16, color: palette.textSecondary, marginTop: 8, lineHeight: 24 },
+  elderScoreTitle: { fontSize: 18, fontWeight: '800', color: palette.text },
+  elderScoreHint: { fontSize: 14, color: palette.textSecondary, marginTop: 8, lineHeight: 21 },
   detailsToggle: {
     backgroundColor: palette.surface,
     borderRadius: 16,

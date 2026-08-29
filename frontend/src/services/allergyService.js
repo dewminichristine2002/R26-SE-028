@@ -203,6 +203,18 @@ export const allergyService = {
     }
   },
 
+  async fetchMedicineSuggestions(query) {
+    const headers = await getAuthHeaders();
+    const response = await allergyClient.request({
+      method: 'get',
+      url: '/prescriptions/suggestions',
+      params: { q: query },
+      headers,
+    });
+
+    return response.data?.suggestions || [];
+  },
+
   async updateCard(cardId, payload) {
     const data = await request('put', `/allergies/cards/${cardId}`, payload);
     return data.card;

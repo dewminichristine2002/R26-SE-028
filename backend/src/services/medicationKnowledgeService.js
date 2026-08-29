@@ -233,6 +233,38 @@ const OCR_EXCLUDED_TERMS = [
   'calcium',
 ];
 
+const TRUSTED_MEDICINE_ALIASES = {
+  panadol: 'acetaminophen',
+  paracetamol: 'acetaminophen',
+  acetaminophen: 'acetaminophen',
+  advil: 'ibuprofen',
+  nurofen: 'ibuprofen',
+  ibuprofen: 'ibuprofen',
+  'vitamin c': 'ascorbic acid',
+  'ascorbic acid': 'ascorbic acid',
+  'co trimoxazole': 'sulfamethoxazole / trimethoprim',
+  'co-trimoxazole': 'sulfamethoxazole / trimethoprim',
+  cotrimoxazole: 'sulfamethoxazole / trimethoprim',
+  bactrim: 'sulfamethoxazole / trimethoprim',
+  sulfatrim: 'sulfamethoxazole / trimethoprim',
+  amoxicillin: 'amoxicillin',
+  warfarin: 'warfarin',
+  metformin: 'metformin',
+  cetirizine: 'cetirizine',
+};
+
+const buildNormalizationAudit = ({
+  inputDrug,
+  normalizedDrug,
+  normalizationSource,
+  normalizationConfidence,
+}) => ({
+  inputDrug,
+  normalizedDrug,
+  normalizationSource,
+  normalizationConfidence,
+});
+
 const looksLikeNonMedicineOcrMatch = (match) => {
   const normalized = normalizeLookupText(
     match?.displayName || match?.ingredientName || match?.normalizedName || ''
@@ -461,6 +493,69 @@ const buildUnresolvedMedication = (input) => {
     matchType: 'none',
     matchedAlias: '',
     matchDistance: null,
+    normalizationSource: 'UNRESOLVED_FALLBACK',
+    normalizationConfidence: 0,
+    normalizationAudit: buildNormalizationAudit({
+      inputDrug: fallbackName,
+      normalizedDrug: normalizeText(fallbackName),
+      normalizationSource: 'UNRESOLVED_FALLBACK',
+      normalizationConfidence: 0,
+    }),
+  };
+};
+
+const resolveTrustedAlias = (input) => {
+  const cleaned = normalizeLookupText(input);
+  if (!cleaned || !TRUSTED_MEDICINE_ALIASES[cleaned]) {
+    return null;
+  }
+
+  const normalizedName = TRUSTED_MEDICINE_ALIASES[cleaned];
+  const trustedMatch = findDrugEntry(normalizedName) || findDrugEntry(input);
+
+  if (trustedMatch) {
+    return {
+      ...trustedMatch,
+      normalizedName,
+      ingredientName: trustedMatch.ingredientName || normalizedName,
+      canonicalIngredient: normalizedName,
+      normalizationSource: 'TRUSTED_ALIAS',
+      normalizationConfidence: 1,
+      originalInput: String(input || '').trim(),
+      knowledgeSources: Array.from(new Set([...(trustedMatch.knowledgeSources || []), 'Trusted Alias'])),
+      normalizationAudit: buildNormalizationAudit({
+        inputDrug: String(input || '').trim(),
+        normalizedDrug: normalizedName,
+        normalizationSource: 'TRUSTED_ALIAS',
+        normalizationConfidence: 1,
+      }),
+    };
+  }
+
+  return {
+    rxnormCui: '',
+    displayName: normalizedName,
+    normalizedName,
+    ingredientName: normalizedName,
+    therapeuticClass: '',
+    aliases: [String(input || '').trim()],
+    sideEffects: [],
+    severeSideEffects: [],
+    matched: true,
+    knowledgeSources: ['Trusted Alias'],
+    matchType: 'trusted_alias',
+    matchedAlias: String(input || '').trim(),
+    matchDistance: 0,
+    canonicalIngredient: normalizedName,
+    normalizationSource: 'TRUSTED_ALIAS',
+    normalizationConfidence: 1,
+    originalInput: String(input || '').trim(),
+    normalizationAudit: buildNormalizationAudit({
+      inputDrug: String(input || '').trim(),
+      normalizedDrug: normalizedName,
+      normalizationSource: 'TRUSTED_ALIAS',
+      normalizationConfidence: 1,
+    }),
   };
 };
 
@@ -483,9 +578,35 @@ const resolveMedication = async (input, options = {}) => {
     return resolveMedicationSync(input);
   }
 
+  const trustedAliasMatch = resolveTrustedAlias(rawInput);
+  if (trustedAliasMatch) {
+    return trustedAliasMatch;
+  }
+
+  const localMatch = findDrugEntry(rawInput);
+  const hasStrongLocalMatch =
+    localMatch &&
+    ['exact', 'lowercase'].includes(String(localMatch.matchType || '').toLowerCase());
+
+  if (hasStrongLocalMatch) {
+    return {
+      ...localMatch,
+      canonicalIngredient: normalizeLookupText(localMatch.ingredientName || localMatch.displayName),
+      normalizationSource: 'local',
+      normalizationConfidence: 1,
+      originalInput: rawInput,
+      knowledgeSources: Array.from(new Set([...(localMatch.knowledgeSources || []), 'Local Knowledge'])),
+      normalizationAudit: buildNormalizationAudit({
+        inputDrug: rawInput,
+        normalizedDrug: localMatch.normalizedName,
+        normalizationSource: 'LOCAL_EXACT',
+        normalizationConfidence: 1,
+      }),
+    };
+  }
+
   const canonical = await canonicalizeDrugName(rawInput);
   const genericMatch = canonical.ingredientName ? findDrugEntry(canonical.ingredientName) : null;
-  const localMatch = findDrugEntry(rawInput);
   const match = genericMatch || localMatch;
 
   if (!match) {
@@ -506,21 +627,53 @@ const resolveMedication = async (input, options = {}) => {
         matchDistance: 0,
         canonicalIngredient: canonical.ingredientName,
         normalizationSource: canonical.source,
+        normalizationConfidence: canonical.source === 'rxnorm' ? 0.9 : 0,
         originalInput: rawInput,
+        normalizationAudit: buildNormalizationAudit({
+          inputDrug: rawInput,
+          normalizedDrug: normalizeLookupText(canonical.ingredientName),
+          normalizationSource: canonical.source === 'rxnorm' ? 'RXNORM' : 'UNRESOLVED_FALLBACK',
+          normalizationConfidence: canonical.source === 'rxnorm' ? 0.9 : 0,
+        }),
       };
     }
     return buildUnresolvedMedication(input);
   }
 
-  const resolved = genericMatch ? { ...genericMatch } : { ...match };
+  const shouldPreferLocalMatch =
+    localMatch &&
+    (String(localMatch.matchType || '').toLowerCase() === 'lowercase' ||
+      String(localMatch.matchType || '').toLowerCase() === 'exact' ||
+      !genericMatch);
+
+  const resolved = shouldPreferLocalMatch ? { ...localMatch } : { ...match };
 
   return {
     ...resolved,
-    rxnormCui: (genericMatch && canonical.ingredientRxcui) || canonical.rxcui || resolved.rxnormCui,
-    canonicalIngredient: canonical.ingredientName || normalizeLookupText(resolved.ingredientName),
-    normalizationSource: canonical.source,
+    rxnormCui:
+      shouldPreferLocalMatch && resolved.rxnormCui
+        ? resolved.rxnormCui
+        : (genericMatch && canonical.ingredientRxcui) || canonical.rxcui || resolved.rxnormCui,
+    canonicalIngredient:
+      shouldPreferLocalMatch
+        ? normalizeLookupText(resolved.ingredientName || resolved.displayName)
+        : canonical.ingredientName || normalizeLookupText(resolved.ingredientName),
+    normalizationSource: shouldPreferLocalMatch ? 'local' : canonical.source,
+    normalizationConfidence: shouldPreferLocalMatch ? 1 : canonical.source === 'rxnorm' ? 0.9 : 0,
     originalInput: rawInput,
-    knowledgeSources: Array.from(new Set([...(resolved.knowledgeSources || []), ...(genericMatch ? ['RxNorm'] : [])])),
+    knowledgeSources: Array.from(
+      new Set([
+        ...(resolved.knowledgeSources || []),
+        ...(shouldPreferLocalMatch ? ['Local Knowledge'] : []),
+        ...(!shouldPreferLocalMatch && genericMatch ? ['RxNorm'] : []),
+      ])
+    ),
+    normalizationAudit: buildNormalizationAudit({
+      inputDrug: rawInput,
+      normalizedDrug: resolved.normalizedName,
+      normalizationSource: shouldPreferLocalMatch ? 'LOCAL_EXACT' : canonical.source === 'rxnorm' ? 'RXNORM' : 'UNRESOLVED_FALLBACK',
+      normalizationConfidence: shouldPreferLocalMatch ? 1 : canonical.source === 'rxnorm' ? 0.9 : 0,
+    }),
   };
 };
 
@@ -608,6 +761,10 @@ const enrichMedication = async ({ medicineName, currentMedicationsText, symptomM
     canonicalIngredient: drug.canonicalIngredient || drug.ingredientName,
     normalizationSource: drug.normalizationSource || null,
     originalMedicineInput: drug.originalInput || medicineName,
+    normalizationSource: drug.normalizationSource || null,
+    normalizationConfidence:
+      typeof drug.normalizationConfidence === 'number' ? drug.normalizationConfidence : null,
+    normalizationAudit: drug.normalizationAudit || null,
     therapeuticClass: drug.therapeuticClass,
     matched: drug.matched !== false,
     whoAtc: atcRecord
@@ -633,21 +790,102 @@ const enrichMedication = async ({ medicineName, currentMedicationsText, symptomM
 };
 
 const searchMedications = (query) => {
-  const normalizedQuery = normalizeText(query);
+  const rawQuery = String(query || '').trim();
+  const normalizedQuery = normalizeLookupText(rawQuery);
   if (!normalizedQuery) {
     return [];
   }
 
-  return knowledge.drugs.filter((drug) =>
-    drug.aliases.some((alias) => normalizeText(alias).includes(normalizedQuery))
-  ).map((drug) => ({
-    rxnormCui: drug.rxnormCui,
-    displayName: drug.displayName,
-    normalizedName: drug.normalizedName,
-    ingredientName: drug.ingredientName,
-    therapeuticClass: drug.therapeuticClass,
-    source: 'RxNorm',
-  }));
+  const results = [];
+  const seen = new Set();
+  const addResult = (drug, extra = {}) => {
+    if (!drug) {
+      return;
+    }
+    const key = `${drug.rxnormCui || ''}:${drug.normalizedName || drug.displayName || ''}`.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    results.push({
+      rxnormCui: drug.rxnormCui,
+      displayName: drug.displayName,
+      normalizedName: drug.normalizedName,
+      ingredientName: drug.ingredientName,
+      therapeuticClass: drug.therapeuticClass,
+      source: 'RxNorm',
+      ...extra,
+    });
+  };
+
+  const trustedAlias = TRUSTED_MEDICINE_ALIASES[normalizedQuery];
+  if (trustedAlias) {
+    const trustedMatch = findDrugEntry(trustedAlias);
+    addResult(trustedMatch || {
+      rxnormCui: '',
+      displayName: rawQuery,
+      normalizedName: trustedAlias,
+      ingredientName: trustedAlias,
+      therapeuticClass: '',
+    }, {
+      matchType: 'trusted_alias',
+      matchedAlias: rawQuery,
+      confidence: 1,
+    });
+  }
+
+  const directMatch = matchMedicationName(rawQuery);
+  if (directMatch) {
+    addResult(directMatch, {
+      matchType: directMatch.matchType || 'exact',
+      matchedAlias: directMatch.matchedAlias || rawQuery,
+      confidence:
+        directMatch.matchType === 'fuzzy'
+          ? Math.max(0.55, 1 - ((Number(directMatch.matchDistance || 0) / Math.max(String(directMatch.matchedAlias || '').length, 4))))
+          : 0.98,
+    });
+  }
+
+  aliasEntries.forEach((entry) => {
+    if (!entry.aliasNormalized) {
+      return;
+    }
+
+    const alias = entry.aliasNormalized;
+    const includesQuery = alias.includes(normalizedQuery) || normalizedQuery.includes(alias);
+    const distance = levenshteinDistance(normalizedQuery, alias);
+    const fuzzyLimit = maxFuzzyDistance(normalizedQuery);
+    const prefix = commonPrefixLength(normalizedQuery, alias);
+
+    if (!includesQuery && !(distance <= fuzzyLimit && prefix >= 2)) {
+      return;
+    }
+
+    const isTrustedAlias = TRUSTED_MEDICINE_ALIASES[alias] === entry.drug.normalizedName;
+    const matchType = includesQuery
+      ? (isTrustedAlias ? 'brand_alias' : 'partial')
+      : (isTrustedAlias ? 'fuzzy_brand' : 'fuzzy');
+
+    const confidence = includesQuery
+      ? Math.min(0.96, Math.max(0.72, normalizedQuery.length / Math.max(alias.length, 1)))
+      : Math.max(0.5, 1 - (distance / Math.max(alias.length, 4)));
+
+    addResult(entry.drug, {
+      matchType,
+      matchedAlias: entry.alias,
+      confidence: Number(confidence.toFixed(2)),
+    });
+  });
+
+  return results
+    .sort((left, right) => {
+      const confidenceDiff = Number(right.confidence || 0) - Number(left.confidence || 0);
+      if (confidenceDiff !== 0) {
+        return confidenceDiff;
+      }
+      return String(left.displayName || '').localeCompare(String(right.displayName || ''));
+    })
+    .slice(0, 10);
 };
 
 const matchMedicinesFromText = (rawText) => {

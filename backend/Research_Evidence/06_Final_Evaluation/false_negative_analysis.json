@@ -1,0 +1,38 @@
+{
+  "count": 1888,
+  "percentage_of_serious_holdout": 0.02389873417721519,
+  "top_primary_reactions": {
+    "Gynaecomastia": 178,
+    "Drug ineffective": 128,
+    "Off label use": 62,
+    "Fatigue": 60,
+    "Abnormal weight gain": 53,
+    "Pain": 51,
+    "Drug hypersensitivity": 47,
+    "Headache": 44,
+    "Malaise": 38,
+    "Nausea": 37
+  },
+  "top_suspect_drugs": {
+    "RISPERIDONE": 339,
+    "DUPILUMAB": 101,
+    "TOFACITINIB": 84,
+    "CERTOLIZUMAB PEGOL": 75,
+    "AMBRISENTAN": 66,
+    "ETANERCEPT": 58,
+    "PREGABALIN": 57,
+    "APREMILAST": 49,
+    "DALFAMPRIDINE": 43,
+    "PALBOCICLIB": 42
+  },
+  "age_summary": {
+    "count": 1234.0,
+    "mean": 53.978248706733865,
+    "std": 21.815000517261584,
+    "min": 0.5,
+    "25%": 40.0,
+    "50%": 59.0,
+    "75%": 70.0,
+    "max": 96.0
+  }
+}

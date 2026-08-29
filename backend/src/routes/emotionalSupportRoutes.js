@@ -8,6 +8,9 @@ const moodCheckinController = require('../controllers/moodCheckinController');
 const emotionalTrendController = require('../controllers/emotionalTrendController');
 const adaptiveQuestionBankController = require('../controllers/adaptiveQuestionBankController');
 const adaptiveChatController = require('../controllers/adaptiveChatController');
+const activityExecutionController = require('../controllers/activityExecutionController');
+const wellnessTrendController = require('../controllers/wellnessTrendController');
+const adaptiveCaregiverAlertController = require('../controllers/adaptiveCaregiverAlertController');
 
 const router = express.Router();
 
@@ -15,9 +18,15 @@ router.post('/check-ins', checkInController.createCheckIn);
 router.post('/process-narrative', narrativeController.processNarrative);
 router.post('/mood-checkin', moodCheckinController.createMoodCheckin);
 router.get('/trends/:userId', emotionalTrendController.getUserTrends);
+router.get('/wellness-trends/:userId', wellnessTrendController.getWellnessTrends);
+router.get('/wellness-summary/:userId', wellnessTrendController.getWellnessSummary);
+router.get('/caregiver-alerts/:userId', adaptiveCaregiverAlertController.listUserCaregiverAlerts);
 router.get('/adaptive-question-bank/next', adaptiveQuestionBankController.getNextAdaptiveQuestion);
 router.post('/adaptive-chat/start', adaptiveChatController.startAdaptiveChat);
 router.post('/adaptive-chat/respond', adaptiveChatController.respondAdaptiveChat);
+router.post('/adaptive-activities/start', activityExecutionController.startActivity);
+router.get('/cognitive-activities', activityExecutionController.listCognitiveActivities);
+router.post('/adaptive-activities/attempts/:attemptId/submit', activityExecutionController.submitActivity);
 router.get('/sessions/:sessionId/chat-logs', checkInController.getChatLogs);
 router.get('/elders/:elderId/history', checkInController.getHistory);
 router.get('/elders/:elderId/trends/summary', checkInController.getTrendSummary);

@@ -9,7 +9,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import MedicineSafetyScreen from './src/screens/MedicineSafetyScreenFixed';
+import MedicineSafetyScreen from './src/screens/MedicineSafetyScreen';
 import UnifiedDashboardScreen from './src/screens/UnifiedDashboardScreen';
 import AssistantChatScreen from './src/screens/AssistantChatScreen';
 import DiabetesPredictionScreen from './src/screens/DiabetesPredictionScreen';
@@ -329,7 +329,7 @@ export default function App() {
     }
 
     if (activeScreen === 'emotional-support') {
-      return <EmotionalSupportNavigator />;
+      return <EmotionalSupportNavigator user={currentUser} />;
     }
 
     if (activeScreen === 'unified-dashboard') {

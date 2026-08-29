@@ -20,7 +20,7 @@ const withComponent4ErrorHandling = async (request) => {
       error.response?.data?.message ||
       error.response?.data?.errors?.join?.(', ') ||
       error.message ||
-      'Component 4 emotional support request failed.';
+      'We could not complete that request. Please try again.';
 
     throw new Error(message);
   }
@@ -62,8 +62,20 @@ export const startAdaptiveChat = (payload) =>
 
 export const respondAdaptiveChat = (payload) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-chat/respond', payload));
+export const startAdaptiveActivity = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-activities/start', payload));
+export const getCognitiveActivities = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get('/cognitive-activities', { params: { user_id: Number(userId) } }));
+export const submitAdaptiveActivity = (attemptId, payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post(`/adaptive-activities/attempts/${attemptId}/submit`, payload));
 
 export const getEmotionalTrends = (userId) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.get(`/trends/${Number(userId)}`));
+export const getWellnessTrends = (userId, period = '7d') =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/wellness-trends/${Number(userId)}`, { params: { period } }));
+export const getWellnessSummary = (userId, period = '30d') =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/wellness-summary/${Number(userId)}`, { params: { period } }));
+export const getAdaptiveCaregiverAlerts = (userId, period = '30d') =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/caregiver-alerts/${Number(userId)}`, { params: { period } }));
 
 export default emotionalSupportApi;

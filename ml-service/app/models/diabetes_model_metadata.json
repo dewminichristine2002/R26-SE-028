@@ -32,6 +32,23 @@
     "trainPositive": 28277,
     "trainNegative": 28276
   },
+  "selectionPolicy": {
+    "bestIndividualAlgorithm": "XGBoost",
+    "ensembleAlgorithm": "Soft Voting Ensemble",
+    "ensembleBaseAlgorithms": [
+      "Logistic Regression",
+      "Random Forest",
+      "XGBoost"
+    ],
+    "ensembleSelected": false,
+    "requiredEnsembleImprovementMetrics": [
+      "accuracy",
+      "recall",
+      "f1Score",
+      "rocAuc"
+    ],
+    "ensembleSelectionRule": "Select the soft-voting ensemble only when it is at least as strong as the best individual model on every required metric and improves at least one required metric."
+  },
   "modelComparison": [
     {
       "algorithm": "Logistic Regression",
@@ -115,6 +132,32 @@
           ]
         ],
         "positiveRate": 0.5014088153839111
+      }
+    },
+    {
+      "algorithm": "Soft Voting Ensemble",
+      "baseAlgorithms": [
+        "Logistic Regression",
+        "Random Forest",
+        "XGBoost"
+      ],
+      "metrics": {
+        "accuracy": 0.7381710163377891,
+        "precision": 0.7216006318283533,
+        "recall": 0.7754986561041166,
+        "f1Score": 0.7475794354288832,
+        "rocAuc": 0.8125318566252275,
+        "confusionMatrix": [
+          [
+            4955,
+            2115
+          ],
+          [
+            1587,
+            5482
+          ]
+        ],
+        "positiveRate": 0.5009678891312422
       }
     }
   ]
