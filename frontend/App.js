@@ -11,6 +11,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import MedicineSafetyScreen from './src/screens/MedicineSafetyScreen';
 import UnifiedDashboardScreen from './src/screens/UnifiedDashboardScreen';
+import QuickCareScreen from './src/screens/QuickCareScreen';
 import AssistantChatScreen from './src/screens/AssistantChatScreen';
 import DiabetesPredictionScreen from './src/screens/DiabetesPredictionScreen';
 import StrokePredictionScreen from './src/screens/StrokePredictionScreen';
@@ -23,6 +24,12 @@ import { reminderNotificationService } from './src/services/reminderNotification
 
 let NotificationsModule = null;
 let SpeechModule = null;
+
+const PREDICTION_SCREENS = new Set([
+  'diabetes-prediction',
+  'stroke-prediction',
+  'hypertension-prediction',
+]);
 
 try {
   NotificationsModule = require('expo-notifications');
@@ -45,6 +52,7 @@ export default function App() {
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState('');
   const [assistantReturnScreen, setAssistantReturnScreen] = useState('home');
+  const [predictionReturnScreen, setPredictionReturnScreen] = useState('quick-care');
 
   const handleAssistantNavigation = (navigation = {}) => {
     const launchIntent = navigation.launchIntent
@@ -61,6 +69,9 @@ export default function App() {
     }
 
     if (navigation.screen) {
+      if (PREDICTION_SCREENS.has(navigation.screen)) {
+        setPredictionReturnScreen(assistantReturnScreen || 'quick-care');
+      }
       setActiveScreen(navigation.screen);
       setAssistantInitialPrompt('');
     }
@@ -74,7 +85,11 @@ export default function App() {
         return false;
       }
       if (activeScreen === 'assistant-chat') {
-        setActiveScreen(assistantReturnScreen || 'home');
+        const returnScreen = assistantReturnScreen && assistantReturnScreen !== 'assistant-chat'
+          ? assistantReturnScreen
+          : 'unified-dashboard';
+        setActiveScreen(returnScreen);
+        setAssistantInitialPrompt('');
         return true;
       }
       if (
@@ -82,6 +97,10 @@ export default function App() {
         activeScreen === 'stroke-prediction' ||
         activeScreen === 'hypertension-prediction'
       ) {
+        setActiveScreen(predictionReturnScreen || 'quick-care');
+        return true;
+      }
+      if (activeScreen === 'quick-care') {
         setActiveScreen('home');
         return true;
       }
@@ -105,18 +124,30 @@ export default function App() {
     };
     BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-  }, [isAuthenticated, activeScreen, assistantReturnScreen]);
+  }, [isAuthenticated, activeScreen, assistantReturnScreen, predictionReturnScreen]);
 
   const openAssistant = (options = {}) => {
     const fromScreen = activeScreen === 'assistant-chat' ? assistantReturnScreen : activeScreen;
-    setAssistantReturnScreen(fromScreen || 'home');
+    setAssistantReturnScreen(fromScreen && fromScreen !== 'assistant-chat' ? fromScreen : 'unified-dashboard');
     setAssistantInitialPrompt(options.initialPrompt || '');
     setActiveScreen('assistant-chat');
   };
 
   const closeAssistant = () => {
-    setActiveScreen(assistantReturnScreen || 'home');
+    const returnScreen = assistantReturnScreen && assistantReturnScreen !== 'assistant-chat'
+      ? assistantReturnScreen
+      : 'unified-dashboard';
+    setActiveScreen(returnScreen);
     setAssistantInitialPrompt('');
+  };
+
+  const openPredictionScreen = (screen) => {
+    setPredictionReturnScreen(activeScreen || 'quick-care');
+    setActiveScreen(screen);
+  };
+
+  const closePredictionScreen = () => {
+    setActiveScreen(predictionReturnScreen || 'quick-care');
   };
 
   const openAssistantFromFab = () => {
@@ -131,31 +162,6 @@ export default function App() {
 
     openAssistant();
   };
-
-  // Android hardware back button navigation
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const onBackPress = () => {
-      // If on login/register, exit app
-      if (!isAuthenticated) {
-        return false;
-      }
-      // If on profile/settings, go back to home
-      if (activeScreen === 'profile' || activeScreen === 'settings') {
-        setActiveScreen('home');
-        return true;
-      }
-      // If not on home, go back to home
-      if (activeScreen !== 'home') {
-        setActiveScreen('home');
-        return true;
-      }
-      // Otherwise, let default (exit app)
-      return false;
-    };
-    BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-  }, [isAuthenticated, activeScreen]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -338,9 +344,21 @@ export default function App() {
           user={currentUser}
           onBack={() => setActiveScreen('home')}
           onOpenAssistant={openAssistant}
-          onOpenDiabetesPrediction={() => setActiveScreen('diabetes-prediction')}
-          onOpenStrokePrediction={() => setActiveScreen('stroke-prediction')}
-          onOpenHypertensionPrediction={() => setActiveScreen('hypertension-prediction')}
+          onOpenQuickCare={() => setActiveScreen('quick-care')}
+        />
+      );
+    }
+
+    if (activeScreen === 'quick-care') {
+      return (
+        <QuickCareScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+          onOpenSummary={() => setActiveScreen('unified-dashboard')}
+          onOpenAssistant={openAssistant}
+          onOpenDiabetesPrediction={() => openPredictionScreen('diabetes-prediction')}
+          onOpenStrokePrediction={() => openPredictionScreen('stroke-prediction')}
+          onOpenHypertensionPrediction={() => openPredictionScreen('hypertension-prediction')}
         />
       );
     }
@@ -349,7 +367,7 @@ export default function App() {
       return (
         <DiabetesPredictionScreen
           user={currentUser}
-          onBack={() => setActiveScreen('home')}
+          onBack={closePredictionScreen}
         />
       );
     }
@@ -358,7 +376,7 @@ export default function App() {
       return (
         <StrokePredictionScreen
           user={currentUser}
-          onBack={() => setActiveScreen('home')}
+          onBack={closePredictionScreen}
         />
       );
     }
@@ -367,7 +385,7 @@ export default function App() {
       return (
         <HypertensionPredictionScreen
           user={currentUser}
-          onBack={() => setActiveScreen('home')}
+          onBack={closePredictionScreen}
         />
       );
     }
@@ -394,9 +412,7 @@ export default function App() {
         onLaunchIntentConsumed={() => setHomeLaunchIntent(null)}
         onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
         onOpenDashboard={() => setActiveScreen('unified-dashboard')}
-        onOpenDiabetesPrediction={() => setActiveScreen('diabetes-prediction')}
-        onOpenStrokePrediction={() => setActiveScreen('stroke-prediction')}
-        onOpenHypertensionPrediction={() => setActiveScreen('hypertension-prediction')}
+        onOpenQuickCare={() => setActiveScreen('quick-care')}
         onOpenAssistant={openAssistant}
         onLogout={handleLogout}
       />

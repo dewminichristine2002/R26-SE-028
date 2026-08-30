@@ -14,7 +14,7 @@ import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
 
-const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenAssistant, onLogout, launchIntent, onLaunchIntentConsumed }) => {
+const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenQuickCare, onOpenAssistant, onLogout, launchIntent, onLaunchIntentConsumed }) => {
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
@@ -83,6 +83,15 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
       borderColor: '#cae3f2',
       iconBg: '#2576a6',
       arrowColor: '#2576a6',
+    },
+    {
+      id: 5,
+      label: 'Quick Care',
+      icon: '\u{1F49A}',
+      cardColor: '#fff1f4',
+      borderColor: '#efccd3',
+      iconBg: '#a93447',
+      arrowColor: '#a93447',
     },
   ];
 
@@ -174,6 +183,13 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
       setShowReminderMenu(false);
       setActiveReminderView('menu');
       onOpenDashboard?.();
+      return;
+    }
+
+    if (item.label === 'Quick Care') {
+      setShowReminderMenu(false);
+      setActiveReminderView('menu');
+      onOpenQuickCare?.();
       return;
     }
 
@@ -366,6 +382,35 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
     }
 
     return rawTitle || 'Caregiver Alert';
+  };
+
+  const buildCaregiverAlertAssistantPrompt = (alertItem) => {
+    const title = String(alertItem?.title || '').trim();
+    const message = String(alertItem?.message || '').trim();
+    const summary = message || title || 'There is a caregiver alert about my elder.';
+    return `I saw this caregiver alert for my elder: "${summary}". Please explain what this means, why it may be happening, and what I should monitor or ask next.`;
+  };
+
+  const handleAlertOpenAssistant = async (alertItem) => {
+    if (!alertItem?.id) {
+      onOpenAssistant?.({ initialPrompt: buildCaregiverAlertAssistantPrompt(alertItem) });
+      return;
+    }
+
+    try {
+      await caregiverAlertService.markAlertRead(alertItem.id);
+      setCaregiverAlerts((prev) => prev.map((item) => (
+        item.id === alertItem.id ? { ...item, is_read: true } : item
+      )));
+      setCaregiverUnreadCount((prev) => Math.max(0, prev - 1));
+      caregiverUnreadCountRef.current = Math.max(0, caregiverUnreadCountRef.current - 1);
+    } catch (error) {
+      console.log('[HomeScreen] mark alert read before assistant open failed:', error?.message || error);
+    }
+
+    onOpenAssistant?.({
+      initialPrompt: buildCaregiverAlertAssistantPrompt(alertItem),
+    });
   };
 
   const openEmotionalAssistantReview = () => {
@@ -598,17 +643,44 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
           <Text style={styles.caregiverDashboardArrow}>{'\u203A'}</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.caregiverDashboardCard, styles.caregiverQuickCareCard]}
+          activeOpacity={0.88}
+          onPress={onOpenQuickCare}
+          accessibilityRole="button"
+          accessibilityLabel="Open Quick Care"
+          accessibilityHint="Shows risk prediction summary and checks"
+        >
+          <View style={[styles.caregiverDashboardIconWrap, styles.caregiverQuickCareIconWrap]}>
+            <Text style={styles.caregiverDashboardIcon}>{'\u{1F49A}'}</Text>
+          </View>
+          <View style={styles.caregiverDashboardTextWrap}>
+            <Text style={styles.caregiverDashboardTitle}>Quick Care</Text>
+            <Text style={styles.caregiverDashboardSubtitle}>
+              Open risk prediction summary and checks for the elder.
+            </Text>
+          </View>
+          <Text style={[styles.caregiverDashboardArrow, styles.caregiverQuickCareArrow]}>{'\u203A'}</Text>
+        </TouchableOpacity>
+
         {!!criticalAlerts.length && (
           <View style={styles.caregiverCriticalCard}>
             <Text style={styles.caregiverSectionTitle}>Immediate Action Required</Text>
             {criticalAlerts.slice(0, 2).map((alertItem) => (
-              <View key={`critical-${alertItem.id}`} style={styles.caregiverCriticalItem}>
+              <TouchableOpacity
+                key={`critical-${alertItem.id}`}
+                style={styles.caregiverCriticalItem}
+                onPress={() => handleAlertOpenAssistant(alertItem)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Open assistant about ${getCaregiverAlertTitle(alertItem)}`}
+              >
                 <View style={styles.caregiverCriticalHeader}>
                   <Text style={styles.caregiverCriticalLabel}>{getCaregiverAlertTitle(alertItem)}</Text>
                   <Text style={styles.caregiverCriticalTime}>{formatAlertTime(alertItem.created_at)}</Text>
                 </View>
                 <Text style={styles.caregiverCriticalMessage}>{alertItem.message}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -619,7 +691,14 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
             <Text style={styles.caregiverEmptyText}>No notifications yet.</Text>
           ) : (
             recentAlerts.map((alertItem) => (
-              <View key={`recent-${alertItem.id}`} style={styles.caregiverRecentItem}>
+              <TouchableOpacity
+                key={`recent-${alertItem.id}`}
+                style={styles.caregiverRecentItem}
+                onPress={() => handleAlertOpenAssistant(alertItem)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Open assistant about ${getCaregiverAlertTitle(alertItem)}`}
+              >
                 <View style={styles.caregiverRecentDotWrap}>
                   <Text style={styles.caregiverRecentDot}>{alertItem.is_read ? '○' : '●'}</Text>
                 </View>
@@ -630,7 +709,7 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
                   </View>
                   <Text style={styles.caregiverRecentMessage}>{alertItem.message}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -1159,7 +1238,7 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
 
       <View style={styles.homeSectionHeader}>
         <View>
-          <Text style={styles.homeSectionTitle}>Quick Care</Text>
+          <Text style={styles.homeSectionTitle}>More Care Tools</Text>
           <Text style={styles.homeSectionSubtitle}>Large buttons for easy tapping</Text>
         </View>
       </View>
@@ -1926,6 +2005,16 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     color: '#0F7490',
     fontWeight: '900',
+  },
+  caregiverQuickCareCard: {
+    backgroundColor: '#FFF1F4',
+    borderColor: '#F1C7D1',
+  },
+  caregiverQuickCareIconWrap: {
+    backgroundColor: '#A93447',
+  },
+  caregiverQuickCareArrow: {
+    color: '#A93447',
   },
   caregiverSectionTitle: {
     fontSize: 15,

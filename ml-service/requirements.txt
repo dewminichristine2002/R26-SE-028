@@ -10,6 +10,7 @@ scikit-learn==1.7.1
 xgboost==2.1.1
 pandas==2.3.1
 numpy==2.3.2
+matplotlib==3.11.1
 librosa==0.11.0
 soundfile==0.13.1
 joblib==1.5.1

@@ -8,7 +8,7 @@ const {
   saveOrUpdateHealthValues,
 } = require('./diabetesPredictionService');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
 const HYPERTENSION_CONVERSATION_TITLE = 'Hypertension Risk Assistant';
 const PHASE_ONE_HYPERTENSION_ADVICE_MESSAGE =

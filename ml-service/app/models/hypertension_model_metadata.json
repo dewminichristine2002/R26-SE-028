@@ -93,6 +93,13 @@
     "Employment_Status": "Retired"
   },
   "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\hypertension_dataset.csv",
+  "visualizations": {
+    "confusionMatrix": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\confusion_matrix.png",
+    "rocCurve": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\roc_curve.png",
+    "modelMetricsComparison": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\model_metrics_comparison.png",
+    "featureCorrelationHeatmap": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\feature_correlation_heatmap.png",
+    "targetCorrelationBar": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\target_correlation_bar.png"
+  },
   "target": {
     "targetMode": "dataset-label",
     "targetColumn": "Hypertension_binary",

@@ -55,3 +55,8 @@ least one of those metrics.
 - `ml-service/app/models/stroke_model.pkl`
 - `ml-service/app/models/stroke_preprocessor.pkl`
 - `ml-service/app/models/stroke_model_metadata.json`
+- `ml-service/app/models/training_visualizations/stroke/confusion_matrix.png`
+- `ml-service/app/models/training_visualizations/stroke/roc_curve.png`
+- `ml-service/app/models/training_visualizations/stroke/model_metrics_comparison.png`
+- `ml-service/app/models/training_visualizations/stroke/feature_correlation_heatmap.png`
+- `ml-service/app/models/training_visualizations/stroke/target_correlation_bar.png`

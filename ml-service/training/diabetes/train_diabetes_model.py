@@ -1,6 +1,7 @@
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import joblib
 import numpy as np
@@ -23,6 +24,12 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
+
+TRAINING_ROOT = Path(__file__).resolve().parents[1]
+if str(TRAINING_ROOT) not in sys.path:
+    sys.path.insert(0, str(TRAINING_ROOT))
+
+from visualization_utils import save_training_visualizations
 
 RANDOM_STATE = 42
 DEFAULT_DATASET = ""
@@ -280,6 +287,21 @@ def main() -> None:
     joblib.dump(best_model, model_path)
     joblib.dump(preprocessor, preprocessor_path)
 
+    visualization_paths = save_training_visualizations(
+        output_dir=output_dir,
+        model_slug="diabetes",
+        model_title="Diabetes Risk Prediction",
+        y_test=y_test,
+        y_pred=best_model.predict(X_test_t),
+        y_prob=best_model.predict_proba(X_test_t)[:, 1],
+        comparison=comparison,
+        selected_algorithm=best_name,
+        feature_frame=X,
+        target=y,
+        numeric_features=numeric_features,
+        target_label="Diabetes Risk",
+    )
+
     metadata = {
         "selectedAlgorithm": best_name,
         "accuracy": best_result["metrics"]["accuracy"],
@@ -290,6 +312,7 @@ def main() -> None:
         "confusionMatrix": best_result["metrics"]["confusionMatrix"],
         "featuresUsed": features_used,
         "datasetPath": str(dataset_path),
+        "visualizations": visualization_paths,
         "classBalance": {
             "trainPositive": positive,
             "trainNegative": negative,
