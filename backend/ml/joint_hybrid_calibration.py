@@ -20,6 +20,7 @@ from sklearn.metrics import accuracy_score, classification_report, f1_score
 from sklearn.model_selection import train_test_split
 
 from data_loaders import load_raw_training_data
+from train_fda_serious_models import select_text_column
 from fda_lr_calibration_support import (
     FDA_TUNED_LOGISTIC_MODEL_PATH,
     cap_fda_feature_splits,
@@ -29,15 +30,20 @@ from fda_lr_calibration_support import (
 )
 from hybrid_eval import MIN_DANGEROUS_PRECISION, derive_risk_labels, derive_rule_score
 
+import __main__
+
+
+__main__.select_text_column = select_text_column
+
 
 ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
 OUTPUT_PATH = MODELS_DIR / "fda_lr_joint_hybrid_calibration.json"
 
 RISK_CLASSES = ["Safe", "Warning", "Dangerous"]
-ALPHA_GRID = [0.5, 0.6, 0.7, 0.8, 0.9]
-WARNING_GRID = [15, 20, 25, 30, 35]
-DANGEROUS_GRID = list(range(50, 71))
+ALPHA_GRID = [round(x / 10, 1) for x in range(0, 11)]
+WARNING_GRID = list(range(5, 41))
+DANGEROUS_GRID = list(range(30, 71))
 
 
 def classify(score: float, warning_threshold: int, dangerous_threshold: int) -> str:

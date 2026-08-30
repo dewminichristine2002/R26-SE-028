@@ -141,12 +141,14 @@ def load_or_fit_tuned_fda_logistic(
     X_train: pd.DataFrame,
     y_train: pd.Series,
 ):
-    if FDA_TUNED_LOGISTIC_MODEL_PATH.exists():
-        try:
-            return joblib.load(FDA_TUNED_LOGISTIC_MODEL_PATH)
-        except (AttributeError, ModuleNotFoundError, ImportError):
-            pass
-    return build_tuned_fda_logistic_pipeline().fit(X_train, y_train)
+    if not FDA_TUNED_LOGISTIC_MODEL_PATH.exists():
+        raise FileNotFoundError(
+            f"Existing tuned Logistic Regression model not found: "
+            f"{FDA_TUNED_LOGISTIC_MODEL_PATH}"
+        )
+
+    print(f"[calibration] Loading existing model: {FDA_TUNED_LOGISTIC_MODEL_PATH}")
+    return joblib.load(FDA_TUNED_LOGISTIC_MODEL_PATH)
 
 
 def ml_scores_from_fda_model(model, X: pd.DataFrame) -> pd.Series:

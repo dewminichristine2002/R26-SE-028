@@ -4,7 +4,7 @@
 **Constraint:** No database schema changes  
 **Audit date:** August 2026 — aligned with production artifacts in `backend/ml/models/` and `backend/src/config/hybridScoring.js`
 
-> **Footnote:** This document was revised in **August 2026** to match the implemented system: **three** ML algorithms in `compare_models.py` (Random Forest, XGBoost, Logistic Regression), final hybrid defaults **α=0.5, β=0.5, Warning=15, Dangerous=50**, and **FAERS-first** training (`faers_adrs.csv`, n ≈ 11,868). Older references to five algorithms, 25/60 thresholds, or legacy 0.6/0.4 defaults are obsolete.
+> **Footnote:** This document was revised in **August 2026** to match the implemented system: **three** ML algorithms in `compare_models.py` (Random Forest, XGBoost, Logistic Regression), final hybrid defaults **α=0.6, β=0.4, Warning=34, Dangerous=36**, and **FAERS-first** training (`faers_adrs.csv`, n ≈ 11,868). Older references to five algorithms or prior calibration settings are obsolete.
 
 ---
 
@@ -103,13 +103,13 @@
 
 | Item | Evidence |
 |------|----------|
-| Formula α=0.5, β=0.5 | `hybridScoring.js`, `applyMlPrediction` |
-| **Production thresholds** | **Warning ≥ 15, Dangerous ≥ 50** (`hybridScoring.js`, `selected_hybrid_thresholds.json`) |
-| Final operating configuration | **α=0.5, β=0.5, T_C=15, T_D=50** (validated in controller-level system scenarios) |
+| Formula α=0.6, β=0.4 | `hybridScoring.js`, `applyMlPrediction` |
+| **Production thresholds** | **Warning ≥ 34, Dangerous ≥ 36** (`hybridScoring.js`) |
+| Final operating configuration | **α=0.6, β=0.4, T_C=34, T_D=36** |
 | Ablation (rule/ML/hybrid) | `hybrid_weight_ablation.json` |
 | Explainable breakdown | `dataUsed.hybridBreakdown` in API + app UI |
 
-**Note:** Offline proxy calibration explored multiple blends, but the final deployed configuration is **0.5/0.5 + 15/50**, retained only after controller-level validation with live rule overrides and clean-case guardrails.
+**Calibration summary:** A safety-oriented proxy calibration selected **0.6/0.4 + 34/36** as the final operating point. The reported proxy-calibration metrics for this setting are **Accuracy 81.55%**, **Macro F1 61.57%**, **Weighted F1 81.18%**, **Dangerous Precision 82.20%**, **Dangerous Recall 97.50%**, and **Dangerous FNR 2.50%**.
 
 **Run:** `npm run ml:hybrid-ablation` and `npm run ml:thresholds`
 
@@ -125,7 +125,7 @@
 | ROC-AUC | `baseline_metrics.json` | **0.984** |
 | Brier (calibration) | `baseline_metrics.json` | **0.048** |
 | Algorithm comparison | `compare_models_results.json` | **3 algorithms** |
-| Hybrid thresholds | `selected_hybrid_thresholds.json` | **15 / 50** |
+| Hybrid thresholds | `hybridScoring.js` | **34 / 36** |
 
 **Run:** `npm run ml:evaluate-all`
 
@@ -173,4 +173,4 @@ Produces/updates JSON artifacts under `backend/ml/models/`.
 1. **FAERS proxy labels** for Warning/Safe — not clinician-validated (see [DISSERTATION_LIMITATIONS.md](DISSERTATION_LIMITATIONS.md)).
 2. **SUS** must be completed with elderly/caregiver participants before claiming full O6.
 3. **Barcode** excluded; modalities: manual, OCR, voice.
-4. **Hybrid Dangerous recall** on proxy 3-class labels from offline calibration is not the same as binary severe-ADR recall (~95%), and final deployment weights/thresholds were confirmed in a separate controller-level validation stage.
+4. **Hybrid proxy-calibration metrics** on the 3-class evaluation frame are not the same as binary severe-ADR metrics, even when the final deployed weights and thresholds are used.
