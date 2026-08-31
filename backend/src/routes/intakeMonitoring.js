@@ -11,6 +11,7 @@ const router = express.Router();
 
 const projectPythonPath = path.resolve(__dirname, '..', '..', 'ml', '.venv311', 'Scripts', 'python.exe');
 const projectPythonFallbackPath = path.resolve(__dirname, '..', '..', 'ml', '.venv311', 'bin', 'python');
+const yoloConfigDir = path.resolve(__dirname, '..', '..', 'ml', '.ultralytics');
 
 const firstExistingPath = (...candidates) => candidates.find((candidate) => candidate && candidate !== 'python' && fs.existsSync(candidate));
 
@@ -66,6 +67,7 @@ const runPythonJsonScript = (scriptName, payload, timeoutMs = 20000, purpose = '
       cwd: path.resolve(__dirname, '..', '..'),
       env: {
         ...process.env,
+        YOLO_CONFIG_DIR: process.env.YOLO_CONFIG_DIR || yoloConfigDir,
       },
       windowsHide: true,
     });
@@ -276,6 +278,10 @@ const buildDetectedMedicineMap = (identityAnalysis) => {
     : [];
 
   detectedMedicines.forEach((item) => {
+    if (item?.appearanceConsistent === false) {
+      return;
+    }
+
     const id = String(item?.id || '').trim();
     const count = toPositiveNumber(item?.count, 0);
     if (!id || count <= 0) {
@@ -299,6 +305,10 @@ const buildDetectedMedicineMap = (identityAnalysis) => {
     : [];
 
   detectedObjects.forEach((object, index) => {
+    if (object?.appearanceConsistent === false) {
+      return;
+    }
+
     const match = object?.match || null;
     const id = String(match?.id || '').trim();
     const confidence = Number(match?.confidence ?? object?.confidence) || 0;
@@ -467,7 +477,7 @@ const buildMedicineDoseAnalysis = ({ expectedMedicines, identityAnalysis, detect
   detectedObjects.forEach((object) => {
     const match = object?.match || null;
     const id = String(match?.id || '').trim();
-    if (!id || !scheduledIds.has(id)) {
+    if (!id || !scheduledIds.has(id) || object?.appearanceConsistent === false) {
       unassignedAppearances.push(getDetectedObjectAppearance(object));
     }
   });
@@ -556,6 +566,7 @@ const runPythonArgsScript = (scriptName, args, timeoutMs = 30000, envOverrides =
       cwd: path.resolve(__dirname, '..', '..'),
       env: {
         ...process.env,
+        YOLO_CONFIG_DIR: process.env.YOLO_CONFIG_DIR || yoloConfigDir,
         ...envOverrides,
       },
       windowsHide: true,

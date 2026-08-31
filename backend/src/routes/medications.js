@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { pool } = require('../config/db');
@@ -6,7 +7,21 @@ const { requireAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-const getPythonCommand = () => process.env.TABLET_IDENTITY_PYTHON || process.env.PILL_ML_PYTHON || 'python';
+const projectPythonPath = path.resolve(__dirname, '..', '..', 'ml', '.venv311', 'Scripts', 'python.exe');
+const projectPythonFallbackPath = path.resolve(__dirname, '..', '..', 'ml', '.venv311', 'bin', 'python');
+const yoloConfigDir = path.resolve(__dirname, '..', '..', 'ml', '.ultralytics');
+
+const firstExistingPath = (...candidates) =>
+  candidates.find((candidate) => candidate && candidate !== 'python' && fs.existsSync(candidate));
+
+const getPythonCommand = () =>
+  firstExistingPath(
+    process.env.TABLET_IDENTITY_PYTHON,
+    process.env.PILL_ML_PYTHON,
+    process.env.INTAKE_ML_PYTHON,
+    projectPythonPath,
+    projectPythonFallbackPath
+  ) || 'python';
 
 const runPythonJsonScript = (scriptName, payload, timeoutMs = 30000) =>
   new Promise((resolve, reject) => {
@@ -15,6 +30,7 @@ const runPythonJsonScript = (scriptName, payload, timeoutMs = 30000) =>
       cwd: path.resolve(__dirname, '..', '..'),
       env: {
         ...process.env,
+        YOLO_CONFIG_DIR: process.env.YOLO_CONFIG_DIR || yoloConfigDir,
       },
       windowsHide: true,
     });
