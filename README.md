@@ -48,7 +48,7 @@ npm start
 cd backend
 npm install
 
-# Set up MongoDB connection in .env
+# Set up PostgreSQL connection in .env
 npm start
 ```
 
