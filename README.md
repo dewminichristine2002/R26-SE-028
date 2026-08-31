@@ -154,8 +154,9 @@ See [EAS_SETUP_GUIDE.md](frontend/EAS_SETUP_GUIDE.md) for more details.
 
 - **Frontend**: React Native with Expo
 - **Backend**: Node.js + Express.js
-- **Database**: MongoDB
+- **Database**: PostgreSQL
 - **State Management**: React hooks
 - **Navigation**: React Navigation v6
 - **Internationalization**: i18next
 - **Build & Deploy**: EAS (Expo Application Services)
+  
