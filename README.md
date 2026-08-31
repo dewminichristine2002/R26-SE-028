@@ -158,5 +158,5 @@ See [EAS_SETUP_GUIDE.md](frontend/EAS_SETUP_GUIDE.md) for more details.
 - **State Management**: React hooks
 - **Navigation**: React Navigation v6
 - **Internationalization**: i18next
-- **Build & Deploy**: EAS (Expo Application Services)
+- **Build & Deploy**: EAS (Expo application Services)
   
