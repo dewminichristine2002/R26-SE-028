@@ -78,4 +78,28 @@ export const getWellnessSummary = (userId, period = '30d') =>
 export const getAdaptiveCaregiverAlerts = (userId, period = '30d') =>
   withComponent4ErrorHandling(() => emotionalSupportApi.get(`/caregiver-alerts/${Number(userId)}`, { params: { period } }));
 
+// Consent-based personalized reminiscence topics.
+export const previewReminiscenceTopic = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-topics/preview', payload));
+export const saveReminiscenceTopic = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-topics', payload));
+export const getReminiscenceTopics = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-topics/${Number(userId)}`));
+export const deleteReminiscenceTopic = (topicId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-topics/${topicId}`, { data: { user_id: Number(userId) } }));
+export const clearReminiscenceTopics = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-topics/user/${Number(userId)}`));
+export const getReminiscencePrompt = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-prompt/${Number(userId)}`));
+
+// Memory entries (Life Book, Good Deeds) — photos remain local-only and are not uploaded.
+export const createMemoryEntry = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-entries', payload));
+export const listMemoryEntries = (userId, entryType = null) =>
+  withComponent4ErrorHandling(() =>
+    emotionalSupportApi.get(`/reminiscence-entries/${Number(userId)}`, { params: entryType ? { entry_type: entryType } : {} })
+  );
+export const deleteMemoryEntry = (entryId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-entries/${entryId}`, { data: { user_id: Number(userId) } }));
+
 export default emotionalSupportApi;

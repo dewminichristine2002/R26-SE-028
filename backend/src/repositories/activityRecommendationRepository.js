@@ -27,6 +27,21 @@ async function getRecentRecommendedActivityCodes(userId, limit = 5, client = nul
   return result.rows.map((row) => row.activityCode);
 }
 
+async function getRecentActivityAttemptHistory(userId, limit = 20, client = null) {
+  const executor = client || { query };
+  const result = await executor.query(
+    `SELECT activity_type AS "activityType", activity_code AS "activityCode",
+            activity_source AS "activitySource", completion_status AS "completionStatus",
+            started_at AS "startedAt", completed_at AS "completedAt"
+     FROM adaptive_activity_attempts
+     WHERE user_id = $1 AND started_at IS NOT NULL
+     ORDER BY started_at DESC
+     LIMIT $2`,
+    [userId, limit]
+  );
+  return result.rows;
+}
+
 async function getLatestRecommendedCognitiveDifficulty(userId, client = null) {
   const executor = client || { query };
   const result = await executor.query(
@@ -40,4 +55,9 @@ async function getLatestRecommendedCognitiveDifficulty(userId, client = null) {
   return result.rows[0]?.difficulty || null;
 }
 
-module.exports = { getActiveRoutableActivities, getLatestRecommendedCognitiveDifficulty, getRecentRecommendedActivityCodes };
+module.exports = {
+  getActiveRoutableActivities,
+  getLatestRecommendedCognitiveDifficulty,
+  getRecentActivityAttemptHistory,
+  getRecentRecommendedActivityCodes,
+};

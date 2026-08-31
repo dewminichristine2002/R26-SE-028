@@ -1,5 +1,6 @@
 const SUPPORTED = new Set(['happiness', 'sadness', 'loneliness', 'anxiety', 'anger', 'cognitive_fog', 'neutral']);
 const CONCERNS = new Set(['sadness', 'loneliness', 'anxiety', 'anger', 'cognitive_fog']);
+const { findExplicitEmotionEvidence } = require('./explicitEmotionEvidenceService');
 
 function normalizeEmotion(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -55,13 +56,23 @@ function interpretContextualAnswer({
   const shortAnswer = isShortContextDependentAnswer(answerText);
   const effect = effectFor(question, answerPolarity);
   const contextualEmotion = emotionFromEffect(effect, normalizeEmotion(previousInterpretedEmotion));
+  const explicitEvidence = findExplicitEmotionEvidence(answerText);
+  const explicitlyNegatedRawEmotion = explicitEvidence.negatedEmotions.includes(rawEmotion);
   const confidentMeaningfulMl = rawDetectionSource === 'ml_model' && confidence >= confidenceThreshold && rawEmotion !== 'neutral' && !shortAnswer;
 
   let interpretedEmotion = 'neutral';
   let evidenceSource = 'no_usable_evidence';
   let reason = 'No meaningful ML, deterministic, or question-context evidence was available.';
 
-  if (confidentMeaningfulMl) {
+  if (explicitEvidence.explicitEmotionDetected) {
+    interpretedEmotion = explicitEvidence.explicitEmotion;
+    evidenceSource = 'explicit_self_report';
+    reason = 'A non-negated first-person emotional self-report supplied direct linguistic evidence.';
+  } else if (explicitlyNegatedRawEmotion) {
+    interpretedEmotion = 'neutral';
+    evidenceSource = 'explicit_emotion_negated';
+    reason = `The first-person statement explicitly negated ${rawEmotion}; that class was not retained as supporting evidence.`;
+  } else if (confidentMeaningfulMl) {
     interpretedEmotion = rawEmotion;
     evidenceSource = 'raw_ml_retained';
     reason = 'Confident non-neutral ML evidence from a meaningful free-text answer was retained.';
@@ -97,6 +108,23 @@ function interpretContextualAnswer({
     semanticEffect: effect,
     shortContextDependentAnswer: shortAnswer,
     contextualEvidenceWeight: evidenceSource === 'question_context' ? 0.65 : null,
+    explicitEvidenceWeight: evidenceSource === 'explicit_self_report' ? 1 : null,
+    evidenceStrength: evidenceSource === 'explicit_self_report'
+      ? 'explicit_self_report'
+      : evidenceSource === 'raw_ml_retained'
+        ? 'strong_ml'
+        : evidenceSource === 'question_context' && shortAnswer
+          ? 'weak_contextual'
+          : evidenceSource === 'question_context'
+            ? 'contextual_supported'
+            : evidenceSource === 'rule_fallback_retained'
+              ? 'fallback'
+              : 'ambiguous',
+    explicitEmotion: explicitEvidence.explicitEmotion,
+    explicitEmotionDetected: explicitEvidence.explicitEmotionDetected,
+    secondaryExplicitEmotions: explicitEvidence.secondaryEmotions,
+    negatedExplicitEmotions: explicitEvidence.negatedEmotions,
+    explicitEmotionMentions: explicitEvidence.mentions,
   };
 }
 

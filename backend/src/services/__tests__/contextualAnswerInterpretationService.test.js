@@ -58,7 +58,7 @@ describe('contextual answer interpretation', () => {
   });
 
   test('strong meaningful non-neutral ML remains unchanged', () => {
-    const result = interpret(dimensions.wellbeing, 'Today has been horrible and I feel very down.', { emotion: 'sadness', confidence: 0.84 });
+    const result = interpret(dimensions.wellbeing, 'Today has been horrible and everything seemed bleak.', { emotion: 'sadness', confidence: 0.84 });
     expect(result).toMatchObject({ interpretedEmotion: 'sadness', evidenceSource: 'raw_ml_retained' });
   });
 
@@ -89,6 +89,19 @@ describe('contextual answer interpretation', () => {
   test('voice and typed transcript strings use identical interpretation', () => {
     expect(interpret(dimensions.engagement, 'No', { emotion: 'cognitive_fog', confidence: 0.49 }))
       .toEqual(interpret(dimensions.engagement, 'No', { emotion: 'cognitive_fog', confidence: 0.49 }));
+  });
+
+  test('explicit self-report outranks question inference and records audit metadata', () => {
+    expect(interpret(dimensions.energy, 'I feel angry with my children', { emotion: 'anger', confidence: 0.5355 }))
+      .toMatchObject({
+        interpretedEmotion: 'anger', evidenceSource: 'explicit_self_report',
+        evidenceStrength: 'explicit_self_report', explicitEmotionDetected: true,
+      });
+  });
+
+  test('an explicitly negated emotion is not restored from the raw model label', () => {
+    expect(interpret({ targetState: 'anger', assessmentDimension: 'clarification' }, "I'm not angry.", { emotion: 'anger', confidence: 0.8 }))
+      .toMatchObject({ interpretedEmotion: 'neutral', evidenceSource: 'explicit_emotion_negated' });
   });
 
   test('mixed evidence is accumulated across all turns rather than replaced by Q5', () => {

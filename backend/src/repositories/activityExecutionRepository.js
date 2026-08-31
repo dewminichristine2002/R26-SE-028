@@ -176,7 +176,7 @@ async function getAttemptForUpdate(client, attemptId, userId) {
             session.conversation_engagement AS "conversationEngagement"
      FROM adaptive_activity_attempts attempt
      LEFT JOIN adaptive_chat_sessions session ON session.session_id = attempt.adaptive_session_id
-     WHERE attempt.attempt_id = $1 AND attempt.user_id = $2 FOR UPDATE`,
+     WHERE attempt.attempt_id = $1 AND attempt.user_id = $2 FOR UPDATE OF attempt`,
     [attemptId, userId]
   );
   return mapAttempt(result.rows[0]);

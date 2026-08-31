@@ -11,6 +11,7 @@ const adaptiveChatController = require('../controllers/adaptiveChatController');
 const activityExecutionController = require('../controllers/activityExecutionController');
 const wellnessTrendController = require('../controllers/wellnessTrendController');
 const adaptiveCaregiverAlertController = require('../controllers/adaptiveCaregiverAlertController');
+const reminiscenceMemoryController = require('../controllers/reminiscenceMemoryController');
 
 const router = express.Router();
 
@@ -36,5 +37,18 @@ router.get('/caregivers/:caregiverId/elders', caregiverController.getCaregiverEl
 router.get('/caregivers/:caregiverId/alerts', alertController.getCaregiverAlerts);
 router.patch('/alerts/:alertId/acknowledge', alertController.acknowledgeAlert);
 router.get('/caregivers/:caregiverId/elders/:elderId', caregiverController.getCaregiverElderDetail);
+
+// Consent-based personalized reminiscence topics.
+router.post('/reminiscence-topics/preview', reminiscenceMemoryController.previewTopic);
+router.post('/reminiscence-topics', reminiscenceMemoryController.saveTopic);
+router.get('/reminiscence-topics/:userId', reminiscenceMemoryController.listTopics);
+router.delete('/reminiscence-topics/user/:userId', reminiscenceMemoryController.clearTopics);
+router.delete('/reminiscence-topics/:topicId', reminiscenceMemoryController.deleteTopic);
+router.get('/reminiscence-prompt/:userId', reminiscenceMemoryController.getPrompt);
+
+// Memory entries for Life Book and Good Deeds (no photo upload)
+router.post('/reminiscence-entries', reminiscenceMemoryController.createEntry);
+router.get('/reminiscence-entries/:userId', reminiscenceMemoryController.listEntries);
+router.delete('/reminiscence-entries/:entryId', reminiscenceMemoryController.deleteEntry);
 
 module.exports = router;
