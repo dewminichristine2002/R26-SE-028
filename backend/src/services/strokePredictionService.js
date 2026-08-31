@@ -5,6 +5,7 @@ const {
   calculateBMI,
   extractHealthValuesFromMessage,
   getExistingHealthInputs,
+  normalizeMlServiceError,
   saveOrUpdateHealthValues,
 } = require('./diabetesPredictionService');
 
@@ -129,13 +130,17 @@ const prepareStrokePredictionPayload = async (userId, incomingValues = {}) => {
 
 const callStrokePredictionService = async (payload) => {
   await ensureMlServiceAvailable();
-  const response = await axios.post(
-    `${ML_SERVICE_URL}/predict/stroke`,
-    payload,
-    { timeout: ML_TIMEOUT_MS }
-  );
+  try {
+    const response = await axios.post(
+      `${ML_SERVICE_URL}/predict/stroke`,
+      payload,
+      { timeout: ML_TIMEOUT_MS }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    throw normalizeMlServiceError(error, 'Failed to predict stroke risk');
+  }
 };
 
 const ensureStrokeConversation = async (userId, existingConversationId = null) => {

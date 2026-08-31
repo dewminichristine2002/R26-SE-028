@@ -10,6 +10,30 @@ const PHASE_ONE_ADVICE_MESSAGE =
 
 const normalizeText = (value) => (value == null ? '' : String(value).trim());
 
+const formatMlServiceDetail = (detail) => {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item?.msg || item?.message || JSON.stringify(item))
+      .filter(Boolean)
+      .join('; ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    return JSON.stringify(detail);
+  }
+
+  return normalizeText(detail);
+};
+
+const normalizeMlServiceError = (error, fallbackMessage) => {
+  const detail = error.response?.data?.detail || error.response?.data?.error;
+  const message = formatMlServiceDetail(detail) || normalizeText(error.message) || fallbackMessage;
+  const wrapped = new Error(message);
+  wrapped.status = error.response?.status;
+  wrapped.cause = error;
+  return wrapped;
+};
+
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
 const safeNumber = (value, fallback = null) => {
@@ -334,13 +358,17 @@ const prepareDiabetesPredictionPayload = async (userId, incomingValues = {}) => 
 
 const callDiabetesPredictionService = async (payload) => {
   await ensureMlServiceAvailable();
-  const response = await axios.post(
-    `${ML_SERVICE_URL}/predict/diabetes`,
-    payload,
-    { timeout: ML_TIMEOUT_MS }
-  );
+  try {
+    const response = await axios.post(
+      `${ML_SERVICE_URL}/predict/diabetes`,
+      payload,
+      { timeout: ML_TIMEOUT_MS }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    throw normalizeMlServiceError(error, 'Failed to predict diabetes risk');
+  }
 };
 
 const ensureDiabetesConversation = async (userId, existingConversationId = null) => {
@@ -655,4 +683,5 @@ module.exports = {
   saveHealthChatHistory,
   getLatestDiabetesPrediction,
   buildDiabetesResponseWithSummary,
+  normalizeMlServiceError,
 };
