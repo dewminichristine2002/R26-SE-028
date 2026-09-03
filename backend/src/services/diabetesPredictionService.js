@@ -2,13 +2,37 @@ const axios = require('axios');
 const { pool } = require('../config/db');
 const { ensureMlServiceAvailable } = require('./mlServiceManager');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
 const DIABETES_CONVERSATION_TITLE = 'Diabetes Risk Assistant';
 const PHASE_ONE_ADVICE_MESSAGE =
   'Advice generation will be added in the next phase. For now, I can explain your diabetes risk level and contributing factors.';
 
 const normalizeText = (value) => (value == null ? '' : String(value).trim());
+
+const formatMlServiceDetail = (detail) => {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item?.msg || item?.message || JSON.stringify(item))
+      .filter(Boolean)
+      .join('; ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    return JSON.stringify(detail);
+  }
+
+  return normalizeText(detail);
+};
+
+const normalizeMlServiceError = (error, fallbackMessage) => {
+  const detail = error.response?.data?.detail || error.response?.data?.error;
+  const message = formatMlServiceDetail(detail) || normalizeText(error.message) || fallbackMessage;
+  const wrapped = new Error(message);
+  wrapped.status = error.response?.status;
+  wrapped.cause = error;
+  return wrapped;
+};
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
@@ -334,13 +358,17 @@ const prepareDiabetesPredictionPayload = async (userId, incomingValues = {}) => 
 
 const callDiabetesPredictionService = async (payload) => {
   await ensureMlServiceAvailable();
-  const response = await axios.post(
-    `${ML_SERVICE_URL}/predict/diabetes`,
-    payload,
-    { timeout: ML_TIMEOUT_MS }
-  );
+  try {
+    const response = await axios.post(
+      `${ML_SERVICE_URL}/predict/diabetes`,
+      payload,
+      { timeout: ML_TIMEOUT_MS }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    throw normalizeMlServiceError(error, 'Failed to predict diabetes risk');
+  }
 };
 
 const ensureDiabetesConversation = async (userId, existingConversationId = null) => {
@@ -655,4 +683,5 @@ module.exports = {
   saveHealthChatHistory,
   getLatestDiabetesPrediction,
   buildDiabetesResponseWithSummary,
+  normalizeMlServiceError,
 };

@@ -541,9 +541,36 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
             : null);
 
         if (navigation && onAgentNavigate) {
-          setTimeout(() => {
-            onAgentNavigate(navigation);
-          }, 900);
+          const navigateAfterSpeech = () => {
+            setTimeout(() => {
+              onAgentNavigate(navigation);
+            }, 400);
+          };
+
+          const spokenText = String(assistantBubble.content || '').trim();
+          if (SpeechModule && spokenText) {
+            setSpeakingId(assistantBubble.id);
+            SpeechModule.stop?.();
+            SpeechModule.speak(spokenText, {
+              language: 'en',
+              pitch: 1.0,
+              rate: 0.95,
+              onDone: () => {
+                setSpeakingId(null);
+                navigateAfterSpeech();
+              },
+              onStopped: () => {
+                setSpeakingId(null);
+                navigateAfterSpeech();
+              },
+              onError: () => {
+                setSpeakingId(null);
+                navigateAfterSpeech();
+              },
+            });
+          } else {
+            navigateAfterSpeech();
+          }
         }
       } catch (err) {
         const errMsg = err.response?.data?.error || err.message || 'Failed to get a reply';
@@ -698,7 +725,10 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
     }
     return [];
   })();
-  const visibleFollowUps = getVisibleFollowUps(lastFollowUps, user);
+  const visibleFollowUps = (() => {
+    const fromServer = getVisibleFollowUps(lastFollowUps, user);
+    return fromServer.length > 0 ? fromServer : suggestedPrompts.slice(0, 6);
+  })();
 
   return (
     <KeyboardAvoidingView

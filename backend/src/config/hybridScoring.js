@@ -4,7 +4,7 @@
  * FinalScore = alpha * RuleScore + beta * (ML ADR probability * 100)
  *
  * Section 13.1 weight calibration (held-out test, three risk classes):
- *   rule-only 1.0/0.0 | ML-only 0.0/1.0 | proposed 0.6/0.4 | equal 0.5/0.5
+ *   rule-only 1.0/0.0 | ML-only 0.0/1.0 | selected 0.6/0.4
  * See hybrid_weight_ablation.json (npm run ml:hybrid-ablation).
  */
 const HYBRID_RULE_WEIGHT = Number(process.env.HYBRID_RULE_WEIGHT || 0.6);
@@ -18,7 +18,7 @@ const WEIGHT_ABLATION_CONFIGURATIONS = Object.freeze([
   { name: 'hybrid_equal', alpha: 0.5, beta: 0.5 },
 ]);
 
-/** Section 13.2 — auto-selected on FAERS hold-out: min FNR_D s.t. Precision_D ≥ 0.99 → 20/55. */
+/** Section 13.2 — final runtime defaults selected for deployment: Warning >= 34, Dangerous >= 36. */
 const THRESHOLD_SENSITIVITY_CONFIGS = Object.freeze([
   { configuration: 'delta_minus_10', warningMin: 15, dangerousMin: 50, delta: -10 },
   { configuration: 'delta_minus_5', warningMin: 20, dangerousMin: 55, delta: -5 },
@@ -28,8 +28,8 @@ const THRESHOLD_SENSITIVITY_CONFIGS = Object.freeze([
 ]);
 
 const RISK_THRESHOLDS = {
-  warningMin: Number(process.env.RISK_THRESHOLD_WARNING || 20),
-  dangerousMin: Number(process.env.RISK_THRESHOLD_DANGEROUS || 55),
+  warningMin: Number(process.env.RISK_THRESHOLD_WARNING || 34),
+  dangerousMin: Number(process.env.RISK_THRESHOLD_DANGEROUS || 36),
 };
 
 const classifyRiskLevel = (score) => {

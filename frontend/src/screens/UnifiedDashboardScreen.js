@@ -24,9 +24,7 @@ const UnifiedDashboardScreen = ({
   user,
   onBack,
   onOpenAssistant,
-  onOpenDiabetesPrediction,
-  onOpenStrokePrediction,
-  onOpenHypertensionPrediction,
+  onOpenQuickCare,
 }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -164,73 +162,25 @@ const UnifiedDashboardScreen = ({
           </View>
         ) : null}
 
-        {!loading && !error ? (
-          <View style={styles.diabetesCard}>
-            <View style={styles.diabetesHeaderRow}>
-              <Text style={styles.diabetesIcon}>🩺</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.diabetesTitle}>Diabetes Risk Prediction</Text>
-                <Text style={styles.diabetesSubtitle}>
-                  Check possible diabetes risk using saved health and lifestyle values.
-                </Text>
-              </View>
+        {!loading && !error && typeof onOpenQuickCare === 'function' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open Quick Care"
+            accessibilityHint="Opens risk prediction summary and checks"
+            onPress={onOpenQuickCare}
+            style={({ pressed }) => [styles.quickCareCard, pressed && { opacity: 0.86 }]}
+          >
+            <View style={styles.quickCareIconWrap}>
+              <Text style={styles.quickCareIcon}>{'\u{1F49A}'}</Text>
             </View>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Start diabetes risk check"
-              onPress={onOpenDiabetesPrediction}
-              style={({ pressed }) => [styles.diabetesButton, pressed && { opacity: 0.8 }]}
-            >
-              <Text style={styles.diabetesButtonText}>Start Diabetes Check</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {!loading && !error ? (
-          <View style={styles.strokeCard}>
-            <View style={styles.diabetesHeaderRow}>
-              <Text style={styles.diabetesIcon}>🧠</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.strokeTitle}>Stroke Risk Prediction</Text>
-                <Text style={styles.strokeSubtitle}>
-                  Check possible stroke risk using BP, glucose, BMI, and history values.
-                </Text>
-              </View>
+            <View style={styles.quickCareTextWrap}>
+              <Text style={styles.quickCareTitle}>Quick Care</Text>
+              <Text style={styles.quickCareSubtitle}>
+                Open risk prediction summary and checks in one place.
+              </Text>
             </View>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Start stroke risk check"
-              onPress={onOpenStrokePrediction}
-              style={({ pressed }) => [styles.strokeButton, pressed && { opacity: 0.8 }]}
-            >
-              <Text style={styles.diabetesButtonText}>Start Stroke Check</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {!loading && !error ? (
-          <View style={styles.hypertensionCard}>
-            <View style={styles.diabetesHeaderRow}>
-              <Text style={styles.diabetesIcon}>❤️</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.hypertensionTitle}>Hypertension Risk Prediction</Text>
-                <Text style={styles.hypertensionSubtitle}>
-                  Check possible high blood pressure risk using BP, BMI, glucose, and lifestyle values.
-                </Text>
-              </View>
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Start hypertension risk check"
-              onPress={onOpenHypertensionPrediction}
-              style={({ pressed }) => [styles.hypertensionButton, pressed && { opacity: 0.8 }]}
-            >
-              <Text style={styles.diabetesButtonText}>Start BP Check</Text>
-            </Pressable>
-          </View>
+            <Text style={styles.quickCareArrow}>{'\u203A'}</Text>
+          </Pressable>
         ) : null}
 
         {!loading && !error ? (
@@ -390,52 +340,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 27,
   },
-  diabetesCard: {
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#e3f8ee',
-    borderWidth: 1,
-    borderColor: '#b8ead6',
-    marginTop: 8,
-    shadowColor: '#7a674f',
-    shadowOpacity: 0.09,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  diabetesHeaderRow: {
+  quickCareCard: {
+    minHeight: 106,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  diabetesIcon: { fontSize: 28, marginRight: 10 },
-  diabetesTitle: {
-    color: '#18352f',
-    fontWeight: '900',
-    fontSize: 20,
-    lineHeight: 26,
-  },
-  diabetesSubtitle: {
-    color: '#2f6654',
-    marginTop: 2,
-    fontSize: 16,
-    lineHeight: 23,
-  },
-  diabetesButton: {
-    alignSelf: 'flex-start',
-    minHeight: 54,
-    backgroundColor: '#2f6654',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  diabetesButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 16,
-  },
-  strokeCard: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderRadius: 18,
     backgroundColor: '#eaf7ff',
     borderWidth: 1,
@@ -447,58 +357,42 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  strokeTitle: {
-    color: '#174862',
-    fontWeight: '900',
-    fontSize: 20,
-    lineHeight: 26,
-  },
-  strokeSubtitle: {
-    color: '#2576a6',
-    marginTop: 2,
-    fontSize: 16,
-    lineHeight: 23,
-  },
-  strokeButton: {
-    alignSelf: 'flex-start',
-    minHeight: 54,
-    backgroundColor: '#2576a6',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  hypertensionCard: {
-    padding: 16,
+  quickCareIconWrap: {
+    width: 56,
+    height: 56,
     borderRadius: 18,
-    backgroundColor: '#fff1f4',
-    borderWidth: 1,
-    borderColor: '#efccd3',
-    marginTop: 12,
-    shadowColor: '#7a674f',
-    shadowOpacity: 0.09,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  hypertensionTitle: {
-    color: '#7c2231',
-    fontWeight: '900',
-    fontSize: 20,
-    lineHeight: 26,
-  },
-  hypertensionSubtitle: {
-    color: '#a93447',
-    marginTop: 2,
-    fontSize: 16,
-    lineHeight: 23,
-  },
-  hypertensionButton: {
-    alignSelf: 'flex-start',
-    minHeight: 54,
     backgroundColor: '#a93447',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
+  quickCareIcon: {
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  quickCareTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
+  },
+  quickCareTitle: {
+    color: '#174862',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '900',
+  },
+  quickCareSubtitle: {
+    color: '#2576a6',
+    marginTop: 3,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  quickCareArrow: {
+    color: '#a93447',
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '900',
   },
   healthAdviceCard: {
     padding: 16,

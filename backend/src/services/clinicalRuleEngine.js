@@ -39,6 +39,9 @@ const buildRuleAuditEntry = ({
   anonymizedUserId,
   drugName,
   normalizedDrugName,
+  normalizationSource,
+  normalizationConfidence,
+  normalizationAudit,
   timestamp = new Date().toISOString(),
 }) => ({
   ruleId: factor.ruleId,
@@ -47,6 +50,10 @@ const buildRuleAuditEntry = ({
   anonymizedUserId,
   drug: drugName,
   normalizedDrug: normalizedDrugName,
+  normalizationSource: normalizationSource || null,
+  normalizationConfidence:
+    typeof normalizationConfidence === 'number' ? normalizationConfidence : null,
+  normalizationAudit: normalizationAudit || null,
   timestamp,
   ruleScore: factor.score,
   clinicalEvidenceSource: factor.evidenceSource,
@@ -54,13 +61,24 @@ const buildRuleAuditEntry = ({
   factorLabel: factor.factorLabel,
 });
 
-const buildRuleAuditTrail = ({ riskFactors, anonymizedUserId, drugName, normalizedDrugName }) =>
+const buildRuleAuditTrail = ({
+  riskFactors,
+  anonymizedUserId,
+  drugName,
+  normalizedDrugName,
+  normalizationSource,
+  normalizationConfidence,
+  normalizationAudit,
+}) =>
   (riskFactors || []).map((factor) =>
     buildRuleAuditEntry({
       factor,
       anonymizedUserId,
       drugName,
       normalizedDrugName,
+      normalizationSource,
+      normalizationConfidence,
+      normalizationAudit,
     })
   );
 

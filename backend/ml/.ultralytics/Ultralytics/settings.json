@@ -1,5 +1,5 @@
 {
-  "settings_version": "0.0.6",
+  "settings_version": "0.0.8",
   "datasets_dir": "D:\\Document\\SLIIT\\Research\\Project\\ElderMeds\\backend\\datasets",
   "weights_dir": "weights",
   "runs_dir": "runs",
@@ -10,9 +10,7 @@
   "clearml": true,
   "comet": true,
   "dvc": true,
-  "hub": true,
   "mlflow": true,
-  "neptune": true,
   "raytune": true,
   "tensorboard": false,
   "wandb": false,

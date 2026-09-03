@@ -303,6 +303,31 @@ const getCaregiverContactFromAlerts = async (executor, userId) => {
   }
 };
 
+const getCaregiverContactFromUsers = async (executor, userId) => {
+  try {
+    const result = await executor.query(
+      `
+        SELECT caregiver_email, caregiver_phone
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return { caregiverEmail: '', caregiverPhone: '' };
+    }
+
+    return {
+      caregiverEmail: normalizeText(result.rows[0].caregiver_email),
+      caregiverPhone: normalizeText(result.rows[0].caregiver_phone),
+    };
+  } catch {
+    return { caregiverEmail: '', caregiverPhone: '' };
+  }
+};
+
 const getHealthProfileAutofill = async (executor, userId) => {
   try {
     const result = await executor.query(
@@ -455,7 +480,8 @@ const getProfile = async (userId) => {
 
     const insertedProfile = mapProfileRow(inserted.rows[0]);
     const medicationRows = await listUserMedicationRows(pool, userId);
-    const caregiverContact = await getCaregiverContactFromAlerts(pool, userId);
+    const caregiverContactFromUsers = await getCaregiverContactFromUsers(pool, userId);
+    const caregiverContactFromAlerts = await getCaregiverContactFromAlerts(pool, userId);
     const healthProfile = await getHealthProfileAutofill(pool, userId);
     return {
       ...insertedProfile,
@@ -465,14 +491,21 @@ const getProfile = async (userId) => {
         medicationRows.length > 0
           ? buildCurrentMedicationsTextFromRows(medicationRows)
           : insertedProfile.currentMedicationsText,
-      caregiverEmail: caregiverContact.caregiverEmail || insertedProfile.caregiverEmail,
-      caregiverPhone: caregiverContact.caregiverPhone || insertedProfile.caregiverPhone,
+      caregiverEmail:
+        caregiverContactFromUsers.caregiverEmail ||
+        caregiverContactFromAlerts.caregiverEmail ||
+        insertedProfile.caregiverEmail,
+      caregiverPhone:
+        caregiverContactFromUsers.caregiverPhone ||
+        caregiverContactFromAlerts.caregiverPhone ||
+        insertedProfile.caregiverPhone,
     };
   }
 
   const profile = mapProfileRow(result.rows[0]);
   const medicationRows = await listUserMedicationRows(pool, userId);
-  const caregiverContact = await getCaregiverContactFromAlerts(pool, userId);
+  const caregiverContactFromUsers = await getCaregiverContactFromUsers(pool, userId);
+  const caregiverContactFromAlerts = await getCaregiverContactFromAlerts(pool, userId);
   const healthProfile = await getHealthProfileAutofill(pool, userId);
   return {
     ...profile,
@@ -482,8 +515,14 @@ const getProfile = async (userId) => {
       medicationRows.length > 0
         ? buildCurrentMedicationsTextFromRows(medicationRows)
         : profile.currentMedicationsText,
-    caregiverEmail: caregiverContact.caregiverEmail || profile.caregiverEmail,
-    caregiverPhone: caregiverContact.caregiverPhone || profile.caregiverPhone,
+    caregiverEmail:
+      caregiverContactFromUsers.caregiverEmail ||
+      caregiverContactFromAlerts.caregiverEmail ||
+      profile.caregiverEmail,
+    caregiverPhone:
+      caregiverContactFromUsers.caregiverPhone ||
+      caregiverContactFromAlerts.caregiverPhone ||
+      profile.caregiverPhone,
   };
 };
 
@@ -562,6 +601,17 @@ const upsertProfile = async (userId, payload) => {
         payload.antibioticPainkillerReaction,
         payload.feedbackConsentForTraining === true,
       ]
+    );
+
+    await client.query(
+      `
+        UPDATE users
+        SET
+          caregiver_email = COALESCE(NULLIF($1, ''), caregiver_email),
+          caregiver_phone = COALESCE(NULLIF($2, ''), caregiver_phone)
+        WHERE id = $3
+      `,
+      [payload.caregiverEmail, payload.caregiverPhone, userId]
     );
 
     await client.query('COMMIT');

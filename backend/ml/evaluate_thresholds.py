@@ -22,8 +22,14 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 
-from compare_models import adr_proba, make_pipeline, prepare_features
 from data_loaders import load_raw_training_data
+from fda_lr_calibration_support import (
+    FDA_TUNED_LOGISTIC_MODEL_PATH,
+    cap_fda_feature_splits,
+    load_or_fit_tuned_fda_logistic,
+    ml_scores_from_fda_model,
+    project_proxy_frame_to_fda_features,
+)
 from hybrid_eval import (
     HYBRID_ALPHA,
     HYBRID_BETA,
@@ -36,7 +42,6 @@ from hybrid_eval import (
 
 ROOT = Path(__file__).resolve().parent
 MODELS_DIR = ROOT / "models"
-MODEL_PATH = MODELS_DIR / "baseline_model.joblib"
 OUTPUT_PATH = MODELS_DIR / "threshold_sensitivity.json"
 SELECTED_PATH = MODELS_DIR / "selected_hybrid_thresholds.json"
 
@@ -168,13 +173,6 @@ def build_multiclass_threshold_pr_summary(configurations: list[dict]) -> list[di
         }
         for row in configurations
     ]
-
-
-def ml_scores_from_model(model, X: pd.DataFrame) -> pd.Series:
-    proba = adr_proba(model, X)
-    return pd.Series(np.round(proba * 100), index=X.index)
-
-
 def build_grid_configurations(hybrid: np.ndarray, y_true: pd.Series) -> list[dict]:
     """Exhaustive grid for automatic T_D* selection (Option C)."""
     rows: list[dict] = []
@@ -197,10 +195,10 @@ def build_grid_configurations(hybrid: np.ndarray, y_true: pd.Series) -> list[dic
 
 def main() -> None:
     df, dataset_names = load_raw_training_data()
-    X, y_adr = prepare_features(df)
+    X = project_proxy_frame_to_fda_features(df)
+    y_adr = pd.to_numeric(df["adr_event"], errors="coerce").fillna(0).astype(int)
     y_labels = derive_risk_labels(df.loc[X.index]).reset_index(drop=True)
     rule_scores = derive_rule_score(df.loc[X.index]).reset_index(drop=True)
-    X = X.reset_index(drop=True)
 
     valid = y_labels.isin(RISK_CLASSES)
     if not valid.all():
@@ -219,19 +217,13 @@ def main() -> None:
         stratify=y_labels,
     )
     X_train, X_test, y_train, _, rule_train, rule_test, _, label_test = split
-    label_test = label_test.reset_index(drop=True)
+    X_train, X_test, numeric_caps = cap_fda_feature_splits(X_train.reset_index(drop=True), X_test.reset_index(drop=True))
+    y_train = y_train.reset_index(drop=True)
     rule_test = rule_test.reset_index(drop=True)
+    label_test = label_test.reset_index(drop=True)
 
-    if MODEL_PATH.exists():
-        model = joblib.load(MODEL_PATH)
-        ml_test = ml_scores_from_model(model, X_test).reset_index(drop=True)
-    else:
-        from sklearn.ensemble import RandomForestClassifier
-
-        fitted = make_pipeline(
-            RandomForestClassifier(n_estimators=200, class_weight="balanced", random_state=42, n_jobs=1)
-        ).fit(X_train, y_train)
-        ml_test = ml_scores_from_model(fitted, X_test).reset_index(drop=True)
+    model = load_or_fit_tuned_fda_logistic(X_train, y_train)
+    ml_test = ml_scores_from_fda_model(model, X_test).reset_index(drop=True)
 
     hybrid = hybrid_scores(rule_test, ml_test)
     configurations = [
@@ -272,7 +264,7 @@ def main() -> None:
         },
         "evaluation_scope": {
             "includes": [
-                "Production XGBoost adr_risk_probability × 100 as mlDangerScore",
+                "Tuned Logistic Regression Serious-class probability × 100 as mlDangerScore",
                 "Hybrid score: round(0.6 × ruleScore + 0.4 × mlDangerScore)",
                 "Threshold banding into Safe / Warning / Dangerous",
             ],
@@ -288,6 +280,12 @@ def main() -> None:
                 "NOT the same as binary severe-ADR detection (see baseline_metrics.json) and NOT full "
                 "deployed-system recall with clinical overrides."
             ),
+        },
+        "ml_model_artifact": str(FDA_TUNED_LOGISTIC_MODEL_PATH),
+        "fda_feature_projection": {
+            "source_dataset": "FAERS/OMOP proxy hybrid-evaluation dataset",
+            "target_schema": "FDA serious vs non-serious Logistic Regression feature schema",
+            "numeric_caps": numeric_caps,
         },
         "configurations": configurations,
         "grid_search": {
@@ -342,6 +340,8 @@ def main() -> None:
             "Hybrid score = round(0.6 * ruleScore + 0.4 * mlDangerScore). "
             "Ground truth: risk_label_eval (FAERS) or risk_level (legacy). "
             "Rule scores: risk_score column or FAERS feature-derived proxy. "
+            "mlDangerScore is the tuned Logistic Regression probability of the Serious class × 100 "
+            "on a projected FDA-style feature frame. "
             "FNR = 1 − Dangerous recall (true Dangerous cases predicted Safe or Warning)."
         ),
         "ground_truth_column": "risk_label_eval" if "risk_label_eval" in df.columns else "risk_level",

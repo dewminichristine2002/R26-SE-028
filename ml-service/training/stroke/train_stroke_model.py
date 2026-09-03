@@ -1,12 +1,14 @@
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -23,9 +25,18 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
+TRAINING_ROOT = Path(__file__).resolve().parents[1]
+if str(TRAINING_ROOT) not in sys.path:
+    sys.path.insert(0, str(TRAINING_ROOT))
+
+from visualization_utils import save_training_visualizations
+
 RANDOM_STATE = 42
 DEFAULT_DATASET = "data/raw/healthcare-dataset-stroke-data.csv"
 DEFAULT_OUTPUT_DIR = "app/models"
+ENSEMBLE_NAME = "Soft Voting Ensemble"
+ENSEMBLE_BASE_ALGORITHMS = ["Logistic Regression", "Random Forest", "XGBoost"]
+REQUIRED_ENSEMBLE_METRICS = ("accuracy", "recall", "f1Score", "rocAuc")
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,6 +117,19 @@ def rank_key(result: dict) -> tuple:
         metrics["f1Score"],
         metrics["rocAuc"],
         metrics["accuracy"],
+    )
+
+
+def improves_required_metrics(candidate: dict, baseline: dict) -> bool:
+    candidate_metrics = candidate["metrics"]
+    baseline_metrics = baseline["metrics"]
+
+    return all(
+        candidate_metrics[metric] >= baseline_metrics[metric]
+        for metric in REQUIRED_ENSEMBLE_METRICS
+    ) and any(
+        candidate_metrics[metric] > baseline_metrics[metric]
+        for metric in REQUIRED_ENSEMBLE_METRICS
     )
 
 
@@ -191,11 +215,19 @@ def main() -> None:
             n_jobs=4,
         ),
     }
+    ensemble_model = VotingClassifier(
+        estimators=[
+            ("logistic_regression", clone(models["Logistic Regression"])),
+            ("random_forest", clone(models["Random Forest"])),
+            ("xgboost", clone(models["XGBoost"])),
+        ],
+        voting="soft",
+    )
 
     comparison = []
-    best_name = None
-    best_model = None
-    best_result = None
+    best_individual_name = None
+    best_individual_model = None
+    best_individual_result = None
 
     for name, model in models.items():
         model.fit(X_train_t, y_train)
@@ -203,10 +235,29 @@ def main() -> None:
         result = {"algorithm": name, "metrics": metrics}
         comparison.append(result)
 
-        if best_result is None or rank_key(result) > rank_key(best_result):
-            best_name = name
-            best_model = model
-            best_result = result
+        if best_individual_result is None or rank_key(result) > rank_key(best_individual_result):
+            best_individual_name = name
+            best_individual_model = model
+            best_individual_result = result
+
+    ensemble_model.fit(X_train_t, y_train)
+    ensemble_metrics = evaluate_model(ensemble_model, X_test_t, y_test)
+    ensemble_result = {
+        "algorithm": ENSEMBLE_NAME,
+        "baseAlgorithms": ENSEMBLE_BASE_ALGORITHMS,
+        "metrics": ensemble_metrics,
+    }
+    comparison.append(ensemble_result)
+
+    ensemble_selected = improves_required_metrics(ensemble_result, best_individual_result)
+    if ensemble_selected:
+        best_name = ENSEMBLE_NAME
+        best_model = ensemble_model
+        best_result = ensemble_result
+    else:
+        best_name = best_individual_name
+        best_model = best_individual_model
+        best_result = best_individual_result
 
     model_path = output_dir / "stroke_model.pkl"
     preprocessor_path = output_dir / "stroke_preprocessor.pkl"
@@ -214,6 +265,21 @@ def main() -> None:
 
     joblib.dump(best_model, model_path)
     joblib.dump(preprocessor, preprocessor_path)
+
+    visualization_paths = save_training_visualizations(
+        output_dir=output_dir,
+        model_slug="stroke",
+        model_title="Stroke Risk Prediction",
+        y_test=y_test,
+        y_pred=best_model.predict(X_test_t),
+        y_prob=best_model.predict_proba(X_test_t)[:, 1],
+        comparison=comparison,
+        selected_algorithm=best_name,
+        feature_frame=X,
+        target=y,
+        numeric_features=numeric_features,
+        target_label="Stroke Risk",
+    )
 
     metadata = {
         "selectedAlgorithm": best_name,
@@ -227,9 +293,22 @@ def main() -> None:
         "numericFeatures": numeric_features,
         "categoricalFeatures": categorical_features,
         "datasetPath": str(dataset_path),
+        "visualizations": visualization_paths,
         "classBalance": {
             "trainPositive": positive,
             "trainNegative": negative,
+        },
+        "selectionPolicy": {
+            "bestIndividualAlgorithm": best_individual_name,
+            "ensembleAlgorithm": ENSEMBLE_NAME,
+            "ensembleBaseAlgorithms": ENSEMBLE_BASE_ALGORITHMS,
+            "ensembleSelected": ensemble_selected,
+            "requiredEnsembleImprovementMetrics": list(REQUIRED_ENSEMBLE_METRICS),
+            "ensembleSelectionRule": (
+                "Select the soft-voting ensemble only when it is at least as strong as "
+                "the best individual model on every required metric and improves at "
+                "least one required metric."
+            ),
         },
         "modelComparison": comparison,
     }

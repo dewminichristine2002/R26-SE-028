@@ -42,8 +42,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "ElderMeds reads prescription photos to help check medicine safety.",
         "NSCameraUsageDescription": "ElderMeds can use the camera to capture a prescription for safety checking.",
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to convert speech into assistant chat messages.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone for voice assistant input."
+        "NSSpeechRecognitionUsageDescription": "ElderMeds converts your speech into assistant chat messages.",
+        "NSMicrophoneUsageDescription": "ElderMeds uses your microphone so you can talk to the health assistant."
       }
     },
     "android": {
@@ -57,11 +57,11 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "owner": "thyagaalwis",
     "extra": {
       "eas": {
-        "projectId": "24a21b0b-dd9d-4e1c-a8b2-92f84bbd7322"
+        "projectId": "a9753d49-2146-4910-b83b-b6b526fb2fdf"
       }
-    },
-    "owner": "dewmini_expo"
+    }
   }
 }
