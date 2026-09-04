@@ -1,0 +1,70 @@
+{
+  "model_version": "minilm_logistic_regression_v4",
+  "evaluation_set": "ElderMeds Domain Test",
+  "evaluated_samples": 140,
+  "accuracy": 0.8142857142857143,
+  "macro_precision": 0.8278231811412589,
+  "macro_recall": 0.8142857142857143,
+  "macro_f1": 0.8165781179245072,
+  "macro_specificity": 0.969047619047619,
+  "specificity_definition": "macro mean of one-vs-rest TN / (TN + FP)",
+  "classes": {
+    "happiness": {
+      "precision": 1.0,
+      "recall": 0.95,
+      "f1_score": 0.9743589743589743,
+      "support": 20,
+      "specificity": 1.0
+    },
+    "sadness": {
+      "precision": 0.8421052631578947,
+      "recall": 0.8,
+      "f1_score": 0.8205128205128205,
+      "support": 20,
+      "specificity": 0.975
+    },
+    "loneliness": {
+      "precision": 0.782608695652174,
+      "recall": 0.9,
+      "f1_score": 0.8372093023255814,
+      "support": 20,
+      "specificity": 0.9583333333333334
+    },
+    "anxiety": {
+      "precision": 0.8888888888888888,
+      "recall": 0.8,
+      "f1_score": 0.8421052631578947,
+      "support": 20,
+      "specificity": 0.9833333333333333
+    },
+    "anger": {
+      "precision": 0.9333333333333333,
+      "recall": 0.7,
+      "f1_score": 0.8,
+      "support": 20,
+      "specificity": 0.9916666666666667
+    },
+    "cognitive_fog": {
+      "precision": 0.6956521739130435,
+      "recall": 0.8,
+      "f1_score": 0.7441860465116279,
+      "support": 20,
+      "specificity": 0.9416666666666667
+    },
+    "neutral": {
+      "precision": 0.6521739130434783,
+      "recall": 0.75,
+      "f1_score": 0.6976744186046512,
+      "support": 20,
+      "specificity": 0.9333333333333333
+    }
+  },
+  "validation": {
+    "model_artifact_sha256": "8c93ccc4a87c975b5a58d3ef8a42be3efc41b71e52653f05879cf45e50d82ee7",
+    "evaluation_set_sha256_sorted_csv": "08cdb59dc101e0dfae1b94927d0a587218fdabbbede25d39c73263e125e3674d",
+    "duplicate_test_samples": 0,
+    "exact_training_text_overlap": 0,
+    "training_rows_checked": 2096,
+    "model_retrained": false
+  }
+}
