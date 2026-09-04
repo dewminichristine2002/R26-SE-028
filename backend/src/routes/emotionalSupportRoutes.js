@@ -1,4 +1,6 @@
 const express = require('express');
+const { requireAuth } = require('../middleware/authMiddleware');
+const { requireDatabase } = require('../middleware/databaseMiddleware');
 const checkInController = require('../controllers/checkInController');
 const activityController = require('../controllers/activityController');
 const caregiverController = require('../controllers/caregiverController');
@@ -14,6 +16,9 @@ const adaptiveCaregiverAlertController = require('../controllers/adaptiveCaregiv
 const reminiscenceMemoryController = require('../controllers/reminiscenceMemoryController');
 
 const router = express.Router();
+
+router.use(requireDatabase);
+router.use(requireAuth);
 
 router.post('/check-ins', checkInController.createCheckIn);
 router.post('/process-narrative', narrativeController.processNarrative);

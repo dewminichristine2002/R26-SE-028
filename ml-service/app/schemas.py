@@ -127,3 +127,33 @@ class HypertensionPredictionResponse(BaseModel):
     probability: float
     featuresUsed: list[str] = Field(default_factory=list)
     derived: dict[str, float | int] = Field(default_factory=dict)
+
+
+class MedicineSafetyPredictionRequest(BaseModel):
+    year: int | None = None
+    month: int | None = None
+    primary_reaction: str | None = None
+    num_reactions: float | None = None
+    suspect_drug: str | None = None
+    drug_route: str | None = None
+    drug_indication: str | None = None
+    pharm_class: str | None = None
+    num_drugs: float | None = None
+    patient_age_years: float | None = None
+    patient_sex: str | None = None
+    country: str | None = None
+    report_age_days: float | None = None
+
+
+class MedicineSafetyPredictionResponse(BaseModel):
+    riskType: str
+    seriousProbability: float
+    threshold: float
+    prediction: int
+    classification: str
+    riskLevelLabel: str
+    mlRiskScore: float
+    confidence: int
+    featuresUsed: list[str] = Field(default_factory=list)
+    featureRow: dict[str, Any] = Field(default_factory=dict)
+    modelPath: str

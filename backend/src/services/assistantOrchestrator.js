@@ -50,11 +50,64 @@ const { getNextActivityByEmotion } = require('../repositories/activityRepository
 const { getProfileByElderId } = require('../repositories/profileRepository');
 const { createAlertsForCaregivers } = require('../repositories/alertRepository');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
 const STATEMENT_TIMEOUT_MS = Number(process.env.ASSISTANT_SQL_TIMEOUT_MS || 5000);
 const MAX_ROWS_RETURNED = Number(process.env.ASSISTANT_MAX_ROWS || 100);
 const MAX_HISTORY_MESSAGES = 6;
+const ASSISTANT_RESPONSE_CACHE_TTL_MS = Number(process.env.ASSISTANT_RESPONSE_CACHE_TTL_MS || 180000);
+const assistantResponseCache = new Map();
+
+const normalizeAssistantQuestion = (value = '') => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+const buildAssistantCacheKey = (userId, role, question) => {
+  const safeUserId = String(userId ?? 'anonymous');
+  const safeRole = String(role || 'user').toLowerCase();
+  const safeQuestion = normalizeAssistantQuestion(question);
+  return `${safeUserId}|${safeRole}|${safeQuestion}`;
+};
+
+const buildConversationTitle = (message = '') => {
+  const raw = String(message || '').trim();
+  if (!raw) {
+    return 'New conversation';
+  }
+
+  const cleaned = raw.replace(/\s+/g, ' ');
+  const maxChars = 80;
+
+  if (cleaned.length <= maxChars) {
+    return cleaned.trim();
+  }
+
+  const base = cleaned.slice(0, maxChars).trim();
+  const lastSpace = base.lastIndexOf(' ');
+  const candidate = lastSpace > 18 ? base.slice(0, lastSpace).trim() : base;
+  return `${candidate}...`;
+};
+
+const getCachedAssistantResponse = (userId, role, question) => {
+  const key = buildAssistantCacheKey(userId, role, question);
+  const entry = assistantResponseCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    assistantResponseCache.delete(key);
+    return null;
+  }
+
+  return entry.response;
+};
+
+const setCachedAssistantResponse = (userId, role, question, response) => {
+  const key = buildAssistantCacheKey(userId, role, question);
+  assistantResponseCache.set(key, {
+    expiresAt: Date.now() + ASSISTANT_RESPONSE_CACHE_TTL_MS,
+    response,
+  });
+};
 
 const SENSITIVE_KEYS = new Set([
   'password',
@@ -93,14 +146,26 @@ const redactRowsForLLM = (rows) => {
   });
 };
 
-const ensureConversation = async (userId, conversationId) => {
+const ensureConversation = async (userId, conversationId, initialQuestion = '') => {
   if (conversationId) {
     const existing = await pool.query(
-      `SELECT id FROM assistant_conversations WHERE id = $1 AND user_id = $2 LIMIT 1`,
+      `SELECT id, title FROM assistant_conversations WHERE id = $1 AND user_id = $2 LIMIT 1`,
       [conversationId, userId]
     );
     if (existing.rows.length > 0) {
-      return existing.rows[0].id;
+      const existingRow = existing.rows[0];
+      const currentTitle = String(existingRow.title || '').trim();
+      if (currentTitle && currentTitle !== 'New conversation') {
+        return existingRow.id;
+      }
+      const firstTitle = buildConversationTitle(initialQuestion || '');
+      if (firstTitle && firstTitle !== 'New conversation') {
+        await pool.query(
+          `UPDATE assistant_conversations SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3`,
+          [firstTitle, existingRow.id, userId]
+        );
+      }
+      return existingRow.id;
     }
   }
 
@@ -110,7 +175,7 @@ const ensureConversation = async (userId, conversationId) => {
       VALUES ($1, $2)
       RETURNING id
     `,
-    [userId, 'New conversation']
+    [userId, buildConversationTitle(initialQuestion)]
   );
   return created.rows[0].id;
 };
@@ -446,7 +511,7 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
 
   const pendingAgenticAction = await getLatestPendingAgenticAction(conversationId, userId);
   if (pendingAgenticAction && (isConfirmMessage(trimmedMessage) || isCancelMessage(trimmedMessage))) {
-    const conversation = await ensureConversation(userId, conversationId);
+    const conversation = await ensureConversation(userId, conversationId, trimmedMessage);
     await appendMessage({
       conversationId: conversation,
       userId,
@@ -538,7 +603,7 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
 
   const parsedAgenticAction = parseAgenticAction(trimmedMessage);
   if (parsedAgenticAction) {
-    const conversation = await ensureConversation(userId, conversationId);
+    const conversation = await ensureConversation(userId, conversationId, trimmedMessage);
     await appendMessage({
       conversationId: conversation,
       userId,
@@ -593,7 +658,7 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
   }
 
   if (isEmotionalSupportAgentRequest(trimmedMessage)) {
-    const conversation = await ensureConversation(userId, conversationId);
+    const conversation = await ensureConversation(userId, conversationId, trimmedMessage);
     await appendMessage({
       conversationId: conversation,
       userId,
@@ -794,7 +859,7 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     };
   }
 
-  const conversation = await ensureConversation(userId, conversationId);
+  const conversation = await ensureConversation(userId, conversationId, trimmedMessage);
   const recentMessages = await recentMessagesForContext(conversation);
 
   await appendMessage({
@@ -803,6 +868,32 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     role: 'user',
     content: trimmedMessage,
   });
+
+  const messageRole = String(role || 'user').toLowerCase();
+  const normalizedMessage = String(trimmedMessage || '').trim();
+  const cachedResponse = getCachedAssistantResponse(userId, messageRole, normalizedMessage);
+  if (cachedResponse) {
+    await appendMessage({
+      conversationId: conversation,
+      userId,
+      role: 'assistant',
+      content: cachedResponse.answer,
+      sqlUsed: cachedResponse.sql || '',
+      rowsReturned: Array.isArray(cachedResponse.rows) ? cachedResponse.rows : [],
+      intent: cachedResponse.intent || '',
+      fallbackReason: cachedResponse.fallback ? 'cached_response' : '',
+      latencyMs: Date.now() - startedAt,
+    });
+    return {
+      conversationId: conversation,
+      answer: cachedResponse.answer,
+      sql: cachedResponse.sql || '',
+      rows: Array.isArray(cachedResponse.rows) ? cachedResponse.rows : [],
+      fallback: Boolean(cachedResponse.fallback),
+      intent: cachedResponse.intent || '',
+      followUps: Array.isArray(cachedResponse.followUps) ? cachedResponse.followUps : [],
+    };
+  }
 
   const schemaDigest = buildPromptDigest();
 
@@ -974,6 +1065,8 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
       ? 'I could not find any matching records for that question.'
       : 'I retrieved your records but could not summarise them.');
 
+  const finalFollowUps = Array.isArray(answerResult.follow_ups) ? answerResult.follow_ups : [];
+
   await appendMessage({
     conversationId: conversation,
     userId,
@@ -986,6 +1079,15 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     latencyMs: Date.now() - startedAt,
   });
 
+  setCachedAssistantResponse(userId, messageRole, normalizedMessage, {
+    answer: finalAnswer,
+    sql: prepared.sql,
+    rows,
+    fallback: false,
+    intent: intent || '',
+    followUps: finalFollowUps,
+  });
+
   return {
     conversationId: conversation,
     answer: finalAnswer,
@@ -993,7 +1095,7 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     rows,
     fallback: false,
     intent: intent || '',
-    followUps: Array.isArray(answerResult.follow_ups) ? answerResult.follow_ups : [],
+    followUps: finalFollowUps,
   };
 };
 
@@ -1010,7 +1112,13 @@ const listConversations = async (userId) => {
           WHERE conversation_id = c.id
           ORDER BY created_at DESC
           LIMIT 1
-        ) AS last_message
+        ) AS last_message,
+        (
+          SELECT content FROM assistant_messages
+          WHERE conversation_id = c.id AND role = 'user'
+          ORDER BY created_at ASC, id ASC
+          LIMIT 1
+        ) AS first_user_message
       FROM assistant_conversations c
       WHERE c.user_id = $1
       ORDER BY c.updated_at DESC
@@ -1018,7 +1126,13 @@ const listConversations = async (userId) => {
     `,
     [userId]
   );
-  return result.rows;
+
+  return result.rows.map((row) => ({
+    ...row,
+    title: row.title === 'New conversation' && row.first_user_message
+      ? buildConversationTitle(row.first_user_message)
+      : row.title,
+  }));
 };
 
 const listMessages = async (userId, conversationId) => {
@@ -1096,6 +1210,7 @@ const deleteConversation = async (userId, conversationId) => {
 
 module.exports = {
   handleChat,
+  buildConversationTitle,
   listConversations,
   listMessages,
   renameConversation,

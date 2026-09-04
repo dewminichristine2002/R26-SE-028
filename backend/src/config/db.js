@@ -78,6 +78,24 @@ const dbConfig = resolvedDatabaseUrl
       ssl: getSslConfig(resolvedHost),
     };
 
+const buildConfigWithPortOverride = (portOverride) => {
+  if (resolvedDatabaseUrl) {
+    const parsed = new URL(resolvedDatabaseUrl);
+    parsed.port = String(portOverride);
+    return {
+      connectionString: parsed.toString(),
+      ...poolOptions,
+      ssl: getSslConfig(parsed.hostname || sslHost),
+    };
+  }
+
+  return {
+    ...dbConfig,
+    port: portOverride,
+    ssl: getSslConfig(resolvedHost),
+  };
+};
+
 const parseConnectionStringIdentity = (connectionString) => {
   if (!connectionString) {
     return null;
@@ -159,34 +177,66 @@ const getDatabaseTroubleshootingHints = (errorMessage = '') => {
   return hints;
 };
 
-if (!dbConfig.password) {
+if (!dbConfig.password && process.env.NODE_ENV !== 'test') {
   console.warn('DB_PASSWORD is not set. Database-backed features will not work until configured.');
 }
 
-const pool = new Pool(dbConfig);
+let livePool = new Pool(dbConfig);
 const dbState = {
   connected: false,
   lastError: null,
   lastAttemptAt: null,
+  activePort: resolvedPort,
 };
 
-pool.on('error', (error) => {
-  const message = String(error?.message || error);
-  const normalized = message.toLowerCase();
-  const isIdleDisconnect =
-    normalized.includes('administrator command') ||
-    normalized.includes('connection terminated') ||
-    normalized.includes('ECONNRESET'.toLowerCase());
+const attachPoolListeners = (targetPool) => {
+  targetPool.on('error', (error) => {
+    const message = String(error?.message || error);
+    const normalized = message.toLowerCase();
+    const isIdleDisconnect =
+      normalized.includes('administrator command') ||
+      normalized.includes('connection terminated') ||
+      normalized.includes('ECONNRESET'.toLowerCase());
 
-  if (isIdleDisconnect) {
-    console.warn('[DB] Idle pool connection closed by server; pool will reconnect on next query.');
-    return;
+    if (isIdleDisconnect) {
+      console.warn('[DB] Idle pool connection closed by server; pool will reconnect on next query.');
+      return;
+    }
+
+    console.error('[DB] Unexpected pool error:', message);
+    dbState.connected = false;
+    dbState.lastError = message;
+  });
+};
+
+attachPoolListeners(livePool);
+
+// Keep a stable exported object so route modules do not retain a stale Pool
+// instance when we switch from Supabase pooler port 6543 to session port 5432.
+const pool = {
+  query: (...args) => livePool.query(...args),
+  connect: (...args) => livePool.connect(...args),
+  end: (...args) => livePool.end(...args),
+  on: (...args) => livePool.on(...args),
+};
+
+const shouldRetryWithSupabaseSessionPort = (errorMessage = '') => {
+  if (!isSupabasePooler || String(dbState.activePort) !== '6543') {
+    return false;
   }
 
-  console.error('[DB] Unexpected pool error:', message);
-  dbState.connected = false;
-  dbState.lastError = message;
-});
+  const message = String(errorMessage);
+  const normalized = message.toLowerCase();
+  return normalized.includes('timeout') || normalized.includes('connection terminated');
+};
+
+const switchPoolToPort = (portOverride) => {
+  const nextConfig = buildConfigWithPortOverride(portOverride);
+  livePool.end().catch(() => {});
+  livePool = new Pool(nextConfig);
+  attachPoolListeners(livePool);
+  dbState.activePort = portOverride;
+};
 
 const initializeDatabase = async () => {
   const identity = getResolvedDatabaseIdentity();
@@ -306,6 +356,18 @@ const initializeDatabase = async () => {
   `;
 
   try {
+    try {
+      await pool.query('SELECT 1');
+    } catch (connectionError) {
+      if (shouldRetryWithSupabaseSessionPort(connectionError?.message || '')) {
+        console.warn('[DB] Port 6543 handshake timed out. Retrying with Supabase session mode on port 5432...');
+        switchPoolToPort(5432);
+        await pool.query('SELECT 1');
+      } else {
+        throw connectionError;
+      }
+    }
+
     await pool.query(createTableQuery);
     await pool.query(createUsersTableQuery);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS caregiver_email TEXT;`);
@@ -499,7 +561,7 @@ const getDatabaseStatus = () => ({
   lastAttemptAt: dbState.lastAttemptAt,
   lastError: dbState.lastError,
   host: dbConfig.host || resolvedHost,
-  port: dbConfig.port || resolvedPort,
+  port: dbState.activePort || dbConfig.port || resolvedPort,
   database: dbConfig.database || process.env.DB_NAME || '',
   user: dbConfig.user || process.env.DB_USER || '',
   usesConnectionString: Boolean(resolvedDatabaseUrl),

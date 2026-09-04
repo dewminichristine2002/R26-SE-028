@@ -31,4 +31,4 @@ Run the usability study:
 
 **Target:** mean SUS ≥ 70; task completion ≥ 80%.
 
-**Documentation aligned June 2026:** [OBJECTIVES_EVIDENCE.md](OBJECTIVES_EVIDENCE.md) now lists **3 algorithms** and thresholds **20/55** (matches production code).
+**Documentation aligned August 2026:** [OBJECTIVES_EVIDENCE.md](OBJECTIVES_EVIDENCE.md) now lists **3 algorithms** and the final hybrid operating configuration **α=0.6, β=0.4, Warning=34, Dangerous=36** (matches production code).

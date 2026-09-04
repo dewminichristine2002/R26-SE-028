@@ -1,7 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const { recognizePrescriptionImage } = require('../services/prescriptionOcrService');
-const { matchMedicinesFromText } = require('../services/medicationKnowledgeService');
+const {
+  matchMedicinesFromText,
+  searchMedications,
+} = require('../services/medicationKnowledgeService');
 
 const router = express.Router();
 
@@ -64,6 +67,39 @@ router.post('/ocr', uploadImage, async (req, res) => {
     console.error('[prescriptions/ocr]', e);
     return res.status(500).json({
       error: 'OCR processing failed. Try a different image or enter text manually.',
+    });
+  }
+});
+
+router.get('/suggestions', async (req, res) => {
+  const rawQuery = (req.query.q || '').toString().trim();
+
+  if (rawQuery.length < 3) {
+    return res.json({ suggestions: [] });
+  }
+
+  try {
+    const suggestions = searchMedications(rawQuery)
+      .slice(0, 10)
+      .map((item, index) => ({
+        id: `${item.rxnormCui || item.normalizedName || index}`,
+        name: item.displayName || item.normalizedName || '',
+        displayName: item.displayName || item.normalizedName || '',
+        normalizedName: item.normalizedName || '',
+        normalizedDrugName: item.normalizedName || '',
+        ingredientName: item.ingredientName || '',
+        therapeuticClass: item.therapeuticClass || '',
+        genericName: item.ingredientName || item.normalizedName || '',
+        matchType: item.matchType || 'partial',
+        matchedAlias: item.matchedAlias || '',
+        confidence: Number.isFinite(Number(item.confidence)) ? Number(item.confidence) : null,
+      }));
+
+    return res.json({ suggestions });
+  } catch (error) {
+    console.error('[prescriptions/suggestions]', error);
+    return res.status(500).json({
+      error: 'Failed to load medicine suggestions.',
     });
   }
 });

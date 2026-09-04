@@ -42,9 +42,33 @@
     "smoking_status"
   ],
   "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\healthcare-dataset-stroke-data.csv",
+  "visualizations": {
+    "confusionMatrix": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\confusion_matrix.png",
+    "rocCurve": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\roc_curve.png",
+    "modelMetricsComparison": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\model_metrics_comparison.png",
+    "featureCorrelationHeatmap": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\feature_correlation_heatmap.png",
+    "targetCorrelationBar": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\target_correlation_bar.png"
+  },
   "classBalance": {
     "trainPositive": 199,
     "trainNegative": 3889
+  },
+  "selectionPolicy": {
+    "bestIndividualAlgorithm": "Logistic Regression",
+    "ensembleAlgorithm": "Soft Voting Ensemble",
+    "ensembleBaseAlgorithms": [
+      "Logistic Regression",
+      "Random Forest",
+      "XGBoost"
+    ],
+    "ensembleSelected": false,
+    "requiredEnsembleImprovementMetrics": [
+      "accuracy",
+      "recall",
+      "f1Score",
+      "rocAuc"
+    ],
+    "ensembleSelectionRule": "Select the soft-voting ensemble only when it is at least as strong as the best individual model on every required metric and improves at least one required metric."
   },
   "modelComparison": [
     {
@@ -129,6 +153,32 @@
           ]
         ],
         "positiveRate": 0.17931075394153595
+      }
+    },
+    {
+      "algorithm": "Soft Voting Ensemble",
+      "baseAlgorithms": [
+        "Logistic Regression",
+        "Random Forest",
+        "XGBoost"
+      ],
+      "metrics": {
+        "accuracy": 0.8718199608610567,
+        "precision": 0.2206896551724138,
+        "recall": 0.64,
+        "f1Score": 0.3282051282051282,
+        "rocAuc": 0.8370164609053499,
+        "confusionMatrix": [
+          [
+            859,
+            113
+          ],
+          [
+            18,
+            32
+          ]
+        ],
+        "positiveRate": 0.20643283088544798
       }
     }
   ]

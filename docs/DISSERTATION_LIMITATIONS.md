@@ -2,7 +2,7 @@
 
 Ready-to-adapt paragraphs for the **Limitations** and **Future Work** sections of your methodology / evaluation chapters.
 
-**Production alignment (June 2026):** Hybrid thresholds **20/55**; three algorithms in `compare_models.py`; FAERS training n ≈ 11,868.
+**Production alignment (August 2026):** Final hybrid defaults **α=0.6, β=0.4, Warning=34, Dangerous=36**; three algorithms in `compare_models.py`; FAERS training n ≈ 11,868.
 
 ---
 
@@ -19,7 +19,7 @@ npm run ml:confusion-matrices
 **Artifact:** `backend/ml/models/confusion_matrices.json`
 
 **Dissertation text:**
-> Model performance was evaluated on a held-out 20% stratified test set (n = 2,374). Table X reports the binary confusion matrix for severe ADR classification (adr_event). Table Y reports the hybrid 3-class confusion matrix, where ground truth labels were derived from the evaluation-only `risk_label_eval` column and predictions used the production hybrid formula (0.6 × ruleScore + 0.4 × mlDangerScore) with thresholds **20/55**.
+> Model performance was evaluated on a held-out 20% stratified test set (n = 2,374). Table X reports the binary confusion matrix for severe ADR classification (adr_event). Table Y reports the hybrid 3-class confusion matrix, where ground truth labels were derived from the evaluation-only `risk_label_eval` column and predictions used the final runtime hybrid formula (0.6 × ruleScore + 0.4 × mlDangerScore) with thresholds **34/36**.
 
 ---
 
@@ -44,10 +44,10 @@ Warning cases were derived post-hoc as non-severe FAERS reports with a DDInter c
 | Metric | What it measures | Typical F1 |
 |--------|------------------|------------|
 | Binary F1 | XGBoost: severe ADR vs non-severe | ~0.93–0.94 |
-| Hybrid 3-class F1 | Rule + ML blend → Safe/Warning/Dangerous | ~0.70 |
+| Hybrid 3-class F1 | Rule + ML blend → Safe/Warning/Dangerous | ~0.81 weighted |
 
 **Dissertation text:**
-> The apparent gap between binary F1 (0.94) and hybrid 3-class F1 (0.70) is expected and does not indicate ML underperformance. Binary F1 evaluates the classifier on its training target (adr_event). Hybrid 3-class F1 evaluates a separate pipeline: rule-engine scores blended with ML probabilities and discretised through clinical thresholds (20/55). Degradation arises from three defensible sources: (1) Warning is a sparse proxy class (~8%); (2) offline rule-score estimation from FAERS features approximates, but does not replicate, the live P1–P16 rule engine; and (3) Safe↔Warning boundary errors affect 3-class F1 without implying missed severe ADR detection — the primary safety objective. At thresholds 20/55, Dangerous **precision** on FAERS proxy labels exceeds 99%, while Dangerous **recall** is approximately 48% — a deliberate trade-off documented in `selected_hybrid_thresholds.json`.
+> The apparent gap between binary F1 (0.94) and hybrid 3-class Macro F1 (~0.62) is expected and does not indicate ML underperformance. Binary F1 evaluates the classifier on its training target (adr_event). Hybrid 3-class evaluation measures a separate pipeline: rule-engine scores blended with ML probabilities and discretised through clinical thresholds. Even with the final deployed setting **0.6/0.4 + 34/36**, the reported proxy-calibration metrics should be interpreted as operating-point evidence rather than end-to-end clinical validation. For this selected setting, the proxy-calibration results are Accuracy **81.55%**, Macro F1 **61.57%**, Weighted F1 **81.18%**, Dangerous Precision **82.20%**, Dangerous Recall **97.50%**, and Dangerous FNR **2.50%**.
 
 ---
 
@@ -84,10 +84,10 @@ Warning cases were derived post-hoc as non-severe FAERS reports with a DDInter c
 | `npm run ml:confusion-matrices` | Binary + hybrid CM (JSON + terminal) |
 | `npm run ml:compare` | **Three-algorithm** comparison table |
 | `npm run ml:hybrid-ablation` | Weight ablation (Section 13.1) |
-| `npm run ml:thresholds` | Threshold sensitivity → **20/55** selection |
+| `npm run ml:thresholds` | Threshold sensitivity artifact generation |
 
 ---
 
 ## Viva — If Asked About Gaps
 
-> "We were transparent about proxy labels and class imbalance. The ML model is validated on binary severe ADR — the safety-critical endpoint. Three-class output is a runtime clinical decision supported by rules and thresholds 20/55, not a trained classifier. Usability was assessed with SUS on [n] elderly users and caregivers [or: pharmacist validation of 50 vignettes is planned in Section 12]. Documentation and production artifacts were aligned in June 2026."
+> "We were transparent about proxy labels and class imbalance. The ML model is validated on binary severe ADR — the safety-critical endpoint. Three-class output is a runtime clinical decision supported by rules and the final deployed configuration α=0.6, β=0.4, Warning=34, Dangerous=36, not a trained classifier. Usability was assessed with SUS on [n] elderly users and caregivers [or: pharmacist validation of 50 vignettes is planned in Section 12]. Documentation and production artifacts were aligned in August 2026."
