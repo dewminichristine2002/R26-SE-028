@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { API_BASE_URL } from '../../../services/apiConfig';
+import { API_BASE_URL, getBackendConnectionHelp } from '../../../services/apiConfig';
+import { getAuthHeaders } from '../../../services/authService';
 
 const normalizedApiBaseUrl = API_BASE_URL.replace(/\/$/, '');
 
@@ -8,6 +9,14 @@ const emotionalSupportApi = axios.create({
   timeout: 10000,
 });
 
+emotionalSupportApi.interceptors.request.use(async (config) => ({
+  ...config,
+  headers: {
+    ...(config.headers || {}),
+    ...(await getAuthHeaders()),
+  },
+}));
+
 export const emotionalSupportApiBaseUrl = `${normalizedApiBaseUrl}/emotional-support`;
 
 const withComponent4ErrorHandling = async (request) => {
@@ -15,7 +24,9 @@ const withComponent4ErrorHandling = async (request) => {
     const response = await request();
     return response.data;
   } catch (error) {
+    const isNetworkError = error?.message === 'Network Error' || error?.code === 'ERR_NETWORK';
     const message =
+      (isNetworkError && getBackendConnectionHelp()) ||
       error.response?.data?.error ||
       error.response?.data?.message ||
       error.response?.data?.errors?.join?.(', ') ||

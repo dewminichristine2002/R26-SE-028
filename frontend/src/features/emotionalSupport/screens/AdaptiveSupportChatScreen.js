@@ -140,6 +140,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [showTypeInput, setShowTypeInput] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -202,7 +203,7 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
     return () => {
       isMounted = false;
     };
-  }, [elderId]);
+  }, [elderId, retryKey]);
 
   // Voice-first start: the system calmly reads the question aloud when each
   // new moment begins. The microphone NEVER starts automatically.
@@ -348,7 +349,13 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
           ) : null}
 
           {loading ? <InlineState loading emptyText="Getting our conversation ready…" /> : null}
-          {errorMessage ? <InlineState error /> : null}
+          {errorMessage ? (
+            <InlineState
+              error
+              errorText={errorMessage}
+              onRetry={() => setRetryKey((value) => value + 1)}
+            />
+          ) : null}
 
           {/* Primary answer action: large microphone */}
           {!loading && currentQuestion && !voiceTranscript ? (

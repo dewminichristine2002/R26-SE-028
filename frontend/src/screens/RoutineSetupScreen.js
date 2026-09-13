@@ -70,6 +70,13 @@ const routineRows = [
   },
 ];
 
+const normalizeMeridiem = (period) => {
+  const compact = String(period || '').toLowerCase().replace(/[^apm]/g, '');
+  if (compact === 'am') return 'AM';
+  if (compact === 'pm') return 'PM';
+  return null;
+};
+
 const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1, highlight = null }) => {
   const [mealTimes, setMealTimes] = useState({
     breakfast: '08:00 AM',
@@ -108,14 +115,14 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1, highlight = n
       mealKey = 'sleep';
     }
 
-    const timeMatch = text.match(/(\d{1,2})(?:\s*[:.]\s*(\d{1,2}))?\s*(am|pm)?/i);
+    const timeMatch = text.match(/\b(\d{1,2})(?:\s*[:.]\s*(\d{1,2}))?\s*((?:a\s*\.?\s*m\.?|p\s*\.?\s*m\.?))?\b/i);
     if (!timeMatch || !mealKey) {
       return null;
     }
 
     let hour = parseInt(timeMatch[1], 10);
     const minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-    let period = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+    let period = normalizeMeridiem(timeMatch[3]);
 
     if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
       return null;
