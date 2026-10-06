@@ -53,7 +53,7 @@ const getClinicalAction = (riskLevel) => {
     band: `0-${RISK_THRESHOLDS.warningMin - 1}`,
       icon: '✅',
       label: 'Safe',
-      action: 'Proceed; log interaction',
+      action: 'Proceed as directed; log safety check',
       proceedAllowed: true,
   };
 };

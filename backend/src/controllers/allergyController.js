@@ -582,10 +582,38 @@ const findAllergyEvidenceMatches = (sources, terms = []) => {
 };
 
 const summarizeEvidenceLabels = (matches = []) =>
-  matches
+  [...new Set(matches
     .map((match) => match.label)
-    .filter(Boolean)
+    .filter(Boolean))]
     .join(', ');
+
+// Resolve allergy entries through the same trusted-alias/local/RxNorm pipeline
+// as the checked medicine. Compare ingredients, never therapeutic classes here.
+const findNormalizedAllergyMatches = async (allergiesText, checkedMedication) => {
+  const ingredientTerms = (medication) => {
+    if (!medication?.matched || /fuzzy/i.test(medication.matchType || '') ||
+        !(Number(medication.normalizationConfidence) > 0)) return [];
+    return extractIngredientTerms(medication.canonicalIngredient || medication.ingredientName)
+      .map((term) => normalizeText(term).toLowerCase());
+  };
+  const checkedIngredients = new Set(ingredientTerms(checkedMedication));
+  const entries = [...new Set(normalizeText(allergiesText).split(/[,;\n/]+/).map((entry) => entry.trim()).filter(Boolean))];
+  const resolvedEntries = await Promise.all(entries.map(async (entry) => ({
+    entry,
+    medication: await resolveMedication(entry),
+  })));
+  return resolvedEntries.flatMap(({ entry, medication }) => {
+    const matchedTerms = ingredientTerms(medication).filter((term) => checkedIngredients.has(term));
+    return matchedTerms.length ? [{
+      sourceKey: 'known_allergies_text',
+      label: 'known allergy list',
+      matchedTerms,
+      originalAllergy: entry,
+      normalizedIngredient: medication.canonicalIngredient || medication.ingredientName,
+      normalizationSource: medication.normalizationSource,
+    }] : [];
+  });
+};
 
 const assessChronicContraindicationRisk = ({
   chronicDiseasesText,
@@ -878,7 +906,7 @@ const getMedicationRecognitionStatus = (resolvedDrug) => {
     confidence,
     rxnormCui,
     matchType,
-    matched,
+    matched: matched && !unresolved,
   };
 };
 
@@ -889,6 +917,11 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
     symptomMatch: payload.symptomMatch,
   });
   const fallbackMedication = await resolveMedication(payload.medicineName);
+  profile = {
+    ...profile,
+    currentMedicationsText: (medicationKnowledge.currentMedications || [])
+      .map((item) => item.canonicalIngredient).join(', ') || profile?.currentMedicationsText,
+  };
   const normalizedDrug = medicationKnowledge.normalizedDrugName || fallbackMedication.normalizedName || payload.medicineName.toLowerCase();
   const knownAllergiesText = normalizeText(profile?.knownAllergiesText).toLowerCase();
   const chronicDiseasesText = normalizeText(profile?.chronicDiseasesText).toLowerCase();
@@ -934,6 +967,7 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
   const allergyTerms = buildMedicationAllergyTerms(payload, medicationKnowledge, fallbackMedication, currentDrugClassInfo);
   const severeReactionSignal = hasSevereReactionSignal(payload, questionnaireText, medicationKnowledge);
   const allergyEvidenceMatches = findAllergyEvidenceMatches(allergyEvidenceSources, allergyTerms);
+  allergyEvidenceMatches.push(...await findNormalizedAllergyMatches(profile?.knownAllergiesText, fallbackMedication));
   const userAllergyEvidence = allergyEvidenceMatches.some((match) => match.sourceKey !== 'questionnaire_answers');
   const questionnaireAllergyEvidence = allergyEvidenceMatches.some((match) => match.sourceKey === 'questionnaire_answers');
   const profileDrugClasses = new Set([
@@ -1494,9 +1528,11 @@ const buildAnalysis = async (payload, profile, questionnaireAnswers, medicineHis
       ingredientName: medicationKnowledge.ingredientName,
       therapeuticClass: medicationKnowledge.therapeuticClass,
       commonSideEffects: medicationKnowledge.commonSideEffects,
+      sideEffectCount: medicationKnowledge.sideEffectCount,
       severeSideEffects: medicationKnowledge.severeSideEffects,
       sideEffectMatches: medicationKnowledge.sideEffectMatches,
       interactions: medicationKnowledge.interactions,
+      sameIngredientCurrentMedications: medicationKnowledge.sameIngredientCurrentMedications || [],
       knowledgeSources: medicationKnowledge.knowledgeSources,
       whoAtc: medicationKnowledge.whoAtc || null,
     },
@@ -1672,6 +1708,12 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     hybridGuardrailApplied = 'ml_background_only_clean_case';
   }
 
+  if (!hybridGuardrailApplied && combinedRiskScore !== preGuardrailBlendedScore) {
+    hybridGuardrailApplied = shouldBlockMlDowngrade(analysisPayload)
+      ? 'p1_direct_allergy_score_floor'
+      : 'clinical_score_floor';
+  }
+
   const riskFactors = [...analysisPayload.riskFactors];
   const capNote = mlScoreWasCapped
     ? mlAdjustmentReason === 'weak_rule_safe_class_cap'
@@ -1735,6 +1777,11 @@ const applyMlPrediction = (analysisPayload, mlPrediction) => {
     ...analysisPayload,
     riskScore: combinedRiskScore,
     riskLevel: combinedRiskLevel,
+    recommendation: combinedRiskLevel === 'Dangerous'
+      ? 'Do not take this medicine until you speak to a doctor or qualified clinician.'
+      : combinedRiskLevel === 'Warning'
+        ? 'Use caution and talk to a pharmacist or clinician before taking this medicine.'
+        : 'Use as directed and keep monitoring for any unusual reaction.',
     riskFactors,
     explanation: `${analysisPayload.explanation} ${mlExplanation}`,
     medicationKnowledge: {

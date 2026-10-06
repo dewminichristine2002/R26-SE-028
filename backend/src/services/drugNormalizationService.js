@@ -110,7 +110,7 @@ const canonicalizeDrugName = async (rawName) => {
   }
 
   if (cache.has(query)) {
-    return { ...cache.get(query), source: 'cache', originalInput: rawName };
+    return { ...cache.get(query), originalInput: rawName };
   }
 
   if (!isRxNormEnabled()) {
