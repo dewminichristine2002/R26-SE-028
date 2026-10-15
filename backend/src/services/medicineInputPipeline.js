@@ -113,8 +113,8 @@ const buildPipelineReport = async ({
         status: knowledgeSources.length > 0 ? 'complete' : 'partial',
         detail: {
           sourcesQueried: knowledgeSources.length ? knowledgeSources : ['RxNorm'],
-          sideEffectCount: Array.isArray(medicationKnowledge.sideEffectMatches)
-            ? medicationKnowledge.sideEffectMatches.length
+          sideEffectCount: Array.isArray(medicationKnowledge.commonSideEffects)
+            ? medicationKnowledge.commonSideEffects.length
             : medicationKnowledge.sideEffectCount || 0,
           interactionCount,
           maxInteractionSeverity,

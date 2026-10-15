@@ -544,6 +544,9 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
 
   const filteredMedicineSuggestions = useMemo(() => {
     const query = String(medicineInput.medicineName || '').trim().toLowerCase();
+    if (query.length < 3) {
+      return [];
+    }
     const seen = new Set();
 
     return medicineSuggestions.filter((item) => {
@@ -649,6 +652,7 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
     }
 
     let cancelled = false;
+    setMedicineSuggestions([]);
     setSuggestionsLoading(true);
 
     const timer = setTimeout(async () => {
@@ -1703,58 +1707,67 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
 
   if (route === 'home') {
     return (
-      <View style={styles.screen}>
-        {renderHeader('Medicine Safety')}
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.heroCard}>
-            <View style={styles.heroIntroCard}>
-              <View style={styles.helloBadge}>
-              <Text style={styles.helloBadgeText}>Hello</Text>
+      <View style={landingStyles.screen}>
+        <View style={landingStyles.header}>
+          <TouchableOpacity style={landingStyles.backButton} onPress={onBack}
+            accessibilityRole="button" accessibilityLabel="Go back">
+            <View style={landingStyles.backChevron} />
+          </TouchableOpacity>
+          <Text style={landingStyles.headerTitle}>Medicine Safety</Text>
+        </View>
+        <ScrollView contentContainerStyle={landingStyles.content} showsVerticalScrollIndicator={false}>
+          <View style={landingStyles.hero}>
+            <View style={landingStyles.badge}>
+              <Text style={landingStyles.badgeText}>Hello</Text>
             </View>
-            <Text style={styles.heroTitle}>{getGreeting()}</Text>
-            <Text style={styles.heroSubtitle}>
+            <Text style={landingStyles.greeting}>{getGreeting()}</Text>
+            <View style={landingStyles.heroBottom}>
+            <Text style={landingStyles.description}>
               Check medicines against your health profile,
               allergies and current treatment.
             </Text>
-          </View>
-          <View style={styles.profileCircle}>
-            <Text style={styles.profileCircleText}>{getInitials(profile)}</Text>
+            <View style={landingStyles.avatar}>
+              <Text style={landingStyles.avatarText}>{getInitials(profile)}</Text>
+            </View>
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.actionCard, styles.actionPrimary]} onPress={openMedicineFlow}>
-            <View style={[styles.actionIconWrap, styles.actionGreen]}>
-              <Text style={styles.actionIcon}>💊</Text>
+          <TouchableOpacity style={[landingStyles.card, landingStyles.medicineCard]} onPress={openMedicineFlow}
+            accessibilityRole="button" accessibilityLabel="Check a Medicine. Check personalized medicine safety">
+            <View style={[landingStyles.iconWrap, landingStyles.medicineIcon]}>
+              <Text style={landingStyles.icon}>{'\uD83D\uDC8A'}</Text>
             </View>
-            <View style={styles.actionTextWrap}>
-              <Text style={[styles.actionTitle, styles.actionPrimaryText]}>Check a Medicine</Text>
-              <Text style={[styles.actionSubtitle, styles.actionPrimarySub]}>
+            <View style={landingStyles.cardBody}>
+              <Text style={landingStyles.cardTitle}>Check a Medicine</Text>
+              <Text style={landingStyles.cardDescription}>
                 Check personalized medicine safety
               </Text>
             </View>
-            <Text style={styles.actionChevron}>›</Text>
+            <View style={[landingStyles.arrowCircle, landingStyles.medicineArrow]}><View style={landingStyles.chevron} /></View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => setRoute('profile-view')}>
-            <View style={[styles.actionIconWrap, styles.actionBlue]}>
-              <Text style={styles.actionIcon}>👤</Text>
+          <TouchableOpacity style={landingStyles.card} onPress={() => setRoute('profile-view')}
+            accessibilityRole="button" accessibilityLabel="My Profile. Allergies, conditions and current medicines">
+            <View style={[landingStyles.iconWrap, landingStyles.profileIcon]}>
+              <Text style={landingStyles.icon}>{'\uD83D\uDC64'}</Text>
             </View>
-            <View style={styles.actionTextWrap}>
-              <Text style={styles.actionTitle}>My Profile</Text>
-              <Text style={styles.actionSubtitle}>Allergies, conditions and current medicines</Text>
+            <View style={landingStyles.cardBody}>
+              <Text style={landingStyles.cardTitle}>My Profile</Text>
+              <Text style={landingStyles.cardDescription}>Allergies, conditions and current medicines</Text>
             </View>
-            <Text style={styles.actionChevron}>›</Text>
+            <View style={landingStyles.arrowCircle}><View style={landingStyles.chevron} /></View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => setRoute('history')}>
-            <View style={[styles.actionIconWrap, styles.actionOrange]}>
-              <Text style={styles.actionIcon}>🕘</Text>
+          <TouchableOpacity style={landingStyles.card} onPress={() => setRoute('history')}
+            accessibilityRole="button" accessibilityLabel="Safety History. Review previous safety checks">
+            <View style={[landingStyles.iconWrap, landingStyles.historyIcon]}>
+              <Text style={landingStyles.icon}>{'\uD83D\uDD58'}</Text>
             </View>
-            <View style={styles.actionTextWrap}>
-              <Text style={styles.actionTitle}>Safety History</Text>
-              <Text style={styles.actionSubtitle}>Review previous safety checks</Text>
+            <View style={landingStyles.cardBody}>
+              <Text style={landingStyles.cardTitle}>Safety History</Text>
+              <Text style={landingStyles.cardDescription}>Review previous safety checks</Text>
             </View>
-            <Text style={styles.actionChevron}>›</Text>
+            <View style={landingStyles.arrowCircle}><View style={landingStyles.chevron} /></View>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -2035,7 +2048,12 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
             }
             placeholder="e.g. Amoxicillin"
             autoCapitalize="words"
+            autoCorrect={false}
           />
+
+          {medicineInput.medicineName.trim().length < 3 ? (
+            <Text style={styles.voiceInfoText}>Type at least 3 letters to see medicine suggestions.</Text>
+          ) : null}
 
           {suggestionsLoading ? (
             <Text style={styles.voiceInfoText}>Looking for medicine names...</Text>
@@ -2464,47 +2482,99 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
   );
 }
 
+// Match UnifiedDashboardScreen's palette and native system typography.
 const COLORS = {
-  bg: '#F5FAF8',
-  surface: '#FFFFFF',
-  surfaceSoft: '#F0F7F4',
-  headerBg: '#F5FAF8',
-  green: '#24796D',
-  greenDark: '#185F56',
-  greenSoft: '#E2F3ED',
-  mint: '#DDEFE8',
-  blueSoft: '#DDEFF8',
-  amber: '#985111',
-  amberDark: '#7A3F0C',
-  amberSoft: '#FFF7ED',
-  danger: '#C63F46',
-  dangerDark: '#8D2430',
-  dangerSoft: '#FDE9EB',
-  textDark: '#173F3A',
-  textMuted: '#607770',
-  cardBorder: '#D9E8E3',
-  divider: '#E6F0EC',
-  white: '#FFFFFF',
-  tealGlow: '#7FD1BC',
-  sky: '#376F86',
-  shadow: 'rgba(23, 63, 58, 0.08)',
+  bg: '#f7efe4',
+  surface: '#fffdf8',
+  surfaceSoft: '#e3f8ee',
+  headerBg: '#2f6654',
+  green: '#2f6654',
+  greenDark: '#18352f',
+  greenSoft: '#e3f8ee',
+  mint: '#b8ead6',
+  blueSoft: '#eaf7ff',
+  amber: '#a77920',
+  amberDark: '#725319',
+  amberSoft: '#fff7db',
+  danger: '#a93447',
+  dangerDark: '#8a2636',
+  dangerSoft: '#fff1f4',
+  textDark: '#27231f',
+  textMuted: '#5e5143',
+  cardBorder: '#eadfcd',
+  divider: '#eadfcd',
+  white: '#fffdf8',
+  tealGlow: '#b8ead6',
+  sky: '#2576a6',
+  shadow: '#7a674f',
 };
 
-const FONTS = Platform.select({
-  ios: {
-    display: 'Georgia',
-    body: 'Avenir Next',
-    bodyBold: 'Avenir Next',
+// The dashboard uses the platform's default font, with weight for emphasis.
+const FONTS = { display: undefined, body: undefined, bodyBold: undefined };
+
+// These styles belong only to the Medicine Safety landing page.
+const landingStyles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: COLORS.bg },
+  header: {
+    backgroundColor: COLORS.bg, paddingHorizontal: 18, paddingTop: 30, paddingBottom: 16,
+    flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
-  android: {
-    display: 'serif',
-    body: 'sans-serif',
-    bodyBold: 'sans-serif-medium',
+  backButton: {
+    width: 48, height: 48, borderRadius: 999, backgroundColor: COLORS.surface,
+    borderWidth: 1, borderColor: COLORS.cardBorder, alignItems: 'center',
+    justifyContent: 'center', marginRight: 14,
   },
-  default: {
-    display: 'serif',
-    body: 'sans-serif',
-    bodyBold: 'sans-serif',
+  backChevron: {
+    width: 13, height: 13, borderLeftWidth: 3, borderBottomWidth: 3,
+    borderColor: COLORS.green, transform: [{ rotate: '45deg' }], marginLeft: 5,
+  },
+  headerTitle: { flex: 1, fontSize: 22, lineHeight: 28, fontWeight: '900', color: COLORS.textDark },
+  content: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 56, width: '100%', maxWidth: 600, alignSelf: 'center' },
+  hero: {
+    backgroundColor: COLORS.green, borderRadius: 22, borderWidth: 2,
+    borderColor: '#e5c44f', padding: 18, marginBottom: 16,
+    shadowColor: '#725e25', shadowOpacity: 0.18, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 }, elevation: 5,
+  },
+  badge: {
+    alignSelf: 'flex-start', borderRadius: 999, backgroundColor: '#fff4b8',
+    paddingHorizontal: 12, paddingVertical: 6, marginBottom: 10,
+  },
+  badgeText: { color: COLORS.greenDark, fontSize: 16, fontWeight: '900' },
+  greeting: { fontSize: 26, lineHeight: 32, fontWeight: '900', color: '#FFFFFF', marginBottom: 10 },
+  heroBottom: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  description: { flex: 1, fontSize: 17, lineHeight: 24, fontWeight: '700', color: '#ecfff6' },
+  avatar: {
+    width: 66, height: 66, borderRadius: 20, backgroundColor: '#fff4b8',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { color: COLORS.greenDark, fontSize: 28, fontWeight: '900' },
+  card: {
+    flexDirection: 'row', alignItems: 'center', padding: 16,
+    borderRadius: 18, backgroundColor: COLORS.surface, borderWidth: 1,
+    borderColor: COLORS.cardBorder, marginBottom: 14,
+    shadowColor: COLORS.shadow, shadowOpacity: 0.09, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }, elevation: 2,
+  },
+  medicineCard: { backgroundColor: COLORS.greenSoft, borderColor: COLORS.mint },
+  iconWrap: { width: 52, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  medicineIcon: { backgroundColor: COLORS.mint },
+  profileIcon: { backgroundColor: COLORS.blueSoft },
+  historyIcon: { backgroundColor: COLORS.amberSoft },
+  icon: { fontSize: 28 },
+  cardBody: { flex: 1 },
+  cardTitle: { fontSize: 20, lineHeight: 26, fontWeight: '900', color: COLORS.greenDark },
+  cardDescription: { fontSize: 16, lineHeight: 23, color: COLORS.textMuted, marginTop: 4 },
+  arrowCircle: {
+    width: 38, height: 38, borderRadius: 999, borderWidth: 1,
+    borderColor: COLORS.cardBorder, backgroundColor: COLORS.surface,
+    alignItems: 'center', justifyContent: 'center', marginLeft: 8,
+  },
+  medicineArrow: { backgroundColor: COLORS.greenSoft, borderColor: COLORS.mint },
+  chevron: {
+    width: 11, height: 11, borderTopWidth: 3, borderRightWidth: 3,
+    borderColor: COLORS.green, transform: [{ rotate: '45deg' }], marginRight: 4,
   },
 });
 
@@ -2520,6 +2590,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: '#e5c44f',
+    shadowColor: '#00110c',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   backIcon: {
     width: 52,
@@ -2551,10 +2628,10 @@ const styles = StyleSheet.create({
     width: 4,
   },
   topBarTitle: {
-    color: COLORS.textDark,
-    flex: 1,
-    fontSize: 28,
-    fontWeight: '800',
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0.2,
     fontFamily: FONTS.display,
   },
   topBarSubtitle: {
@@ -2571,12 +2648,12 @@ const styles = StyleSheet.create({
     paddingBottom: 56,
   },
   centerArea: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
-  loadingTitle: { marginTop: 18, fontSize: 19, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
+  loadingTitle: { marginTop: 18, fontSize: 19, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
   loadingText: { marginTop: 8, fontSize: 15, color: COLORS.textMuted, textAlign: 'center', fontFamily: FONTS.body, lineHeight: 22 },
 
   heroCard: {
-    backgroundColor: COLORS.amberSoft,
-    borderRadius: 26,
+    backgroundColor: '#D9F4EA',
+    borderRadius: 22,
     padding: 22,
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -2599,7 +2676,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginBottom: 12,
   },
-  helloBadgeText: { color: COLORS.amber, fontSize: 13, fontWeight: '800', fontFamily: FONTS.bodyBold, letterSpacing: 0.4 },
+  helloBadgeText: { color: COLORS.greenDark, fontSize: 13, fontWeight: '900', fontFamily: FONTS.bodyBold, letterSpacing: 0.4 },
   profileCircle: {
     width: 72,
     height: 72,
@@ -2611,14 +2688,14 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: 'rgba(255,255,255,0.55)',
   },
-  profileCircleText: { color: '#ffffff', fontSize: 24, fontWeight: '800', fontFamily: FONTS.bodyBold },
+  profileCircleText: { color: '#ffffff', fontSize: 24, fontWeight: '900', fontFamily: FONTS.bodyBold },
   heroTextWrap: { flex: 1 },
-  heroTitle: { fontSize: 27, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
-  heroSubtitle: { marginTop: 7, fontSize: 15, color: '#684715', lineHeight: 22, fontFamily: FONTS.body },
+  heroTitle: { fontSize: 27, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
+  heroSubtitle: { marginTop: 7, fontSize: 15, color: '#44675B', lineHeight: 22, fontFamily: FONTS.body },
 
   actionCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 22,
+    borderRadius: 18,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -2627,10 +2704,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     minHeight: 90,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+    shadowOpacity: 0.09,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   actionPrimary: { backgroundColor: '#FFF7ED', borderColor: '#F3DCBF' },
   actionIconWrap: {
@@ -2641,13 +2718,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 16,
   },
-  actionGreen: { backgroundColor: '#F4D9B8' },
-  actionBlue: { backgroundColor: '#DDEFF8' },
-  actionOrange: { backgroundColor: '#FCE8DC' },
-  actionIcon: { fontSize: 18, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.bodyBold },
+  actionGreen: { backgroundColor: '#CFF3E0' },
+  actionBlue: { backgroundColor: '#DCEBFF' },
+  actionOrange: { backgroundColor: '#FFE7C8' },
+  actionIcon: { fontSize: 18, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.bodyBold },
   actionTextWrap: { flex: 1 },
-  actionTitle: { fontSize: 19, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
-  actionPrimaryText: { color: COLORS.amber },
+  actionTitle: { fontSize: 19, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
+  actionPrimaryText: { color: COLORS.green },
   actionSubtitle: { marginTop: 4, fontSize: 14, color: COLORS.textMuted, fontFamily: FONTS.body, lineHeight: 20 },
   actionPrimarySub: { color: '#684715' },
   actionChevron: { fontSize: 25, color: COLORS.green, fontWeight: '700', marginLeft: 6 },
@@ -2663,8 +2740,8 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: '#FFF1DC',
   },
-  bigProfileCircleText: { color: '#ffffff', fontSize: 27, fontWeight: '800', fontFamily: FONTS.bodyBold },
-  profileName: { marginTop: 14, fontSize: 24, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
+  bigProfileCircleText: { color: '#ffffff', fontSize: 27, fontWeight: '900', fontFamily: FONTS.bodyBold },
+  profileName: { marginTop: 14, fontSize: 24, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
   profileMeta: { marginTop: 5, fontSize: 16, color: COLORS.textMuted, fontWeight: '600', fontFamily: FONTS.body },
   profileInfoRow: {
     backgroundColor: COLORS.white,
@@ -2674,16 +2751,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
+    shadowOpacity: 0.09,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-  profileInfoLabel: { fontSize: 13, fontWeight: '800', color: COLORS.green, marginBottom: 6, fontFamily: FONTS.bodyBold, letterSpacing: 0.3 },
+  profileInfoLabel: { fontSize: 13, fontWeight: '900', color: COLORS.green, marginBottom: 6, fontFamily: FONTS.bodyBold, letterSpacing: 0.3 },
   profileInfoValue: { fontSize: 17, fontWeight: '700', color: COLORS.textDark, lineHeight: 23, fontFamily: FONTS.body },
 
   sectionLead: { fontSize: 16, color: COLORS.textMuted, marginBottom: 16, lineHeight: 22, fontFamily: FONTS.body },
-  fieldLabel: { fontSize: 15, fontWeight: '800', color: COLORS.textDark, marginBottom: 8, marginTop: 6, fontFamily: FONTS.bodyBold },
+  fieldLabel: { fontSize: 15, fontWeight: '900', color: COLORS.textDark, marginBottom: 8, marginTop: 6, fontFamily: FONTS.bodyBold },
   input: {
     backgroundColor: COLORS.white,
     borderRadius: 18,
@@ -2736,7 +2813,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '900',
     fontFamily: FONTS.bodyBold,
     letterSpacing: 0.2,
   },
@@ -2756,27 +2833,27 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   stepperCircleActive: { backgroundColor: COLORS.green },
-  stepperCircleText: { fontSize: 12, fontWeight: '800', color: '#5c6b63', fontFamily: FONTS.bodyBold },
+  stepperCircleText: { fontSize: 12, fontWeight: '900', color: '#5c6b63', fontFamily: FONTS.bodyBold },
   stepperCircleTextActive: { color: '#ffffff' },
   stepperLabel: { fontSize: 12, color: '#7a877f', fontWeight: '600', fontFamily: FONTS.body },
-  stepperLabelActive: { color: COLORS.textDark, fontWeight: '800' },
+  stepperLabelActive: { color: COLORS.textDark, fontWeight: '900' },
   stepperLine: { width: 44, height: 3, backgroundColor: '#D9E2DD', marginHorizontal: 8, marginBottom: 20, borderRadius: 999 },
 
   questionCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     padding: 20,
     marginBottom: 14,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 2,
   },
-  questionSmall: { fontSize: 13, color: COLORS.green, fontWeight: '800', marginBottom: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.4 },
-  questionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
+  questionSmall: { fontSize: 13, color: COLORS.green, fontWeight: '900', marginBottom: 10, fontFamily: FONTS.bodyBold, letterSpacing: 0.4 },
+  questionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
 
   optionCard: {
     backgroundColor: COLORS.white,
@@ -2810,7 +2887,7 @@ const styles = StyleSheet.create({
   optionText: { fontSize: 17, fontWeight: '700', color: '#31443a', flex: 1, fontFamily: FONTS.bodyBold },
   optionTextActive: { color: COLORS.green },
 
-  formLabel: { fontSize: 21, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
+  formLabel: { fontSize: 21, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
   formHint: { fontSize: 15, color: COLORS.textMuted, marginTop: 5, marginBottom: 14, fontFamily: FONTS.body },
   orText: { alignSelf: 'center', fontSize: 13, color: '#758479', marginVertical: 12, fontWeight: '700', fontFamily: FONTS.bodyBold, letterSpacing: 0.8 },
   utilityCard: {
@@ -2880,9 +2957,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   utilityIconBig: { fontSize: 28, marginBottom: 12 },
-  utilityTitle: { fontSize: 17, fontWeight: '800', color: COLORS.textDark, fontFamily: FONTS.display },
+  utilityTitle: { fontSize: 17, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
   utilitySub: { marginTop: 4, fontSize: 14, color: COLORS.textMuted, fontFamily: FONTS.body },
-  utilityTitleCentered: { fontSize: 16, fontWeight: '800', color: COLORS.textDark, textAlign: 'center', fontFamily: FONTS.display },
+  utilityTitleCentered: { fontSize: 16, fontWeight: '900', color: COLORS.textDark, textAlign: 'center', fontFamily: FONTS.display },
   utilitySubCentered: { marginTop: 4, fontSize: 13, color: COLORS.textMuted, textAlign: 'center', fontFamily: FONTS.body, lineHeight: 18 },
   voiceInfoText: {
     fontSize: 13,
@@ -2934,7 +3011,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   confirmTopText: { fontSize: 16, color: '#3c4f44', textAlign: 'center', fontWeight: '700', lineHeight: 22, fontFamily: FONTS.body },
-  confirmLabel: { fontSize: 17, fontWeight: '800', color: COLORS.textDark, marginBottom: 12, fontFamily: FONTS.display },
+  confirmLabel: { fontSize: 17, fontWeight: '900', color: COLORS.textDark, marginBottom: 12, fontFamily: FONTS.display },
   confirmTable: {
     backgroundColor: COLORS.white,
     borderRadius: 22,
@@ -2953,7 +3030,7 @@ const styles = StyleSheet.create({
   },
   confirmRowLast: { borderBottomWidth: 0 },
   confirmKey: { fontSize: 14, color: '#52615a', fontWeight: '700', fontFamily: FONTS.bodyBold },
-  confirmValue: { fontSize: 17, color: '#23342a', fontWeight: '800', fontFamily: FONTS.display },
+  confirmValue: { fontSize: 17, color: '#23342a', fontWeight: '900', fontFamily: FONTS.display },
   noticeBox: { backgroundColor: '#E7F7EE', borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#CBE6D6' },
   noticeText: { color: '#2A4F3A', fontSize: 15, lineHeight: 21, fontWeight: '600', fontFamily: FONTS.body },
   inlineReadButton: {
@@ -2968,7 +3045,7 @@ const styles = StyleSheet.create({
   inlineReadButtonText: {
     color: '#315A8A',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
     fontFamily: FONTS.bodyBold,
   },
   bottomActions: { flexDirection: 'row', marginTop: 8 },
@@ -2991,11 +3068,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 8,
   },
-  fillHalfText: { color: '#ffffff', fontSize: 16, fontWeight: '800', fontFamily: FONTS.bodyBold },
+  fillHalfText: { color: '#ffffff', fontSize: 16, fontWeight: '900', fontFamily: FONTS.bodyBold },
 
   readAloudButton: {
     backgroundColor: COLORS.green,
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 18,
     marginBottom: 14,
     alignItems: 'center',
@@ -3006,7 +3083,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 2,
   },
-  readAloudText: { color: '#ffffff', fontSize: 16, fontWeight: '800', fontFamily: FONTS.display },
+  readAloudText: { color: '#ffffff', fontSize: 16, fontWeight: '900', fontFamily: FONTS.display },
   loadingCard: {
     width: '100%',
     maxWidth: 320,
@@ -3017,7 +3094,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     padding: 18,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
+    shadowOpacity: 0.09,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 2,
@@ -3045,7 +3122,7 @@ const styles = StyleSheet.create({
   historyTab: { flex: 1, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   historyTabActive: { backgroundColor: '#ffffff' },
   historyTabText: { color: '#7b877f', fontSize: 13, fontWeight: '700', fontFamily: FONTS.bodyBold },
-  historyTabTextActive: { color: COLORS.textDark, fontSize: 13, fontWeight: '800', fontFamily: FONTS.bodyBold },
+  historyTabTextActive: { color: COLORS.textDark, fontSize: 13, fontWeight: '900', fontFamily: FONTS.bodyBold },
   historyCard: {
     backgroundColor: COLORS.white,
     borderRadius: 22,
@@ -3063,10 +3140,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   historyLeft: { flex: 1, paddingRight: 12 },
-  historyTitle: { fontSize: 19, fontWeight: '800', color: '#23342a', fontFamily: FONTS.display },
+  historyTitle: { fontSize: 19, fontWeight: '900', color: '#23342a', fontFamily: FONTS.display },
   historyDate: { marginTop: 5, fontSize: 14, color: COLORS.textMuted, fontFamily: FONTS.body },
   historyBadge: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
-  historyBadgeText: { fontSize: 13, fontWeight: '800', fontFamily: FONTS.bodyBold },
+  historyBadgeText: { fontSize: 13, fontWeight: '900', fontFamily: FONTS.bodyBold },
   warningBadge: { backgroundColor: '#fff1d5' },
   safeBadge: { backgroundColor: '#e7f7ec' },
   dangerBadge: { backgroundColor: '#fce7e5' },
@@ -3087,14 +3164,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.2,
     color: COLORS.green,
-    fontWeight: '800',
+    fontWeight: '900',
     marginBottom: 5,
     fontFamily: FONTS.bodyBold,
   },
   medicineHeading: {
     fontSize: 24,
     lineHeight: 30,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     fontFamily: FONTS.display,
   },
@@ -3138,9 +3215,9 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     borderWidth: 1,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 2,
   },
   resultDanger: {
@@ -3191,7 +3268,7 @@ const styles = StyleSheet.create({
   resultModernTitle: {
     fontSize: 18,
     lineHeight: 23,
-    fontWeight: '800',
+    fontWeight: '900',
     marginBottom: 9,
     fontFamily: FONTS.display,
   },
@@ -3212,7 +3289,7 @@ const styles = StyleSheet.create({
   },
   modernInfoCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     padding: 20,
@@ -3245,7 +3322,7 @@ const styles = StyleSheet.create({
   },
   modernSectionTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     fontFamily: FONTS.display,
   },
@@ -3271,7 +3348,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
   },
   actionAdviceCard: {
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     padding: 20,
     marginBottom: 18,
@@ -3322,7 +3399,7 @@ const styles = StyleSheet.create({
   },
   actionAdviceLabel: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     fontFamily: FONTS.display,
   },
@@ -3349,7 +3426,7 @@ const styles = StyleSheet.create({
   },
   simpleSummaryTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.green,
     marginBottom: 7,
     fontFamily: FONTS.bodyBold,
@@ -3380,7 +3457,7 @@ const styles = StyleSheet.create({
   },
   technicalToggleModernTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     fontFamily: FONTS.display,
   },
@@ -3397,7 +3474,7 @@ const styles = StyleSheet.create({
   },
   technicalCardModern: {
     backgroundColor: COLORS.surface,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     padding: 20,
@@ -3410,7 +3487,7 @@ const styles = StyleSheet.create({
   },
   technicalHeading: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     marginBottom: 18,
     fontFamily: FONTS.display,
@@ -3437,7 +3514,7 @@ const styles = StyleSheet.create({
   technicalValue: {
     fontSize: 17,
     color: COLORS.textDark,
-    fontWeight: '800',
+    fontWeight: '900',
     fontFamily: FONTS.display,
   },
   technicalValueLarge: {
@@ -3464,7 +3541,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     fontSize: 12,
     color: '#355C8A',
-    fontWeight: '800',
+    fontWeight: '900',
     fontFamily: FONTS.bodyBold,
   },
   mlDisclaimerBox: {
@@ -3475,7 +3552,7 @@ const styles = StyleSheet.create({
   },
   mlDisclaimerTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.green,
     marginBottom: 7,
     fontFamily: FONTS.bodyBold,
@@ -3495,7 +3572,7 @@ const styles = StyleSheet.create({
   },
   sideEffectsCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     marginBottom: 18,
@@ -3538,7 +3615,7 @@ const styles = StyleSheet.create({
   },
   sideEffectsTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     fontFamily: FONTS.display,
   },
@@ -3577,7 +3654,7 @@ const styles = StyleSheet.create({
   },
   sideEffectsSectionTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textDark,
     marginBottom: 10,
     marginTop: 4,
@@ -3622,7 +3699,7 @@ const styles = StyleSheet.create({
   textButtonText: {
     color: COLORS.green,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '900',
     fontFamily: FONTS.bodyBold,
   },
 });
