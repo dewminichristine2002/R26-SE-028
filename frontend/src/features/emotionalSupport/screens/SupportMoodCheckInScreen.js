@@ -12,8 +12,7 @@ import {
   View,
 } from 'react-native';
 import { createMoodCheckin } from '../api/emotionalSupportApi';
-
-const DEMO_USER_ID = 1;
+import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
 
 const moodOptions = [
   { label: 'Terrible', score: 1 },
@@ -24,13 +23,14 @@ const moodOptions = [
 ];
 
 export default function SupportMoodCheckInScreen({ navigation }) {
+  const { elderId } = useEmotionalSupportContext();
   const [selectedMood, setSelectedMood] = useState(null);
   const [reflectionText, setReflectionText] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const canSubmit = useMemo(() => Boolean(selectedMood) && !loading, [selectedMood, loading]);
+  const canSubmit = useMemo(() => Boolean(elderId && selectedMood) && !loading, [elderId, selectedMood, loading]);
 
   async function handleSubmit() {
     if (!selectedMood || loading) {
@@ -43,7 +43,7 @@ export default function SupportMoodCheckInScreen({ navigation }) {
       setSuccessMessage('');
 
       await createMoodCheckin({
-        user_id: DEMO_USER_ID,
+        user_id: elderId,
         mood_label: selectedMood.label,
         mood_score: selectedMood.score,
         reflection_text: reflectionText.trim(),

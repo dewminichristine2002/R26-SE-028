@@ -3,7 +3,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const HEALTH_TIMEOUT_MS = Number(process.env.ML_SERVICE_HEALTH_TIMEOUT_MS || 1500);
 const STARTUP_TIMEOUT_MS = Number(process.env.ML_SERVICE_STARTUP_TIMEOUT_MS || 90000);
 const POLL_INTERVAL_MS = Number(process.env.ML_SERVICE_STARTUP_POLL_MS || 1500);
@@ -131,8 +131,8 @@ const getBindHost = () => {
 
 const getBindPort = () => {
   const parsed = parseMlUrl();
-  const port = Number(parsed?.port || 8000);
-  return Number.isInteger(port) && port > 0 ? String(port) : '8000';
+  const port = Number(parsed?.port || 8001);
+  return Number.isInteger(port) && port > 0 ? String(port) : '8001';
 };
 
 const registerCleanup = () => {

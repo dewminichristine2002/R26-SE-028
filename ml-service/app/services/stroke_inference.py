@@ -8,7 +8,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-MODEL_DIR = Path("app/models")
+MODEL_DIR = Path(__file__).resolve().parents[1] / "models"
 MODEL_PATH = MODEL_DIR / "stroke_model.pkl"
 PREPROCESSOR_PATH = MODEL_DIR / "stroke_preprocessor.pkl"
 METADATA_PATH = MODEL_DIR / "stroke_model_metadata.json"

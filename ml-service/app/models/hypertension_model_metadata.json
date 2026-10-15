@@ -1,19 +1,19 @@
 {
-  "selectedAlgorithm": "Decision Tree",
-  "accuracy": 0.5205017572934822,
-  "balancedAccuracy": 0.5049481592994369,
-  "precision": 0.7225528749070039,
-  "recall": 0.5404857494931828,
-  "f1Score": 0.6183968163729392,
-  "rocAuc": 0.5031237608307633,
+  "selectedAlgorithm": "Logistic Regression",
+  "accuracy": 0.7188330428322428,
+  "balancedAccuracy": 0.5,
+  "precision": 0.7188330428322428,
+  "recall": 1.0,
+  "f1Score": 0.8364198557036938,
+  "rocAuc": 0.49550271449767,
   "confusionMatrix": [
     [
-      4619,
-      5221
+      0,
+      9840
     ],
     [
-      11560,
-      13597
+      0,
+      25157
     ]
   ],
   "featuresUsed": [
@@ -93,97 +93,164 @@
     "Employment_Status": "Retired"
   },
   "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\hypertension_dataset.csv",
+  "visualizations": {
+    "confusionMatrix": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\confusion_matrix.png",
+    "rocCurve": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\roc_curve.png",
+    "modelMetricsComparison": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\model_metrics_comparison.png",
+    "featureCorrelationHeatmap": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\feature_correlation_heatmap.png",
+    "targetCorrelationBar": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\hypertension\\target_correlation_bar.png"
+  },
+  "target": {
+    "targetMode": "dataset-label",
+    "targetColumn": "Hypertension_binary",
+    "targetDefinition": "1 when the source Hypertension column is High/1/Yes; otherwise 0.",
+    "sourceHypertensionPositiveRate": 0.71882250745791,
+    "clinicalBpPositiveRate": 0.7218856796699089,
+    "sourceClinicalAgreement": 0.5962784743573625,
+    "dataSignalWarning": "The source label has weak agreement with the BP-derived clinical indicator; high accuracy/recall/F1 can be driven by the majority class while ROC-AUC remains close to random."
+  },
   "classBalance": {
     "trainPositive": 100624,
     "trainNegative": 39361
+  },
+  "selectionPolicy": {
+    "bestIndividualAlgorithm": "Logistic Regression",
+    "individualSelectionPriority": [
+      "accuracy",
+      "recall",
+      "f1Score",
+      "rocAuc"
+    ],
+    "compactArtifactTieBreak": "When accuracy, recall, and F1-score are equal, ROC-AUC differences within 0.01 are treated as a tie and the smaller/less complex model is preferred.",
+    "ensembleAlgorithm": "Soft Voting Ensemble",
+    "ensembleBaseAlgorithms": [
+      "Logistic Regression",
+      "Random Forest",
+      "XGBoost"
+    ],
+    "ensembleSelected": false,
+    "requiredEnsembleImprovementMetrics": [
+      "accuracy",
+      "recall",
+      "f1Score",
+      "rocAuc"
+    ],
+    "ensembleSelectionRule": "Select the soft-voting ensemble only when it is at least as strong as the best individual model on every required metric and improves at least one required metric."
   },
   "modelComparison": [
     {
       "algorithm": "Logistic Regression",
       "metrics": {
-        "accuracy": 0.49852844529531104,
-        "balancedAccuracy": 0.4948616974021034,
-        "precision": 0.7147292948681759,
-        "recall": 0.5032396549668084,
-        "f1Score": 0.5906228131560531,
-        "rocAuc": 0.49536848429262603,
-        "confusionMatrix": [
-          [
-            4787,
-            5053
-          ],
-          [
-            12497,
-            12660
-          ]
-        ],
-        "positiveRate": 0.5000264530435551
-      }
-    },
-    {
-      "algorithm": "Decision Tree",
-      "metrics": {
-        "accuracy": 0.5205017572934822,
-        "balancedAccuracy": 0.5049481592994369,
-        "precision": 0.7225528749070039,
-        "recall": 0.5404857494931828,
-        "f1Score": 0.6183968163729392,
-        "rocAuc": 0.5031237608307633,
-        "confusionMatrix": [
-          [
-            4619,
-            5221
-          ],
-          [
-            11560,
-            13597
-          ]
-        ],
-        "positiveRate": 0.5304933493547253
-      }
-    },
-    {
-      "algorithm": "Random Forest",
-      "metrics": {
-        "accuracy": 0.7188044689544818,
-        "balancedAccuracy": 0.49998012481615456,
-        "precision": 0.7188250085724083,
-        "recall": 0.9999602496323091,
-        "f1Score": 0.8364005120276627,
-        "rocAuc": 0.503275515130832,
+        "accuracy": 0.7188330428322428,
+        "balancedAccuracy": 0.5,
+        "precision": 0.7188330428322428,
+        "recall": 1.0,
+        "f1Score": 0.8364198557036938,
+        "rocAuc": 0.49550271449767,
         "confusionMatrix": [
           [
             0,
             9840
           ],
           [
-            1,
-            25156
+            0,
+            25157
           ]
         ],
-        "positiveRate": 0.6134521508047655
+        "positiveRate": 0.7187690741786228
+      }
+    },
+    {
+      "algorithm": "Decision Tree",
+      "metrics": {
+        "accuracy": 0.6702288767608652,
+        "balancedAccuracy": 0.49706826091495004,
+        "precision": 0.7175079872204473,
+        "recall": 0.8927137576022578,
+        "f1Score": 0.7955789361815186,
+        "rocAuc": 0.4963673597288702,
+        "confusionMatrix": [
+          [
+            998,
+            8842
+          ],
+          [
+            2699,
+            22458
+          ]
+        ],
+        "positiveRate": 0.7180150060959479
+      }
+    },
+    {
+      "algorithm": "Random Forest",
+      "metrics": {
+        "accuracy": 0.7188330428322428,
+        "balancedAccuracy": 0.5,
+        "precision": 0.7188330428322428,
+        "recall": 1.0,
+        "f1Score": 0.8364198557036938,
+        "rocAuc": 0.4986571121971903,
+        "confusionMatrix": [
+          [
+            0,
+            9840
+          ],
+          [
+            0,
+            25157
+          ]
+        ],
+        "positiveRate": 0.7186441598518314
       }
     },
     {
       "algorithm": "XGBoost",
       "metrics": {
-        "accuracy": 0.5291024944995285,
-        "balancedAccuracy": 0.5020514340672285,
-        "precision": 0.720306707967298,
-        "recall": 0.5638589656954327,
-        "f1Score": 0.6325529542920847,
-        "rocAuc": 0.5019811155051965,
+        "accuracy": 0.7188330428322428,
+        "balancedAccuracy": 0.5,
+        "precision": 0.7188330428322428,
+        "recall": 1.0,
+        "f1Score": 0.8364198557036938,
+        "rocAuc": 0.4994279441368369,
         "confusionMatrix": [
           [
-            4332,
-            5508
+            0,
+            9840
           ],
           [
-            10972,
-            14185
+            0,
+            25157
           ]
         ],
-        "positiveRate": 0.5048015117645264
+        "positiveRate": 0.7189826369285583
+      }
+    },
+    {
+      "algorithm": "Soft Voting Ensemble",
+      "baseAlgorithms": [
+        "Logistic Regression",
+        "Random Forest",
+        "XGBoost"
+      ],
+      "metrics": {
+        "accuracy": 0.7188330428322428,
+        "balancedAccuracy": 0.5,
+        "precision": 0.7188330428322428,
+        "recall": 1.0,
+        "f1Score": 0.8364198557036938,
+        "rocAuc": 0.4989911647536398,
+        "confusionMatrix": [
+          [
+            0,
+            9840
+          ],
+          [
+            0,
+            25157
+          ]
+        ],
+        "positiveRate": 0.7187986328198489
       }
     }
   ]

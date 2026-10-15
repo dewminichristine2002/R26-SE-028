@@ -1140,12 +1140,20 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Text style={styles.backIconText}>‹</Text>
+        <Text style={styles.backIconText}>{'\u2039'}</Text>
       </TouchableOpacity>
       <View style={styles.topBarTextWrap}>
-        <Text style={styles.topBarTitle}>
-          {title}
-        </Text>
+        <View style={styles.topBarTitleRow}>
+          <View style={styles.topBarAccent} />
+          <Text
+            style={styles.topBarTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            {title}
+          </Text>
+        </View>
         {subtitle ? <Text style={styles.topBarSubtitle}>{subtitle}</Text> : null}
       </View>
     </View>
@@ -2577,9 +2585,9 @@ const styles = StyleSheet.create({
   },
   topBar: {
     backgroundColor: COLORS.headerBg,
-    paddingTop: 24,
-    paddingBottom: 24,
-    paddingHorizontal: 18,
+    paddingTop: 26,
+    paddingBottom: 14,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 2,
@@ -2591,23 +2599,34 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   backIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 13,
+    marginRight: 12,
   },
   backIconText: {
-    color: '#FFFFFF',
-    fontSize: 38,
-    lineHeight: 40,
+    color: COLORS.green,
+    fontSize: 36,
+    lineHeight: 39,
     fontWeight: '400',
   },
   topBarTextWrap: { flex: 1 },
+  topBarTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  topBarAccent: {
+    backgroundColor: COLORS.amber,
+    borderRadius: 3,
+    height: 28,
+    marginRight: 10,
+    width: 4,
+  },
   topBarTitle: {
     color: '#FFFFFF',
     fontSize: 22,
@@ -2616,15 +2635,16 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.display,
   },
   topBarSubtitle: {
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: 13,
-    marginTop: 4,
+    color: COLORS.textMuted,
+    fontSize: 15,
+    lineHeight: 21,
+    marginTop: 6,
     fontWeight: '600',
     fontFamily: FONTS.body,
   },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 22,
+    paddingHorizontal: 20,
+    paddingTop: 12,
     paddingBottom: 56,
   },
   centerArea: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
@@ -2638,14 +2658,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 22,
     borderWidth: 1,
-    borderColor: '#B6E2D1',
-    shadowColor: COLORS.greenDark,
+    borderColor: '#F3DCBF',
+    shadowColor: COLORS.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    elevation: 2,
   },
   heroIntroCard: { flex: 1, paddingRight: 16 },
   helloBadge: {
@@ -2661,7 +2681,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: COLORS.greenDark,
+    backgroundColor: COLORS.amber,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
@@ -2681,7 +2701,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    marginBottom: 16,
+    marginBottom: 14,
     minHeight: 90,
     shadowColor: COLORS.shadow,
     shadowOpacity: 0.09,
@@ -2689,7 +2709,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
-  actionPrimary: { backgroundColor: '#E4F8EF', borderColor: '#B8E5CE' },
+  actionPrimary: { backgroundColor: '#FFF7ED', borderColor: '#F3DCBF' },
   actionIconWrap: {
     width: 58,
     height: 58,
@@ -2706,19 +2726,19 @@ const styles = StyleSheet.create({
   actionTitle: { fontSize: 19, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
   actionPrimaryText: { color: COLORS.green },
   actionSubtitle: { marginTop: 4, fontSize: 14, color: COLORS.textMuted, fontFamily: FONTS.body, lineHeight: 20 },
-  actionPrimarySub: { color: '#3f6b52' },
-  actionChevron: { fontSize: 24, color: '#a9b6ab', fontWeight: '700', marginLeft: 6 },
+  actionPrimarySub: { color: '#684715' },
+  actionChevron: { fontSize: 25, color: COLORS.green, fontWeight: '700', marginLeft: 6 },
 
   profileHeader: { alignItems: 'center', paddingBottom: 12 },
   bigProfileCircle: {
     width: 92,
     height: 92,
     borderRadius: 46,
-    backgroundColor: COLORS.green,
+    backgroundColor: COLORS.amber,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 5,
-    borderColor: '#DFF4EB',
+    borderColor: '#FFF1DC',
   },
   bigProfileCircleText: { color: '#ffffff', fontSize: 27, fontWeight: '900', fontFamily: FONTS.bodyBold },
   profileName: { marginTop: 14, fontSize: 24, fontWeight: '900', color: COLORS.textDark, fontFamily: FONTS.display },
@@ -2745,7 +2765,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#C8DAD0',
+    borderColor: COLORS.cardBorder,
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 17,
@@ -2753,7 +2773,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontFamily: FONTS.body,
     shadowColor: COLORS.shadow,
-    shadowOpacity: 0.55,
+    shadowOpacity: 0.45,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
@@ -2770,13 +2790,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
     marginBottom: 10,
   },
-  choiceChipActive: { backgroundColor: COLORS.green, borderColor: COLORS.green, shadowColor: COLORS.greenDark, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  choiceChipActive: { backgroundColor: COLORS.green, borderColor: COLORS.green, shadowColor: COLORS.greenDark, shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
   choiceChipText: { fontSize: 16, fontWeight: '700', color: '#31503d', fontFamily: FONTS.bodyBold },
   choiceChipTextActive: { color: '#ffffff' },
 
   primaryButton: {
     backgroundColor: COLORS.green,
-    borderRadius: 20,
+    borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 18,
     alignItems: 'center',
@@ -2784,7 +2804,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
     marginTop: 10,
     shadowColor: COLORS.greenDark,
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.18,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
@@ -2837,7 +2857,7 @@ const styles = StyleSheet.create({
 
   optionCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     paddingVertical: 18,
@@ -2872,7 +2892,7 @@ const styles = StyleSheet.create({
   orText: { alignSelf: 'center', fontSize: 13, color: '#758479', marginVertical: 12, fontWeight: '700', fontFamily: FONTS.bodyBold, letterSpacing: 0.8 },
   utilityCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     padding: 18,
@@ -2921,10 +2941,10 @@ const styles = StyleSheet.create({
   utilityGrid: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   utilityCardGrid: {
     flex: 1,
-    backgroundColor: '#FCFFFD',
+    backgroundColor: COLORS.surface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#D8E7DB',
+    borderColor: COLORS.cardBorder,
     paddingVertical: 20,
     paddingHorizontal: 12,
     alignItems: 'center',
@@ -2960,9 +2980,9 @@ const styles = StyleSheet.create({
   },
   secondaryButtonFull: {
     backgroundColor: COLORS.surface,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: COLORS.green,
     paddingVertical: 17,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2970,7 +2990,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   secondaryButtonFullText: {
-    color: COLORS.textDark,
+    color: COLORS.green,
     fontSize: 16,
     fontWeight: '700',
     fontFamily: FONTS.bodyBold,
@@ -3094,12 +3114,12 @@ const styles = StyleSheet.create({
   emptyStateText: { fontSize: 16, color: COLORS.textMuted, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, fontFamily: FONTS.body },
   historyTabs: {
     flexDirection: 'row',
-    backgroundColor: '#EAF0EC',
-    borderRadius: 18,
+    backgroundColor: COLORS.surfaceSoft,
+    borderRadius: 16,
     padding: 4,
     marginBottom: 16,
   },
-  historyTab: { flex: 1, borderRadius: 14, paddingVertical: 10, alignItems: 'center' },
+  historyTab: { flex: 1, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   historyTabActive: { backgroundColor: '#ffffff' },
   historyTabText: { color: '#7b877f', fontSize: 13, fontWeight: '700', fontFamily: FONTS.bodyBold },
   historyTabTextActive: { color: COLORS.textDark, fontSize: 13, fontWeight: '900', fontFamily: FONTS.bodyBold },
@@ -3115,8 +3135,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: COLORS.shadow,
     shadowOpacity: 0.9,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 2,
   },
   historyLeft: { flex: 1, paddingRight: 12 },
@@ -3276,8 +3296,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     shadowColor: COLORS.shadow,
     shadowOpacity: 0.95,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 2,
   },
   sectionTitleRow: {
@@ -3334,8 +3354,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     shadowColor: COLORS.shadow,
     shadowOpacity: 0.9,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
   actionAdviceDanger: {

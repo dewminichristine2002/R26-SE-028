@@ -11,7 +11,7 @@ const { getLatestDiabetesPrediction } = require('./diabetesPredictionService');
 const { getLatestStrokePrediction } = require('./strokePredictionService');
 const { getLatestHypertensionPrediction } = require('./hypertensionPredictionService');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
 const MAX_RETRIEVED_CHUNKS = Number(process.env.HEALTH_ADVICE_MAX_CHUNKS || 6);
 const HEALTH_ADVICE_CONVERSATION_TITLE = 'Health Risk Advice';

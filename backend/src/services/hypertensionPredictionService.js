@@ -5,10 +5,11 @@ const {
   calculateBMI,
   extractHealthValuesFromMessage,
   getExistingHealthInputs,
+  normalizeMlServiceError,
   saveOrUpdateHealthValues,
 } = require('./diabetesPredictionService');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
 const HYPERTENSION_CONVERSATION_TITLE = 'Hypertension Risk Assistant';
 const PHASE_ONE_HYPERTENSION_ADVICE_MESSAGE =
@@ -156,13 +157,17 @@ const prepareHypertensionPredictionPayload = async (userId, incomingValues = {})
 
 const callHypertensionPredictionService = async (payload) => {
   await ensureMlServiceAvailable();
-  const response = await axios.post(
-    `${ML_SERVICE_URL}/predict/hypertension`,
-    payload,
-    { timeout: ML_TIMEOUT_MS }
-  );
+  try {
+    const response = await axios.post(
+      `${ML_SERVICE_URL}/predict/hypertension`,
+      payload,
+      { timeout: ML_TIMEOUT_MS }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    throw normalizeMlServiceError(error, 'Failed to predict hypertension risk');
+  }
 };
 
 const ensureHypertensionConversation = async (userId, existingConversationId = null) => {

@@ -57,11 +57,11 @@ const ELDER_SUGGESTED_PROMPTS = [
   'Show my recent caregiver alerts.',
 ];
 
-const getCareSubject = () => 'my mother';
+const getCareSubject = () => 'your mother';
 
 const getPossessiveSubject = (subject) => {
-  const text = String(subject || '').trim() || 'my mother';
-  if (/^my\b/i.test(text)) {
+  const text = String(subject || '').trim() || 'your mother';
+  if (/^(my|your)\b/i.test(text)) {
     return `${text}'s`;
   }
   return text.endsWith('s') ? `${text}'` : `${text}'s`;
@@ -541,9 +541,36 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
             : null);
 
         if (navigation && onAgentNavigate) {
-          setTimeout(() => {
-            onAgentNavigate(navigation);
-          }, 900);
+          const navigateAfterSpeech = () => {
+            setTimeout(() => {
+              onAgentNavigate(navigation);
+            }, 400);
+          };
+
+          const spokenText = String(assistantBubble.content || '').trim();
+          if (SpeechModule && spokenText) {
+            setSpeakingId(assistantBubble.id);
+            SpeechModule.stop?.();
+            SpeechModule.speak(spokenText, {
+              language: 'en',
+              pitch: 1.0,
+              rate: 0.95,
+              onDone: () => {
+                setSpeakingId(null);
+                navigateAfterSpeech();
+              },
+              onStopped: () => {
+                setSpeakingId(null);
+                navigateAfterSpeech();
+              },
+              onError: () => {
+                setSpeakingId(null);
+                navigateAfterSpeech();
+              },
+            });
+          } else {
+            navigateAfterSpeech();
+          }
         }
       } catch (err) {
         const errMsg = err.response?.data?.error || err.message || 'Failed to get a reply';
@@ -698,7 +725,10 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
     }
     return [];
   })();
-  const visibleFollowUps = getVisibleFollowUps(lastFollowUps, user);
+  const visibleFollowUps = (() => {
+    const fromServer = getVisibleFollowUps(lastFollowUps, user);
+    return fromServer.length > 0 ? fromServer : suggestedPrompts.slice(0, 6);
+  })();
 
   return (
     <KeyboardAvoidingView
@@ -1148,33 +1178,33 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 14,
-    minHeight: 126,
-    borderRadius: 22,
+    marginTop: 10,
+    minHeight: 94,
+    borderRadius: 18,
     backgroundColor: '#2f6654',
     borderWidth: 2,
     borderColor: '#e5c44f',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     shadowColor: '#725e25',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 5,
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   titleEmoji: {
-    width: 66,
-    height: 66,
-    borderRadius: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: '#fff4b8',
-    fontSize: 34,
-    lineHeight: 66,
-    marginRight: 14,
+    fontSize: 28,
+    lineHeight: 52,
+    marginRight: 12,
     textAlign: 'center',
     overflow: 'hidden',
   },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#FFFFFF' },
-  subtitle: { fontSize: 18, color: '#ecfff6', marginTop: 4, lineHeight: 25, fontWeight: '700' },
+  title: { fontSize: 23, lineHeight: 28, fontWeight: '900', color: '#FFFFFF' },
+  subtitle: { fontSize: 15, color: '#ecfff6', marginTop: 2, lineHeight: 21, fontWeight: '700' },
 
   scroll: { flex: 1, backgroundColor: '#f7efe4' },
   scrollContent: { paddingVertical: 16, paddingBottom: 26 },

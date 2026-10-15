@@ -373,6 +373,34 @@ python scripts\train_pill_detector_model.py `
   --device cpu
 ```
 
+To prove model selection, run the same experiment across multiple YOLO variants:
+
+```powershell
+cd backend\ml
+python scripts\compare_yolo_detector_models.py `
+  --data pill-detector-data.yaml `
+  --models yolo11n.pt yolo11s.pt yolo11m.pt `
+  --epochs 3 `
+  --image-size 416 `
+  --batch-size 8 `
+  --device cpu `
+  --exist-ok
+```
+
+This creates:
+
+```text
+backend/ml/runs/detect/model_comparison.csv
+backend/ml/runs/detect/model_comparison.md
+```
+
+Use the generated table as evidence that several YOLO models were evaluated
+under the same dataset, image size, epochs, batch size, and device. The script
+selects the deployment model by validation mAP50-95, then chooses the smaller
+weights file when models are within the configured mAP tolerance. This supports
+selecting `yolo11n.pt` when it gives comparable validation accuracy with the
+lowest deployment cost.
+
 The backend looks for detector weights at:
 
 ```text

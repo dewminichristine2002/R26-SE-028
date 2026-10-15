@@ -1,5 +1,15 @@
 const { query } = require('../db/postgres');
 
+function normalizeQuickReplies(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).map((reply, index) => {
+    const label = String(reply?.label || reply?.value || '').trim();
+    const responseValue = String(reply?.value || label).trim();
+    if (!label || !responseValue) return null;
+    return { id: String(reply?.id || `reply_${index + 1}`), label, value: responseValue };
+  }).filter(Boolean);
+}
+
 function mapQuestion(row) {
   if (!row) {
     return null;
@@ -16,10 +26,106 @@ function mapQuestion(row) {
     triggerKeywords: row.triggerKeywords,
     questionText: row.questionText,
     responseType: row.responseType,
+    quickReplies: normalizeQuickReplies(row.quickReplies),
     priority: row.priority,
     constructSource: row.constructSource,
     isActive: row.isActive,
+    positiveNextCode: row.positiveNextCode,
+    negativeNextCode: row.negativeNextCode,
+    neutralNextCode: row.neutralNextCode,
+    followupNextCode: row.followupNextCode,
+    assessmentDimension: row.assessmentDimension,
+    isAssessment: Boolean(row.isAssessment),
+    minConfidence: row.minConfidence == null ? null : Number(row.minConfidence),
+    difficulty: row.difficulty,
+    positiveResponseEffect: row.positiveResponseEffect,
+    negativeResponseEffect: row.negativeResponseEffect,
+    neutralResponseEffect: row.neutralResponseEffect,
   };
+}
+
+const assessmentColumns = `
+  question_id AS "questionId",
+  question_code AS "questionCode",
+  phase,
+  category,
+  sub_category AS "subCategory",
+  target_state AS "targetState",
+  question_type AS "questionType",
+  trigger_keywords AS "triggerKeywords",
+  question_text AS "questionText",
+  response_type AS "responseType",
+  quick_replies AS "quickReplies",
+  priority,
+  construct_source AS "constructSource",
+  is_active AS "isActive",
+  positive_next_code AS "positiveNextCode",
+  negative_next_code AS "negativeNextCode",
+  neutral_next_code AS "neutralNextCode",
+  followup_next_code AS "followupNextCode",
+  assessment_dimension AS "assessmentDimension",
+  is_assessment AS "isAssessment",
+  min_confidence AS "minConfidence",
+  difficulty,
+  positive_response_effect AS "positiveResponseEffect",
+  negative_response_effect AS "negativeResponseEffect",
+  neutral_response_effect AS "neutralResponseEffect"
+`;
+
+async function getAssessmentQuestionByCode(questionCode) {
+  const result = await query(
+    `SELECT ${assessmentColumns}
+     FROM adaptive_question_bank
+     WHERE question_code = $1 AND is_active = TRUE AND is_assessment = TRUE
+     LIMIT 1`,
+    [questionCode]
+  );
+
+  return mapQuestion(result.rows[0]);
+}
+
+async function getAssessmentCandidates({
+  targetState = null,
+  excludedQuestionIds = [],
+  excludedQuestionCodes = [],
+} = {}) {
+  const params = [];
+  const conditions = ['is_active = TRUE', 'is_assessment = TRUE'];
+
+  if (targetState) {
+    params.push(targetState);
+    conditions.push(`target_state = $${params.length}`);
+  }
+  if (excludedQuestionIds.length) {
+    params.push(excludedQuestionIds);
+    conditions.push(`question_id <> ALL($${params.length}::int[])`);
+  }
+  if (excludedQuestionCodes.length) {
+    params.push(excludedQuestionCodes);
+    conditions.push(`question_code <> ALL($${params.length}::text[])`);
+  }
+
+  const result = await query(
+    `SELECT ${assessmentColumns}
+     FROM adaptive_question_bank
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY priority ASC, question_id ASC`,
+    params
+  );
+
+  return result.rows.map(mapQuestion);
+}
+
+async function getNeutralAssessmentCandidates(options = {}) {
+  return getAssessmentCandidates({ ...options, targetState: 'neutral' });
+}
+
+async function getBranchQuestion(questionCode) {
+  if (!questionCode) {
+    return null;
+  }
+
+  return getAssessmentQuestionByCode(questionCode);
 }
 
 async function getOpeningQuestion() {
@@ -36,6 +142,7 @@ async function getOpeningQuestion() {
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -64,6 +171,7 @@ async function getQuestionByCode(questionCode) {
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -99,6 +207,7 @@ async function getQuestionByTargetState(targetState, excludedQuestionCode = null
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -138,6 +247,7 @@ async function getAnyActiveQuestion(targetState = null) {
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -198,6 +308,7 @@ async function getQuestionByCriteria({
         trigger_keywords AS "triggerKeywords",
         question_text AS "questionText",
         response_type AS "responseType",
+        quick_replies AS "quickReplies",
         priority,
         construct_source AS "constructSource",
         is_active AS "isActive"
@@ -218,20 +329,7 @@ async function getQuestionByCriteria({
 async function getQuestionById(questionId) {
   const result = await query(
     `
-      SELECT
-        question_id AS "questionId",
-        question_code AS "questionCode",
-        phase,
-        category,
-        sub_category AS "subCategory",
-        target_state AS "targetState",
-        question_type AS "questionType",
-        trigger_keywords AS "triggerKeywords",
-        question_text AS "questionText",
-        response_type AS "responseType",
-        priority,
-        construct_source AS "constructSource",
-        is_active AS "isActive"
+      SELECT ${assessmentColumns}
       FROM adaptive_question_bank
       WHERE question_id = $1
       LIMIT 1
@@ -243,10 +341,15 @@ async function getQuestionById(questionId) {
 }
 
 module.exports = {
+  getAssessmentCandidates,
+  getAssessmentQuestionByCode,
+  getBranchQuestion,
+  getNeutralAssessmentCandidates,
   getOpeningQuestion,
   getQuestionByCode,
   getQuestionByTargetState,
   getQuestionByCriteria,
   getQuestionById,
   getAnyActiveQuestion,
+  normalizeQuickReplies,
 };

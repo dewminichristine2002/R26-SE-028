@@ -1386,6 +1386,42 @@ def _candidate_matches_detected_appearance(candidate: dict[str, Any], detected_c
     return bool(color and shape and color == _normalize_color(detected_color) and shape == _normalize_shape(detected_shape))
 
 
+def _appearance_value_known(value: str) -> bool:
+    return bool(value and value not in {"unknown", "not specified", "none", "n/a"})
+
+
+def _colors_compatible(first: str, second: str) -> bool:
+    if not (_appearance_value_known(first) and _appearance_value_known(second)):
+        return True
+    return first == second or {first, second} <= {"gray", "white"}
+
+
+def _shapes_compatible(first: str, second: str) -> bool:
+    if not (_appearance_value_known(first) and _appearance_value_known(second)):
+        return True
+    return first == second or {first, second} <= {"oval", "capsule"}
+
+
+def _candidate_appearance_compatible(candidate: dict[str, Any], detected_color: str, detected_shape: str) -> bool:
+    color = _normalize_color(candidate.get("color"))
+    shape = _normalize_shape(candidate.get("shape"))
+    normalized_detected_color = _normalize_color(detected_color)
+    normalized_detected_shape = _normalize_shape(detected_shape)
+    return _colors_compatible(color, normalized_detected_color) and _shapes_compatible(shape, normalized_detected_shape)
+
+
+def _filter_matches_by_compatible_appearance(
+    matches: list[dict[str, Any]],
+    detected_color: str,
+    detected_shape: str,
+) -> list[dict[str, Any]]:
+    return [
+        match
+        for match in matches
+        if _candidate_appearance_compatible(match, detected_color, detected_shape)
+    ]
+
+
 def _filter_matches_by_detected_appearance(
     matches: list[dict[str, Any]],
     detected_color: str,
@@ -1410,29 +1446,31 @@ def _matches_from_predictions(
     predictions: list[dict[str, Any]],
     candidates: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    candidate_by_name = {
-        _normalize_name(candidate.get("medicineName")): candidate
-        for candidate in candidates
-        if _normalize_name(candidate.get("medicineName"))
-    }
+    candidate_by_name: dict[str, list[dict[str, Any]]] = {}
+    for candidate in candidates:
+        normalized_name = _normalize_name(candidate.get("medicineName"))
+        if normalized_name:
+            candidate_by_name.setdefault(normalized_name, []).append(candidate)
+
     matched = []
     unmatched = []
     for prediction in predictions or []:
         prediction_name = prediction.get("medicineName")
-        candidate = candidate_by_name.get(_normalize_name(prediction_name))
-        if candidate:
-            matched.append(
-                {
-                    "id": candidate.get("id"),
-                    "medicineName": candidate.get("medicineName") or prediction_name or "Medicine",
-                    "dosageMg": candidate.get("dosageMg"),
-                    "color": candidate.get("color") or "",
-                    "shape": candidate.get("shape") or "",
-                    "confidence": prediction.get("confidence") or 0,
-                    "referenceImage": prediction.get("referenceImage"),
-                    "metadata": prediction.get("metadata") or {},
-                }
-            )
+        matching_candidates = candidate_by_name.get(_normalize_name(prediction_name)) or []
+        if matching_candidates:
+            for candidate in matching_candidates:
+                matched.append(
+                    {
+                        "id": candidate.get("id"),
+                        "medicineName": candidate.get("medicineName") or prediction_name or "Medicine",
+                        "dosageMg": candidate.get("dosageMg"),
+                        "color": candidate.get("color") or "",
+                        "shape": candidate.get("shape") or "",
+                        "confidence": prediction.get("confidence") or 0,
+                        "referenceImage": prediction.get("referenceImage"),
+                        "metadata": prediction.get("metadata") or {},
+                    }
+                )
         else:
             unmatched.append(
                 {
@@ -1443,6 +1481,19 @@ def _matches_from_predictions(
                 }
             )
     return matched, unmatched
+
+
+def _has_ambiguous_saved_candidate_tie(matches: list[dict[str, Any]]) -> bool:
+    if len(matches) < 2:
+        return False
+
+    top_confidence = max(float(match.get("confidence") or 0) for match in matches)
+    tied_top_matches = [
+        match
+        for match in matches
+        if abs(float(match.get("confidence") or 0) - top_confidence) < 0.0001
+    ]
+    return len({str(match.get("id") or "") for match in tied_top_matches}) > 1
 
 
 def _accepted_prediction_result(
@@ -1461,10 +1512,17 @@ def _accepted_prediction_result(
     detected_color = str(base.get("detectedColor") or "")
     detected_shape = str(base.get("detectedShape") or "")
     appearance_matched = _filter_matches_by_detected_appearance(matched_by_name, detected_color, detected_shape)
-    appearance_consistent = bool(appearance_matched)
-    matched = appearance_matched or matched_by_name
+    appearance_compatible = _filter_matches_by_compatible_appearance(matched_by_name, detected_color, detected_shape)
+    matched = appearance_matched or appearance_compatible
+    appearance_consistent = bool(matched)
+
+    if matched_by_name and not matched:
+        return None
 
     if candidates and not matched:
+        return None
+
+    if _has_ambiguous_saved_candidate_tie(matched):
         return None
 
     best = matched[0] if matched else (unmatched[0] if unmatched else None)

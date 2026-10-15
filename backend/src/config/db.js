@@ -177,7 +177,7 @@ const getDatabaseTroubleshootingHints = (errorMessage = '') => {
   return hints;
 };
 
-if (!dbConfig.password) {
+if (!dbConfig.password && process.env.NODE_ENV !== 'test') {
   console.warn('DB_PASSWORD is not set. Database-backed features will not work until configured.');
 }
 

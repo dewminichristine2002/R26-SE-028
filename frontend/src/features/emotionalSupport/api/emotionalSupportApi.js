@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { API_BASE_URL } from '../../../services/apiConfig';
+import { API_BASE_URL, getBackendConnectionHelp } from '../../../services/apiConfig';
+import { getAuthHeaders } from '../../../services/authService';
 
 const normalizedApiBaseUrl = API_BASE_URL.replace(/\/$/, '');
 
@@ -8,6 +9,14 @@ const emotionalSupportApi = axios.create({
   timeout: 10000,
 });
 
+emotionalSupportApi.interceptors.request.use(async (config) => ({
+  ...config,
+  headers: {
+    ...(config.headers || {}),
+    ...(await getAuthHeaders()),
+  },
+}));
+
 export const emotionalSupportApiBaseUrl = `${normalizedApiBaseUrl}/emotional-support`;
 
 const withComponent4ErrorHandling = async (request) => {
@@ -15,12 +24,14 @@ const withComponent4ErrorHandling = async (request) => {
     const response = await request();
     return response.data;
   } catch (error) {
+    const isNetworkError = error?.message === 'Network Error' || error?.code === 'ERR_NETWORK';
     const message =
+      (isNetworkError && getBackendConnectionHelp()) ||
       error.response?.data?.error ||
       error.response?.data?.message ||
       error.response?.data?.errors?.join?.(', ') ||
       error.message ||
-      'Component 4 emotional support request failed.';
+      'We could not complete that request. Please try again.';
 
     throw new Error(message);
   }
@@ -62,8 +73,44 @@ export const startAdaptiveChat = (payload) =>
 
 export const respondAdaptiveChat = (payload) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-chat/respond', payload));
+export const startAdaptiveActivity = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/adaptive-activities/start', payload));
+export const getCognitiveActivities = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get('/cognitive-activities', { params: { user_id: Number(userId) } }));
+export const submitAdaptiveActivity = (attemptId, payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post(`/adaptive-activities/attempts/${attemptId}/submit`, payload));
 
 export const getEmotionalTrends = (userId) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.get(`/trends/${Number(userId)}`));
+export const getWellnessTrends = (userId, period = '7d') =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/wellness-trends/${Number(userId)}`, { params: { period } }));
+export const getWellnessSummary = (userId, period = '30d') =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/wellness-summary/${Number(userId)}`, { params: { period } }));
+export const getAdaptiveCaregiverAlerts = (userId, period = '30d') =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/caregiver-alerts/${Number(userId)}`, { params: { period } }));
+
+// Consent-based personalized reminiscence topics.
+export const previewReminiscenceTopic = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-topics/preview', payload));
+export const saveReminiscenceTopic = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-topics', payload));
+export const getReminiscenceTopics = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-topics/${Number(userId)}`));
+export const deleteReminiscenceTopic = (topicId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-topics/${topicId}`, { data: { user_id: Number(userId) } }));
+export const clearReminiscenceTopics = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-topics/user/${Number(userId)}`));
+export const getReminiscencePrompt = (userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-prompt/${Number(userId)}`));
+
+// Memory entries (Life Book, Good Deeds) — photos remain local-only and are not uploaded.
+export const createMemoryEntry = (payload) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-entries', payload));
+export const listMemoryEntries = (userId, entryType = null) =>
+  withComponent4ErrorHandling(() =>
+    emotionalSupportApi.get(`/reminiscence-entries/${Number(userId)}`, { params: entryType ? { entry_type: entryType } : {} })
+  );
+export const deleteMemoryEntry = (entryId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-entries/${entryId}`, { data: { user_id: Number(userId) } }));
 
 export default emotionalSupportApi;

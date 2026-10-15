@@ -49,6 +49,11 @@ For hypertension phase 1:
 2. Train with `python training/hypertension/train_hypertension_model.py`
 3. Start the FastAPI service and use `POST /predict/hypertension`
 
+Each risk trainer also saves PNG training visuals under
+`ml-service/app/models/training_visualizations/<risk-type>/`, including a
+confusion matrix, ROC curve, model metrics comparison, feature correlation
+heatmap, and target-correlation bar chart.
+
 ## Run Locally
 
 ```bash

@@ -55,7 +55,8 @@ function getLocalIPv4() {
       if (/ethernet/.test(lowerName)) score += 40;
       if (/vethernet|wsl|hyper-v|virtual|vmware|docker/.test(lowerName)) score -= 200;
 
-      if (net.address.startsWith('192.168.')) score += 50;
+      if (net.address === '172.20.10.2') score += 80;
+      else if (net.address.startsWith('192.168.')) score += 50;
       else if (net.address.startsWith('10.')) score += 40;
       else if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(net.address)) score += 20;
 

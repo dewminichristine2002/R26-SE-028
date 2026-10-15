@@ -21,8 +21,9 @@ async function getPromptById(promptId) {
   return result.rows[0] || null;
 }
 
-async function getRecentConcernCount({ userId, detectedEmotionalState, days = 7 }) {
-  const result = await query(
+async function getRecentConcernCount({ userId, detectedEmotionalState, days = 7 }, client = null) {
+  const executor = client || { query };
+  const result = await executor.query(
     `
       SELECT COUNT(*)::INT AS total
       FROM narrative_logs

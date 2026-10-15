@@ -57,7 +57,7 @@ router.post('/diabetes', async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('[Predict] diabetes prediction error:', error.message);
-    const status = String(error.message || '').includes('artifacts are missing') ? 503 : 500;
+    const status = error.status || (String(error.message || '').includes('artifacts are missing') ? 503 : 500);
     return res.status(status).json({ error: error.message || 'Failed to predict diabetes risk' });
   }
 });
@@ -165,7 +165,7 @@ router.post('/stroke', async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('[Predict] stroke prediction error:', error.message);
-    const status = String(error.message || '').includes('artifacts are missing') ? 503 : 500;
+    const status = error.status || (String(error.message || '').includes('artifacts are missing') ? 503 : 500);
     return res.status(status).json({ error: error.message || 'Failed to predict stroke risk' });
   }
 });
@@ -269,7 +269,7 @@ router.post('/hypertension', async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('[Predict] hypertension prediction error:', error.message);
-    const status = String(error.message || '').includes('artifacts are missing') ? 503 : 500;
+    const status = error.status || (String(error.message || '').includes('artifacts are missing') ? 503 : 500);
     return res.status(status).json({ error: error.message || 'Failed to predict hypertension risk' });
   }
 });

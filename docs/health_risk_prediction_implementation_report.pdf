@@ -1,0 +1,2069 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R 27 0 R 29 0 R] /Count 13 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 3446 >>
+stream
+BT
+/F1 10 Tf
+/F1 18 Tf
+54.00 785.89 Td
+(Health Risk Prediction Implementation Report) Tj
+-54.00 -785.89 Td
+/F1 15 Tf
+54.00 751.89 Td
+(Scope) Tj
+-54.00 -751.89 Td
+/F1 10 Tf
+54.00 726.89 Td
+(This report covers only the ElderMeds health risk prediction modules for:) Tj
+-54.00 -726.89 Td
+/F1 10 Tf
+66.00 703.89 Td
+(- Diabetes risk prediction) Tj
+-66.00 -703.89 Td
+/F1 10 Tf
+66.00 687.89 Td
+(- Stroke risk prediction) Tj
+-66.00 -687.89 Td
+/F1 10 Tf
+66.00 671.89 Td
+(- Hypertension risk prediction) Tj
+-66.00 -671.89 Td
+/F1 10 Tf
+54.00 651.89 Td
+(It does not cover medicine allergy safety scoring, emotional support risk scoring, pill) Tj
+-54.00 -651.89 Td
+/F1 10 Tf
+54.00 637.89 Td
+(recognition, or medicine intake monitoring.) Tj
+-54.00 -637.89 Td
+/F1 15 Tf
+54.00 608.89 Td
+(1. Overall Architecture) Tj
+-54.00 -608.89 Td
+/F1 10 Tf
+54.00 583.89 Td
+(The health risk prediction feature is implemented as a three-layer system:) Tj
+-54.00 -583.89 Td
+/F1 10 Tf
+54.00 560.89 Td
+(1. React Native frontend screens collect or display user health values.) Tj
+-54.00 -560.89 Td
+/F1 10 Tf
+54.00 541.89 Td
+(2. The Node/Express backend validates the user session, merges saved profile data with new) Tj
+-54.00 -541.89 Td
+/F1 10 Tf
+54.00 527.89 Td
+(input, calls the ML service, stores the result, and returns a user-friendly summary.) Tj
+-54.00 -527.89 Td
+/F1 10 Tf
+54.00 508.89 Td
+(3. The Python FastAPI ML service loads trained model artifacts and returns probability, risk) Tj
+-54.00 -508.89 Td
+/F1 10 Tf
+54.00 494.89 Td
+(level, selected algorithm, contributing factors, and derived values.) Tj
+-54.00 -494.89 Td
+/F1 10 Tf
+54.00 471.89 Td
+(The runtime flow is:) Tj
+-54.00 -471.89 Td
+/F1 9 Tf
+66.00 444.89 Td
+(Frontend prediction screen) Tj
+-66.00 -444.89 Td
+/F1 9 Tf
+66.00 429.89 Td
+(-> frontend prediction service) Tj
+-66.00 -429.89 Td
+/F1 9 Tf
+66.00 414.89 Td
+(-> Node backend /predict route) Tj
+-66.00 -414.89 Td
+/F1 9 Tf
+66.00 399.89 Td
+(-> backend prediction service) Tj
+-66.00 -399.89 Td
+/F1 9 Tf
+66.00 384.89 Td
+(-> FastAPI ML service) Tj
+-66.00 -384.89 Td
+/F1 9 Tf
+66.00 369.89 Td
+(-> saved model + preprocessor) Tj
+-66.00 -369.89 Td
+/F1 9 Tf
+66.00 354.89 Td
+(-> probability and risk band) Tj
+-66.00 -354.89 Td
+/F1 9 Tf
+66.00 339.89 Td
+(-> backend stores prediction) Tj
+-66.00 -339.89 Td
+/F1 9 Tf
+66.00 324.89 Td
+(-> frontend displays result) Tj
+-66.00 -324.89 Td
+/F1 15 Tf
+54.00 295.89 Td
+(2. Frontend Implementation) Tj
+-54.00 -295.89 Td
+/F1 10 Tf
+54.00 270.89 Td
+(The frontend contains one screen per condition:) Tj
+-54.00 -270.89 Td
+/F1 10 Tf
+66.00 247.89 Td
+(- frontend/src/screens/DiabetesPredictionScreen.js) Tj
+-66.00 -247.89 Td
+/F1 10 Tf
+66.00 231.89 Td
+(- frontend/src/screens/StrokePredictionScreen.js) Tj
+-66.00 -231.89 Td
+/F1 10 Tf
+66.00 215.89 Td
+(- frontend/src/screens/HypertensionPredictionScreen.js) Tj
+-66.00 -215.89 Td
+/F1 10 Tf
+54.00 195.89 Td
+(Each screen uses a matching service:) Tj
+-54.00 -195.89 Td
+/F1 10 Tf
+66.00 172.89 Td
+(- frontend/src/services/diabetesPredictionService.js) Tj
+-66.00 -172.89 Td
+/F1 10 Tf
+66.00 156.89 Td
+(- frontend/src/services/strokePredictionService.js) Tj
+-66.00 -156.89 Td
+/F1 10 Tf
+66.00 140.89 Td
+(- frontend/src/services/hypertensionPredictionService.js) Tj
+-66.00 -140.89 Td
+/F1 10 Tf
+54.00 120.89 Td
+(The frontend services call authenticated backend endpoints:) Tj
+-54.00 -120.89 Td
+/F1 9 Tf
+66.00 93.89 Td
+(GET /predict/diabetes/context) Tj
+-66.00 -93.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 1) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 3199 >>
+stream
+BT
+/F1 10 Tf
+/F1 9 Tf
+66.00 785.89 Td
+(POST /predict/diabetes) Tj
+-66.00 -785.89 Td
+/F1 9 Tf
+66.00 770.89 Td
+(POST /predict/diabetes/chat) Tj
+-66.00 -770.89 Td
+/F1 9 Tf
+66.00 751.89 Td
+(GET /predict/stroke/context) Tj
+-66.00 -751.89 Td
+/F1 9 Tf
+66.00 736.89 Td
+(POST /predict/stroke) Tj
+-66.00 -736.89 Td
+/F1 9 Tf
+66.00 721.89 Td
+(POST /predict/stroke/chat) Tj
+-66.00 -721.89 Td
+/F1 9 Tf
+66.00 702.89 Td
+(GET /predict/hypertension/context) Tj
+-66.00 -702.89 Td
+/F1 9 Tf
+66.00 687.89 Td
+(POST /predict/hypertension) Tj
+-66.00 -687.89 Td
+/F1 9 Tf
+66.00 672.89 Td
+(POST /predict/hypertension/chat) Tj
+-66.00 -672.89 Td
+/F1 10 Tf
+54.00 649.89 Td
+(The context endpoints load existing saved user health values and the latest prediction. The) Tj
+-54.00 -649.89 Td
+/F1 10 Tf
+54.00 635.89 Td
+(prediction endpoints submit structured values. The chat endpoints can extract values from) Tj
+-54.00 -635.89 Td
+/F1 10 Tf
+54.00 621.89 Td
+(simple user messages such as "my BP is 145 over 90" or "my sugar is 150".) Tj
+-54.00 -621.89 Td
+/F1 15 Tf
+54.00 592.89 Td
+(3. Backend Implementation) Tj
+-54.00 -592.89 Td
+/F1 10 Tf
+54.00 567.89 Td
+(The backend route file is:) Tj
+-54.00 -567.89 Td
+/F1 10 Tf
+66.00 544.89 Td
+(- backend/src/routes/predict.js) Tj
+-66.00 -544.89 Td
+/F1 10 Tf
+54.00 524.89 Td
+(The main backend service files are:) Tj
+-54.00 -524.89 Td
+/F1 10 Tf
+66.00 501.89 Td
+(- backend/src/services/diabetesPredictionService.js) Tj
+-66.00 -501.89 Td
+/F1 10 Tf
+66.00 485.89 Td
+(- backend/src/services/strokePredictionService.js) Tj
+-66.00 -485.89 Td
+/F1 10 Tf
+66.00 469.89 Td
+(- backend/src/services/hypertensionPredictionService.js) Tj
+-66.00 -469.89 Td
+/F1 10 Tf
+54.00 449.89 Td
+(The backend is responsible for:) Tj
+-54.00 -449.89 Td
+/F1 10 Tf
+66.00 426.89 Td
+(- Requiring database availability.) Tj
+-66.00 -426.89 Td
+/F1 10 Tf
+66.00 410.89 Td
+(- Requiring authenticated user access.) Tj
+-66.00 -410.89 Td
+/F1 10 Tf
+66.00 394.89 Td
+(- Loading saved health profile values.) Tj
+-66.00 -394.89 Td
+/F1 10 Tf
+66.00 378.89 Td
+(- Combining saved values with newly submitted values.) Tj
+-66.00 -378.89 Td
+/F1 10 Tf
+66.00 362.89 Td
+(- Calculating helper values such as BMI.) Tj
+-66.00 -362.89 Td
+/F1 10 Tf
+66.00 346.89 Td
+(- Calling the Python ML service.) Tj
+-66.00 -346.89 Td
+/F1 10 Tf
+66.00 330.89 Td
+(- Generating a plain-language summary.) Tj
+-66.00 -330.89 Td
+/F1 10 Tf
+66.00 314.89 Td
+(- Saving the prediction result and input snapshot.) Tj
+-66.00 -314.89 Td
+/F1 10 Tf
+66.00 298.89 Td
+(- Saving chat history when prediction is triggered from chat.) Tj
+-66.00 -298.89 Td
+/F1 10 Tf
+54.00 278.89 Td
+(The ML service URL is configured through:) Tj
+-54.00 -278.89 Td
+/F1 9 Tf
+66.00 251.89 Td
+(ML_SERVICE_URL) Tj
+-66.00 -251.89 Td
+/F1 10 Tf
+54.00 228.89 Td
+(If not provided, the code defaults to:) Tj
+-54.00 -228.89 Td
+/F1 9 Tf
+66.00 201.89 Td
+(http://localhost:8001) Tj
+-66.00 -201.89 Td
+/F1 10 Tf
+54.00 178.89 Td
+(The backend also uses:) Tj
+-54.00 -178.89 Td
+/F1 9 Tf
+66.00 151.89 Td
+(ML_TIMEOUT_MS) Tj
+-66.00 -151.89 Td
+/F1 10 Tf
+54.00 128.89 Td
+(with a default timeout of 60000 ms.) Tj
+-54.00 -128.89 Td
+/F1 15 Tf
+54.00 99.89 Td
+(4. ML Service Implementation) Tj
+-54.00 -99.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 2) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 3377 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+54.00 785.89 Td
+(The Python service is under:) Tj
+-54.00 -785.89 Td
+/F1 10 Tf
+66.00 762.89 Td
+(- ml-service/app/main.py) Tj
+-66.00 -762.89 Td
+/F1 10 Tf
+66.00 746.89 Td
+(- ml-service/app/routers/predict_diabetes.py) Tj
+-66.00 -746.89 Td
+/F1 10 Tf
+66.00 730.89 Td
+(- ml-service/app/routers/predict_stroke.py) Tj
+-66.00 -730.89 Td
+/F1 10 Tf
+66.00 714.89 Td
+(- ml-service/app/routers/predict_hypertension.py) Tj
+-66.00 -714.89 Td
+/F1 10 Tf
+54.00 694.89 Td
+(The ML inference files are:) Tj
+-54.00 -694.89 Td
+/F1 10 Tf
+66.00 671.89 Td
+(- ml-service/app/services/diabetes_inference.py) Tj
+-66.00 -671.89 Td
+/F1 10 Tf
+66.00 655.89 Td
+(- ml-service/app/services/stroke_inference.py) Tj
+-66.00 -655.89 Td
+/F1 10 Tf
+66.00 639.89 Td
+(- ml-service/app/services/hypertension_inference.py) Tj
+-66.00 -639.89 Td
+/F1 10 Tf
+54.00 619.89 Td
+(Each inference module loads three artifacts:) Tj
+-54.00 -619.89 Td
+/F1 9 Tf
+66.00 592.89 Td
+(<condition>_model.pkl) Tj
+-66.00 -592.89 Td
+/F1 9 Tf
+66.00 577.89 Td
+(<condition>_preprocessor.pkl) Tj
+-66.00 -577.89 Td
+/F1 9 Tf
+66.00 562.89 Td
+(<condition>_model_metadata.json) Tj
+-66.00 -562.89 Td
+/F1 10 Tf
+54.00 539.89 Td
+(The model predicts the probability of the positive class using:) Tj
+-54.00 -539.89 Td
+/F1 9 Tf
+66.00 512.89 Td
+(model.predict_proba\(X_transformed\)[0][1]) Tj
+-66.00 -512.89 Td
+/F1 10 Tf
+54.00 489.89 Td
+(That probability is then mapped into a risk level and a percentage-style confidence value.) Tj
+-54.00 -489.89 Td
+/F1 15 Tf
+54.00 460.89 Td
+(5. Training Implementation) Tj
+-54.00 -460.89 Td
+/F1 10 Tf
+54.00 435.89 Td
+(The training scripts are:) Tj
+-54.00 -435.89 Td
+/F1 10 Tf
+66.00 412.89 Td
+(- ml-service/training/diabetes/train_diabetes_model.py) Tj
+-66.00 -412.89 Td
+/F1 10 Tf
+66.00 396.89 Td
+(- ml-service/training/stroke/train_stroke_model.py) Tj
+-66.00 -396.89 Td
+/F1 10 Tf
+66.00 380.89 Td
+(- ml-service/training/hypertension/train_hypertension_model.py) Tj
+-66.00 -380.89 Td
+/F1 10 Tf
+54.00 360.89 Td
+(All three training scripts follow the same pattern:) Tj
+-54.00 -360.89 Td
+/F1 10 Tf
+54.00 337.89 Td
+(1. Load the raw CSV dataset.) Tj
+-54.00 -337.89 Td
+/F1 10 Tf
+54.00 318.89 Td
+(2. Validate that required target and feature columns are present.) Tj
+-54.00 -318.89 Td
+/F1 10 Tf
+54.00 299.89 Td
+(3. Build the feature matrix X and target label y.) Tj
+-54.00 -299.89 Td
+/F1 10 Tf
+54.00 280.89 Td
+(4. Split the dataset into training and testing data.) Tj
+-54.00 -280.89 Td
+/F1 10 Tf
+54.00 261.89 Td
+(5. Preprocess numeric and categorical features.) Tj
+-54.00 -261.89 Td
+/F1 10 Tf
+54.00 242.89 Td
+(6. Train several candidate models.) Tj
+-54.00 -242.89 Td
+/F1 10 Tf
+54.00 223.89 Td
+(7. Evaluate each model using classification metrics.) Tj
+-54.00 -223.89 Td
+/F1 10 Tf
+54.00 204.89 Td
+(8. Optionally evaluate a soft-voting ensemble.) Tj
+-54.00 -204.89 Td
+/F1 10 Tf
+54.00 185.89 Td
+(9. Select the deployment model based on the defined selection policy.) Tj
+-54.00 -185.89 Td
+/F1 10 Tf
+54.00 166.89 Td
+(10. Save the model, preprocessor, metadata, and visualization outputs.) Tj
+-54.00 -166.89 Td
+/F1 10 Tf
+54.00 143.89 Td
+(The split configuration is:) Tj
+-54.00 -143.89 Td
+/F1 9 Tf
+66.00 116.89 Td
+(test_size = 0.2) Tj
+-66.00 -116.89 Td
+/F1 9 Tf
+66.00 101.89 Td
+(random_state = 42) Tj
+-66.00 -101.89 Td
+/F1 9 Tf
+66.00 86.89 Td
+(stratify = target label) Tj
+-66.00 -86.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 3) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 3902 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+54.00 785.89 Td
+(The compared algorithms are:) Tj
+-54.00 -785.89 Td
+/F1 10 Tf
+66.00 762.89 Td
+(- Logistic Regression) Tj
+-66.00 -762.89 Td
+/F1 10 Tf
+66.00 746.89 Td
+(- Decision Tree) Tj
+-66.00 -746.89 Td
+/F1 10 Tf
+66.00 730.89 Td
+(- Random Forest) Tj
+-66.00 -730.89 Td
+/F1 10 Tf
+66.00 714.89 Td
+(- XGBoost) Tj
+-66.00 -714.89 Td
+/F1 10 Tf
+66.00 698.89 Td
+(- Soft Voting Ensemble) Tj
+-66.00 -698.89 Td
+/F1 10 Tf
+54.00 678.89 Td
+(The soft-voting ensemble combines Logistic Regression, Random Forest, and XGBoost. It is) Tj
+-54.00 -678.89 Td
+/F1 10 Tf
+54.00 664.89 Td
+(selected only if it is at least as strong as the best individual model on the required) Tj
+-54.00 -664.89 Td
+/F1 10 Tf
+54.00 650.89 Td
+(metrics and improves at least one of them.) Tj
+-54.00 -650.89 Td
+/F1 15 Tf
+54.00 621.89 Td
+(6. Why These Algorithms Were Used) Tj
+-54.00 -621.89 Td
+/F1 10 Tf
+54.00 596.89 Td
+(The system compares both simple and more powerful tabular machine learning models.) Tj
+-54.00 -596.89 Td
+/F1 10 Tf
+54.00 573.89 Td
+(Logistic Regression was included because it is fast, stable, easy to interpret, and suitable) Tj
+-54.00 -573.89 Td
+/F1 10 Tf
+54.00 559.89 Td
+(as a baseline for binary medical risk classification. It is also useful when the dataset is) Tj
+-54.00 -559.89 Td
+/F1 10 Tf
+54.00 545.89 Td
+(small or imbalanced because class weighting can improve sensitivity.) Tj
+-54.00 -545.89 Td
+/F1 10 Tf
+54.00 522.89 Td
+(Decision Tree was included because it can model non-linear rules and threshold-like patterns.) Tj
+-54.00 -522.89 Td
+/F1 10 Tf
+54.00 508.89 Td
+(It is easy to understand but can overfit, so it is mainly useful as a comparison model.) Tj
+-54.00 -508.89 Td
+/F1 10 Tf
+54.00 485.89 Td
+(Random Forest was included because it reduces single-tree overfitting by combining many) Tj
+-54.00 -485.89 Td
+/F1 10 Tf
+54.00 471.89 Td
+(trees. It can model non-linear relationships and interactions between variables, but it is) Tj
+-54.00 -471.89 Td
+/F1 10 Tf
+54.00 457.89 Td
+(less compact and less transparent than Logistic Regression.) Tj
+-54.00 -457.89 Td
+/F1 10 Tf
+54.00 434.89 Td
+(XGBoost was included because gradient-boosted trees often perform strongly on structured) Tj
+-54.00 -434.89 Td
+/F1 10 Tf
+54.00 420.89 Td
+(tabular health data. It can capture non-linear patterns and feature interactions more) Tj
+-54.00 -420.89 Td
+/F1 10 Tf
+54.00 406.89 Td
+(effectively than a linear model.) Tj
+-54.00 -406.89 Td
+/F1 10 Tf
+54.00 383.89 Td
+(The Soft Voting Ensemble was tested because combining different model families can sometimes) Tj
+-54.00 -383.89 Td
+/F1 10 Tf
+54.00 369.89 Td
+(improve robustness. However, in the saved artifacts it was not selected because it did not) Tj
+-54.00 -369.89 Td
+/F1 10 Tf
+54.00 355.89 Td
+(satisfy the project selection rule.) Tj
+-54.00 -355.89 Td
+/F1 15 Tf
+54.00 326.89 Td
+(7. Model Selection Policy) Tj
+-54.00 -326.89 Td
+/F1 10 Tf
+54.00 301.89 Td
+(For diabetes and stroke, the selection ranking prioritizes:) Tj
+-54.00 -301.89 Td
+/F1 9 Tf
+66.00 274.89 Td
+(recall) Tj
+-66.00 -274.89 Td
+/F1 9 Tf
+66.00 259.89 Td
+(f1Score) Tj
+-66.00 -259.89 Td
+/F1 9 Tf
+66.00 244.89 Td
+(rocAuc) Tj
+-66.00 -244.89 Td
+/F1 9 Tf
+66.00 229.89 Td
+(accuracy) Tj
+-66.00 -229.89 Td
+/F1 10 Tf
+54.00 206.89 Td
+(This means the system prefers models that catch more true positive risk cases before) Tj
+-54.00 -206.89 Td
+/F1 10 Tf
+54.00 192.89 Td
+(optimizing overall accuracy. This is appropriate for a screening-style healthcare feature,) Tj
+-54.00 -192.89 Td
+/F1 10 Tf
+54.00 178.89 Td
+(where missing a possible risk can be more harmful than showing a cautious warning.) Tj
+-54.00 -178.89 Td
+/F1 10 Tf
+54.00 155.89 Td
+(For hypertension, the selection priority is:) Tj
+-54.00 -155.89 Td
+/F1 9 Tf
+66.00 128.89 Td
+(accuracy) Tj
+-66.00 -128.89 Td
+/F1 9 Tf
+66.00 113.89 Td
+(recall) Tj
+-66.00 -113.89 Td
+/F1 9 Tf
+66.00 98.89 Td
+(f1Score) Tj
+-66.00 -98.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 4) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 2900 >>
+stream
+BT
+/F1 10 Tf
+/F1 9 Tf
+66.00 785.89 Td
+(rocAuc) Tj
+-66.00 -785.89 Td
+/F1 10 Tf
+54.00 762.89 Td
+(The saved hypertension metadata also applies a compact-artifact tie-break. If accuracy,) Tj
+-54.00 -762.89 Td
+/F1 10 Tf
+54.00 748.89 Td
+(recall, and F1 are equal and ROC-AUC is within 0.01, the smaller or simpler model is) Tj
+-54.00 -748.89 Td
+/F1 10 Tf
+54.00 734.89 Td
+(preferred.) Tj
+-54.00 -734.89 Td
+/F1 15 Tf
+54.00 705.89 Td
+(8. Diabetes Risk Prediction) Tj
+-54.00 -705.89 Td
+/F1 12 Tf
+54.00 676.89 Td
+(Dataset) Tj
+-54.00 -676.89 Td
+/F1 10 Tf
+54.00 653.89 Td
+(The diabetes model is trained from the BRFSS 2015 diabetes health indicators dataset:) Tj
+-54.00 -653.89 Td
+/F1 9 Tf
+66.00 626.89 Td
+(ml-service/data/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv) Tj
+-66.00 -626.89 Td
+/F1 10 Tf
+54.00 603.89 Td
+(The target is binary:) Tj
+-54.00 -603.89 Td
+/F1 9 Tf
+66.00 576.89 Td
+(0 = no diabetes) Tj
+-66.00 -576.89 Td
+/F1 9 Tf
+66.00 561.89 Td
+(1 = diabetes or pre-diabetes risk class, depending on source file) Tj
+-66.00 -561.89 Td
+/F1 12 Tf
+54.00 534.89 Td
+(Selected Algorithm) Tj
+-54.00 -534.89 Td
+/F1 10 Tf
+54.00 511.89 Td
+(The selected diabetes algorithm is:) Tj
+-54.00 -511.89 Td
+/F1 9 Tf
+66.00 484.89 Td
+(XGBoost) Tj
+-66.00 -484.89 Td
+/F1 10 Tf
+54.00 461.89 Td
+(XGBoost was selected because it achieved the best ranking across the project priority) Tj
+-54.00 -461.89 Td
+/F1 10 Tf
+54.00 447.89 Td
+(metrics, especially recall and F1-score.) Tj
+-54.00 -447.89 Td
+/F1 12 Tf
+54.00 420.89 Td
+(Features Used) Tj
+-54.00 -420.89 Td
+/F1 10 Tf
+54.00 397.89 Td
+(The diabetes runtime uses these features:) Tj
+-54.00 -397.89 Td
+/F1 9 Tf
+66.00 370.89 Td
+(Age) Tj
+-66.00 -370.89 Td
+/F1 9 Tf
+66.00 355.89 Td
+(Sex) Tj
+-66.00 -355.89 Td
+/F1 9 Tf
+66.00 340.89 Td
+(BMI) Tj
+-66.00 -340.89 Td
+/F1 9 Tf
+66.00 325.89 Td
+(HighBP) Tj
+-66.00 -325.89 Td
+/F1 9 Tf
+66.00 310.89 Td
+(Smoker) Tj
+-66.00 -310.89 Td
+/F1 9 Tf
+66.00 295.89 Td
+(PhysActivity) Tj
+-66.00 -295.89 Td
+/F1 9 Tf
+66.00 280.89 Td
+(HeartDiseaseorAttack) Tj
+-66.00 -280.89 Td
+/F1 9 Tf
+66.00 265.89 Td
+(Stroke) Tj
+-66.00 -265.89 Td
+/F1 9 Tf
+66.00 250.89 Td
+(GenHlth) Tj
+-66.00 -250.89 Td
+/F1 9 Tf
+66.00 235.89 Td
+(DiffWalk) Tj
+-66.00 -235.89 Td
+/F1 12 Tf
+54.00 208.89 Td
+(Feature Mapping) Tj
+-54.00 -208.89 Td
+/F1 10 Tf
+54.00 185.89 Td
+(The app-level user values are converted into training-compatible features:) Tj
+-54.00 -185.89 Td
+/F1 10 Tf
+66.00 162.89 Td
+(- Age is converted into the BRFSS age bin from 1 to 13.) Tj
+-66.00 -162.89 Td
+/F1 10 Tf
+66.00 146.89 Td
+(- Gender is mapped to binary sex.) Tj
+-66.00 -146.89 Td
+/F1 10 Tf
+66.00 130.89 Td
+(- Height and weight are converted into BMI.) Tj
+-66.00 -130.89 Td
+/F1 10 Tf
+66.00 114.89 Td
+(- Systolic BP >= 140 or diastolic BP >= 90 sets HighBP = 1.) Tj
+-66.00 -114.89 Td
+/F1 10 Tf
+66.00 98.89 Td
+(- Smoking status is converted into Smoker.) Tj
+-66.00 -98.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 5) Tj
+ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 3008 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+66.00 785.89 Td
+(- Physical activity is converted into PhysActivity.) Tj
+-66.00 -785.89 Td
+/F1 10 Tf
+66.00 769.89 Td
+(- Existing disease history is scanned for heart disease, stroke, hypertension, mobility) Tj
+-66.00 -769.89 Td
+/F1 10 Tf
+66.00 755.89 Td
+(difficulty, chronic disease, and related terms.) Tj
+-66.00 -755.89 Td
+/F1 12 Tf
+54.00 731.89 Td
+(Risk Level Calculation) Tj
+-54.00 -731.89 Td
+/F1 10 Tf
+54.00 708.89 Td
+(The model returns:) Tj
+-54.00 -708.89 Td
+/F1 9 Tf
+66.00 681.89 Td
+(probability = P\(diabetes risk\)) Tj
+-66.00 -681.89 Td
+/F1 10 Tf
+54.00 658.89 Td
+(The probability is mapped as:) Tj
+-54.00 -658.89 Td
+/F1 9 Tf
+66.00 631.89 Td
+(Low = probability < 0.40) Tj
+-66.00 -631.89 Td
+/F1 9 Tf
+66.00 616.89 Td
+(Medium = 0.40 <= probability < 0.70) Tj
+-66.00 -616.89 Td
+/F1 9 Tf
+66.00 601.89 Td
+(High = probability >= 0.70) Tj
+-66.00 -601.89 Td
+/F1 10 Tf
+54.00 578.89 Td
+(The confidence field is:) Tj
+-54.00 -578.89 Td
+/F1 9 Tf
+66.00 551.89 Td
+(confidence = round\(probability * 100\)) Tj
+-66.00 -551.89 Td
+/F1 12 Tf
+54.00 524.89 Td
+(Clinical Guardrail) Tj
+-54.00 -524.89 Td
+/F1 10 Tf
+54.00 501.89 Td
+(The diabetes module also has a conservative clinical minimum-risk rule. This exists because) Tj
+-54.00 -501.89 Td
+/F1 10 Tf
+54.00 487.89 Td
+(the BRFSS model does not directly include raw glucose readings as a training feature.) Tj
+-54.00 -487.89 Td
+/F1 10 Tf
+54.00 473.89 Td
+(Therefore, the system keeps the ML probability but prevents clearly concerning user-entered) Tj
+-54.00 -473.89 Td
+/F1 10 Tf
+54.00 459.89 Td
+(values from being labelled Low.) Tj
+-54.00 -459.89 Td
+/F1 10 Tf
+54.00 436.89 Td
+(Examples:) Tj
+-54.00 -436.89 Td
+/F1 10 Tf
+66.00 413.89 Td
+(- Blood sugar >= 200 can raise the result to Medium or High.) Tj
+-66.00 -413.89 Td
+/F1 10 Tf
+66.00 397.89 Td
+(- Blood sugar >= 126 plus high BMI, high BP, or family history can raise the result to) Tj
+-66.00 -397.89 Td
+/F1 10 Tf
+66.00 383.89 Td
+(High.) Tj
+-66.00 -383.89 Td
+/F1 10 Tf
+66.00 367.89 Td
+(- BMI >= 40 can raise the result to Medium.) Tj
+-66.00 -367.89 Td
+/F1 10 Tf
+66.00 351.89 Td
+(- BMI >= 30 plus high BP, family history, or low activity can raise the result to Medium.) Tj
+-66.00 -351.89 Td
+/F1 12 Tf
+54.00 327.89 Td
+(Diabetes Metrics) Tj
+-54.00 -327.89 Td
+/F1 9 Tf
+66.00 300.89 Td
+(Selected algorithm: XGBoost) Tj
+-66.00 -300.89 Td
+/F1 9 Tf
+66.00 285.89 Td
+(Accuracy: 0.7427) Tj
+-66.00 -285.89 Td
+/F1 9 Tf
+66.00 270.89 Td
+(Precision: 0.7195) Tj
+-66.00 -270.89 Td
+/F1 9 Tf
+66.00 255.89 Td
+(Recall: 0.7954) Tj
+-66.00 -255.89 Td
+/F1 9 Tf
+66.00 240.89 Td
+(F1-score: 0.7556) Tj
+-66.00 -240.89 Td
+/F1 9 Tf
+66.00 225.89 Td
+(ROC-AUC: 0.8204) Tj
+-66.00 -225.89 Td
+/F1 9 Tf
+66.00 210.89 Td
+(Confusion matrix: [[4878, 2192], [1446, 5623]]) Tj
+-66.00 -210.89 Td
+/F1 9 Tf
+66.00 195.89 Td
+(Training positives: 28277) Tj
+-66.00 -195.89 Td
+/F1 9 Tf
+66.00 180.89 Td
+(Training negatives: 28276) Tj
+-66.00 -180.89 Td
+/F1 12 Tf
+54.00 153.89 Td
+(Interpretation) Tj
+-54.00 -153.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 6) Tj
+ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 2844 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+54.00 785.89 Td
+(The diabetes model is the strongest of the three health risk models in this implementation.) Tj
+-54.00 -785.89 Td
+/F1 10 Tf
+54.00 771.89 Td
+(It has balanced training data and a reasonable ROC-AUC of 0.8204. The recall of 0.7954 means) Tj
+-54.00 -771.89 Td
+/F1 10 Tf
+54.00 757.89 Td
+(it identifies a good proportion of positive risk cases. The clinical guardrail improves) Tj
+-54.00 -757.89 Td
+/F1 10 Tf
+54.00 743.89 Td
+(safety by preventing abnormal glucose and BMI patterns from being hidden behind a low model) Tj
+-54.00 -743.89 Td
+/F1 10 Tf
+54.00 729.89 Td
+(probability.) Tj
+-54.00 -729.89 Td
+/F1 15 Tf
+54.00 700.89 Td
+(9. Stroke Risk Prediction) Tj
+-54.00 -700.89 Td
+/F1 12 Tf
+54.00 671.89 Td
+(Dataset) Tj
+-54.00 -671.89 Td
+/F1 10 Tf
+54.00 648.89 Td
+(The stroke model is trained from:) Tj
+-54.00 -648.89 Td
+/F1 9 Tf
+66.00 621.89 Td
+(ml-service/data/raw/healthcare-dataset-stroke-data.csv) Tj
+-66.00 -621.89 Td
+/F1 10 Tf
+54.00 598.89 Td
+(The target is:) Tj
+-54.00 -598.89 Td
+/F1 9 Tf
+66.00 571.89 Td
+(stroke) Tj
+-66.00 -571.89 Td
+/F1 10 Tf
+54.00 548.89 Td
+(where:) Tj
+-54.00 -548.89 Td
+/F1 9 Tf
+66.00 521.89 Td
+(0 = no stroke) Tj
+-66.00 -521.89 Td
+/F1 9 Tf
+66.00 506.89 Td
+(1 = stroke) Tj
+-66.00 -506.89 Td
+/F1 12 Tf
+54.00 479.89 Td
+(Selected Algorithm) Tj
+-54.00 -479.89 Td
+/F1 10 Tf
+54.00 456.89 Td
+(The selected stroke algorithm is:) Tj
+-54.00 -456.89 Td
+/F1 9 Tf
+66.00 429.89 Td
+(Logistic Regression) Tj
+-66.00 -429.89 Td
+/F1 10 Tf
+54.00 406.89 Td
+(Logistic Regression was selected because the model selection policy prioritizes recall. In) Tj
+-54.00 -406.89 Td
+/F1 10 Tf
+54.00 392.89 Td
+(the saved model comparison, Logistic Regression reached the highest recall among the) Tj
+-54.00 -392.89 Td
+/F1 10 Tf
+54.00 378.89 Td
+(candidate models.) Tj
+-54.00 -378.89 Td
+/F1 12 Tf
+54.00 351.89 Td
+(Features Used) Tj
+-54.00 -351.89 Td
+/F1 10 Tf
+54.00 328.89 Td
+(The stroke runtime uses these features:) Tj
+-54.00 -328.89 Td
+/F1 9 Tf
+66.00 301.89 Td
+(age) Tj
+-66.00 -301.89 Td
+/F1 9 Tf
+66.00 286.89 Td
+(hypertension) Tj
+-66.00 -286.89 Td
+/F1 9 Tf
+66.00 271.89 Td
+(heart_disease) Tj
+-66.00 -271.89 Td
+/F1 9 Tf
+66.00 256.89 Td
+(avg_glucose_level) Tj
+-66.00 -256.89 Td
+/F1 9 Tf
+66.00 241.89 Td
+(bmi) Tj
+-66.00 -241.89 Td
+/F1 9 Tf
+66.00 226.89 Td
+(gender) Tj
+-66.00 -226.89 Td
+/F1 9 Tf
+66.00 211.89 Td
+(ever_married) Tj
+-66.00 -211.89 Td
+/F1 9 Tf
+66.00 196.89 Td
+(work_type) Tj
+-66.00 -196.89 Td
+/F1 9 Tf
+66.00 181.89 Td
+(Residence_type) Tj
+-66.00 -181.89 Td
+/F1 9 Tf
+66.00 166.89 Td
+(smoking_status) Tj
+-66.00 -166.89 Td
+/F1 12 Tf
+54.00 139.89 Td
+(Feature Mapping) Tj
+-54.00 -139.89 Td
+/F1 10 Tf
+54.00 116.89 Td
+(The backend and ML service convert app values as follows:) Tj
+-54.00 -116.89 Td
+/F1 10 Tf
+66.00 93.89 Td
+(- Age is used as a numeric value.) Tj
+-66.00 -93.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 7) Tj
+ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 3399 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+66.00 785.89 Td
+(- Blood pressure and disease history determine the hypertension flag.) Tj
+-66.00 -785.89 Td
+/F1 10 Tf
+66.00 769.89 Td
+(- Disease history determines the heart disease flag.) Tj
+-66.00 -769.89 Td
+/F1 10 Tf
+66.00 753.89 Td
+(- Blood sugar can be used as average glucose if avgGlucoseLevel is not supplied.) Tj
+-66.00 -753.89 Td
+/F1 10 Tf
+66.00 737.89 Td
+(- Height and weight are converted to BMI if BMI is not directly supplied.) Tj
+-66.00 -737.89 Td
+/F1 10 Tf
+66.00 721.89 Td
+(- Gender is normalized to Male, Female, or Other.) Tj
+-66.00 -721.89 Td
+/F1 10 Tf
+66.00 705.89 Td
+(- Smoking is normalized to smokes, formerly smoked, or never smoked.) Tj
+-66.00 -705.89 Td
+/F1 10 Tf
+66.00 689.89 Td
+(- Default values are used for ever_married, work_type, and Residence_type when not) Tj
+-66.00 -689.89 Td
+/F1 10 Tf
+66.00 675.89 Td
+(supplied.) Tj
+-66.00 -675.89 Td
+/F1 12 Tf
+54.00 651.89 Td
+(Risk Level Calculation) Tj
+-54.00 -651.89 Td
+/F1 10 Tf
+54.00 628.89 Td
+(The model returns:) Tj
+-54.00 -628.89 Td
+/F1 9 Tf
+66.00 601.89 Td
+(probability = P\(stroke risk\)) Tj
+-66.00 -601.89 Td
+/F1 10 Tf
+54.00 578.89 Td
+(The probability is mapped as:) Tj
+-54.00 -578.89 Td
+/F1 9 Tf
+66.00 551.89 Td
+(Low = probability < 0.30) Tj
+-66.00 -551.89 Td
+/F1 9 Tf
+66.00 536.89 Td
+(Medium = 0.30 <= probability < 0.65) Tj
+-66.00 -536.89 Td
+/F1 9 Tf
+66.00 521.89 Td
+(High = probability >= 0.65) Tj
+-66.00 -521.89 Td
+/F1 10 Tf
+54.00 498.89 Td
+(The confidence field is:) Tj
+-54.00 -498.89 Td
+/F1 9 Tf
+66.00 471.89 Td
+(confidence = round\(probability * 100\)) Tj
+-66.00 -471.89 Td
+/F1 12 Tf
+54.00 444.89 Td
+(Stroke Metrics) Tj
+-54.00 -444.89 Td
+/F1 9 Tf
+66.00 417.89 Td
+(Selected algorithm: Logistic Regression) Tj
+-66.00 -417.89 Td
+/F1 9 Tf
+66.00 402.89 Td
+(Accuracy: 0.7466) Tj
+-66.00 -402.89 Td
+/F1 9 Tf
+66.00 387.89 Td
+(Precision: 0.1384) Tj
+-66.00 -387.89 Td
+/F1 9 Tf
+66.00 372.89 Td
+(Recall: 0.8000) Tj
+-66.00 -372.89 Td
+/F1 9 Tf
+66.00 357.89 Td
+(F1-score: 0.2360) Tj
+-66.00 -357.89 Td
+/F1 9 Tf
+66.00 342.89 Td
+(ROC-AUC: 0.8426) Tj
+-66.00 -342.89 Td
+/F1 9 Tf
+66.00 327.89 Td
+(Confusion matrix: [[723, 249], [10, 40]]) Tj
+-66.00 -327.89 Td
+/F1 9 Tf
+66.00 312.89 Td
+(Training positives: 199) Tj
+-66.00 -312.89 Td
+/F1 9 Tf
+66.00 297.89 Td
+(Training negatives: 3889) Tj
+-66.00 -297.89 Td
+/F1 12 Tf
+54.00 270.89 Td
+(Interpretation) Tj
+-54.00 -270.89 Td
+/F1 10 Tf
+54.00 247.89 Td
+(The stroke dataset is highly imbalanced, with far fewer positive stroke examples than) Tj
+-54.00 -247.89 Td
+/F1 10 Tf
+54.00 233.89 Td
+(negative examples. Logistic Regression was selected because it achieved high recall, meaning) Tj
+-54.00 -233.89 Td
+/F1 10 Tf
+54.00 219.89 Td
+(it detected 80% of positive stroke cases in the test set. However, precision is low at) Tj
+-54.00 -219.89 Td
+/F1 10 Tf
+54.00 205.89 Td
+(0.1384, meaning many predicted risk cases are false positives.) Tj
+-54.00 -205.89 Td
+/F1 10 Tf
+54.00 182.89 Td
+(This makes the stroke module suitable only as a cautious awareness or screening aid. It) Tj
+-54.00 -182.89 Td
+/F1 10 Tf
+54.00 168.89 Td
+(should not be described as a diagnosis system. Its strength is sensitivity; its weakness is) Tj
+-54.00 -168.89 Td
+/F1 10 Tf
+54.00 154.89 Td
+(false alarms.) Tj
+-54.00 -154.89 Td
+/F1 15 Tf
+54.00 125.89 Td
+(10. Hypertension Risk Prediction) Tj
+-54.00 -125.89 Td
+/F1 12 Tf
+54.00 96.89 Td
+(Dataset) Tj
+-54.00 -96.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 8) Tj
+ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 2711 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+54.00 785.89 Td
+(The hypertension model is trained from:) Tj
+-54.00 -785.89 Td
+/F1 9 Tf
+66.00 758.89 Td
+(ml-service/data/raw/hypertension_dataset.csv) Tj
+-66.00 -758.89 Td
+/F1 10 Tf
+54.00 735.89 Td
+(The target is derived from the source Hypertension column:) Tj
+-54.00 -735.89 Td
+/F1 9 Tf
+66.00 708.89 Td
+(1 when Hypertension is High, 1, or Yes) Tj
+-66.00 -708.89 Td
+/F1 9 Tf
+66.00 693.89 Td
+(0 otherwise) Tj
+-66.00 -693.89 Td
+/F1 12 Tf
+54.00 666.89 Td
+(Selected Algorithm) Tj
+-54.00 -666.89 Td
+/F1 10 Tf
+54.00 643.89 Td
+(The selected hypertension algorithm is:) Tj
+-54.00 -643.89 Td
+/F1 9 Tf
+66.00 616.89 Td
+(Logistic Regression) Tj
+-66.00 -616.89 Td
+/F1 10 Tf
+54.00 593.89 Td
+(It was selected because it matched the highest headline accuracy, recall, and F1-score under) Tj
+-54.00 -593.89 Td
+/F1 10 Tf
+54.00 579.89 Td
+(the current selection policy, and it is simpler and smaller than the alternatives.) Tj
+-54.00 -579.89 Td
+/F1 12 Tf
+54.00 552.89 Td
+(Features Used) Tj
+-54.00 -552.89 Td
+/F1 10 Tf
+54.00 529.89 Td
+(The hypertension runtime uses these numeric features:) Tj
+-54.00 -529.89 Td
+/F1 9 Tf
+66.00 502.89 Td
+(Age) Tj
+-66.00 -502.89 Td
+/F1 9 Tf
+66.00 487.89 Td
+(BMI) Tj
+-66.00 -487.89 Td
+/F1 9 Tf
+66.00 472.89 Td
+(Cholesterol) Tj
+-66.00 -472.89 Td
+/F1 9 Tf
+66.00 457.89 Td
+(Systolic_BP) Tj
+-66.00 -457.89 Td
+/F1 9 Tf
+66.00 442.89 Td
+(Diastolic_BP) Tj
+-66.00 -442.89 Td
+/F1 9 Tf
+66.00 427.89 Td
+(Alcohol_Intake) Tj
+-66.00 -427.89 Td
+/F1 9 Tf
+66.00 412.89 Td
+(Stress_Level) Tj
+-66.00 -412.89 Td
+/F1 9 Tf
+66.00 397.89 Td
+(Salt_Intake) Tj
+-66.00 -397.89 Td
+/F1 9 Tf
+66.00 382.89 Td
+(Sleep_Duration) Tj
+-66.00 -382.89 Td
+/F1 9 Tf
+66.00 367.89 Td
+(Heart_Rate) Tj
+-66.00 -367.89 Td
+/F1 9 Tf
+66.00 352.89 Td
+(LDL) Tj
+-66.00 -352.89 Td
+/F1 9 Tf
+66.00 337.89 Td
+(HDL) Tj
+-66.00 -337.89 Td
+/F1 9 Tf
+66.00 322.89 Td
+(Triglycerides) Tj
+-66.00 -322.89 Td
+/F1 9 Tf
+66.00 307.89 Td
+(Glucose) Tj
+-66.00 -307.89 Td
+/F1 10 Tf
+54.00 284.89 Td
+(It also uses these categorical features:) Tj
+-54.00 -284.89 Td
+/F1 9 Tf
+66.00 257.89 Td
+(Country) Tj
+-66.00 -257.89 Td
+/F1 9 Tf
+66.00 242.89 Td
+(Smoking_Status) Tj
+-66.00 -242.89 Td
+/F1 9 Tf
+66.00 227.89 Td
+(Physical_Activity_Level) Tj
+-66.00 -227.89 Td
+/F1 9 Tf
+66.00 212.89 Td
+(Family_History) Tj
+-66.00 -212.89 Td
+/F1 9 Tf
+66.00 197.89 Td
+(Diabetes) Tj
+-66.00 -197.89 Td
+/F1 9 Tf
+66.00 182.89 Td
+(Gender) Tj
+-66.00 -182.89 Td
+/F1 9 Tf
+66.00 167.89 Td
+(Education_Level) Tj
+-66.00 -167.89 Td
+/F1 9 Tf
+66.00 152.89 Td
+(Employment_Status) Tj
+-66.00 -152.89 Td
+/F1 12 Tf
+54.00 125.89 Td
+(Feature Mapping) Tj
+-54.00 -125.89 Td
+/F1 10 Tf
+54.00 102.89 Td
+(The runtime builds the hypertension row using:) Tj
+-54.00 -102.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 9) Tj
+ET
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 3496 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+66.00 785.89 Td
+(- Age from the profile or metadata default.) Tj
+-66.00 -785.89 Td
+/F1 10 Tf
+66.00 769.89 Td
+(- BMI from supplied BMI or from height and weight.) Tj
+-66.00 -769.89 Td
+/F1 10 Tf
+66.00 753.89 Td
+(- Cholesterol, glucose, LDL, HDL, triglycerides, BP, heart rate, sleep, salt intake,) Tj
+-66.00 -753.89 Td
+/F1 10 Tf
+66.00 739.89 Td
+(alcohol intake, and stress level from the form or defaults.) Tj
+-66.00 -739.89 Td
+/F1 10 Tf
+66.00 723.89 Td
+(- Smoking status normalized to Current, Former, or Never.) Tj
+-66.00 -723.89 Td
+/F1 10 Tf
+66.00 707.89 Td
+(- Physical activity normalized to Low, Moderate, or High.) Tj
+-66.00 -707.89 Td
+/F1 10 Tf
+66.00 691.89 Td
+(- Family history and diabetes normalized to Yes or No.) Tj
+-66.00 -691.89 Td
+/F1 10 Tf
+66.00 675.89 Td
+(- Country, education level, and employment status from user input or model metadata) Tj
+-66.00 -675.89 Td
+/F1 10 Tf
+66.00 661.89 Td
+(defaults.) Tj
+-66.00 -661.89 Td
+/F1 12 Tf
+54.00 637.89 Td
+(Risk Level Calculation) Tj
+-54.00 -637.89 Td
+/F1 10 Tf
+54.00 614.89 Td
+(The model returns:) Tj
+-54.00 -614.89 Td
+/F1 9 Tf
+66.00 587.89 Td
+(probability = P\(hypertension risk\)) Tj
+-66.00 -587.89 Td
+/F1 10 Tf
+54.00 564.89 Td
+(The probability is mapped as:) Tj
+-54.00 -564.89 Td
+/F1 9 Tf
+66.00 537.89 Td
+(Low = probability < 0.40) Tj
+-66.00 -537.89 Td
+/F1 9 Tf
+66.00 522.89 Td
+(Medium = 0.40 <= probability < 0.70) Tj
+-66.00 -522.89 Td
+/F1 9 Tf
+66.00 507.89 Td
+(High = probability >= 0.70) Tj
+-66.00 -507.89 Td
+/F1 10 Tf
+54.00 484.89 Td
+(The confidence field is:) Tj
+-54.00 -484.89 Td
+/F1 9 Tf
+66.00 457.89 Td
+(confidence = round\(probability * 100\)) Tj
+-66.00 -457.89 Td
+/F1 12 Tf
+54.00 430.89 Td
+(Hypertension Metrics) Tj
+-54.00 -430.89 Td
+/F1 9 Tf
+66.00 403.89 Td
+(Selected algorithm: Logistic Regression) Tj
+-66.00 -403.89 Td
+/F1 9 Tf
+66.00 388.89 Td
+(Accuracy: 0.7188) Tj
+-66.00 -388.89 Td
+/F1 9 Tf
+66.00 373.89 Td
+(Balanced accuracy: 0.5000) Tj
+-66.00 -373.89 Td
+/F1 9 Tf
+66.00 358.89 Td
+(Precision: 0.7188) Tj
+-66.00 -358.89 Td
+/F1 9 Tf
+66.00 343.89 Td
+(Recall: 1.0000) Tj
+-66.00 -343.89 Td
+/F1 9 Tf
+66.00 328.89 Td
+(F1-score: 0.8364) Tj
+-66.00 -328.89 Td
+/F1 9 Tf
+66.00 313.89 Td
+(ROC-AUC: 0.4955) Tj
+-66.00 -313.89 Td
+/F1 9 Tf
+66.00 298.89 Td
+(Confusion matrix: [[0, 9840], [0, 25157]]) Tj
+-66.00 -298.89 Td
+/F1 9 Tf
+66.00 283.89 Td
+(Training positives: 100624) Tj
+-66.00 -283.89 Td
+/F1 9 Tf
+66.00 268.89 Td
+(Training negatives: 39361) Tj
+-66.00 -268.89 Td
+/F1 12 Tf
+54.00 241.89 Td
+(Important Limitation) Tj
+-54.00 -241.89 Td
+/F1 10 Tf
+54.00 218.89 Td
+(The hypertension metadata includes a data signal warning. The source label has weak agreement) Tj
+-54.00 -218.89 Td
+/F1 10 Tf
+54.00 204.89 Td
+(with a clinically derived blood-pressure indicator. This means the high accuracy, recall, and) Tj
+-54.00 -204.89 Td
+/F1 10 Tf
+54.00 190.89 Td
+(F1-score are strongly influenced by the majority positive class. The ROC-AUC of 0.4955 is) Tj
+-54.00 -190.89 Td
+/F1 10 Tf
+54.00 176.89 Td
+(close to random.) Tj
+-54.00 -176.89 Td
+/F1 10 Tf
+54.00 153.89 Td
+(In practical terms, the hypertension model is a phase-1 prototype. It can support a) Tj
+-54.00 -153.89 Td
+/F1 10 Tf
+54.00 139.89 Td
+(demonstration of the pipeline, but it should not be presented as a clinically reliable) Tj
+-54.00 -139.89 Td
+/F1 10 Tf
+54.00 125.89 Td
+(predictor without improving the dataset and retraining.) Tj
+-54.00 -125.89 Td
+/F1 15 Tf
+54.00 96.89 Td
+(11. Preprocessing Details) Tj
+-54.00 -96.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 10) Tj
+ET
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 22 0 R >>
+endobj
+24 0 obj
+<< /Length 3257 >>
+stream
+BT
+/F1 10 Tf
+/F1 12 Tf
+54.00 785.89 Td
+(Diabetes) Tj
+-54.00 -785.89 Td
+/F1 10 Tf
+54.00 762.89 Td
+(Diabetes uses numeric preprocessing only:) Tj
+-54.00 -762.89 Td
+/F1 10 Tf
+66.00 739.89 Td
+(- Median imputation for missing values.) Tj
+-66.00 -739.89 Td
+/F1 10 Tf
+66.00 723.89 Td
+(- Standard scaling.) Tj
+-66.00 -723.89 Td
+/F1 12 Tf
+54.00 699.89 Td
+(Stroke) Tj
+-54.00 -699.89 Td
+/F1 10 Tf
+54.00 676.89 Td
+(Stroke uses mixed preprocessing:) Tj
+-54.00 -676.89 Td
+/F1 10 Tf
+66.00 653.89 Td
+(- Numeric features: median imputation and standard scaling.) Tj
+-66.00 -653.89 Td
+/F1 10 Tf
+66.00 637.89 Td
+(- Categorical features: most-frequent imputation and one-hot encoding.) Tj
+-66.00 -637.89 Td
+/F1 10 Tf
+66.00 621.89 Td
+(- Unknown categorical values are ignored safely during inference.) Tj
+-66.00 -621.89 Td
+/F1 12 Tf
+54.00 597.89 Td
+(Hypertension) Tj
+-54.00 -597.89 Td
+/F1 10 Tf
+54.00 574.89 Td
+(Hypertension also uses mixed preprocessing:) Tj
+-54.00 -574.89 Td
+/F1 10 Tf
+66.00 551.89 Td
+(- Numeric features: median imputation and standard scaling.) Tj
+-66.00 -551.89 Td
+/F1 10 Tf
+66.00 535.89 Td
+(- Categorical features: most-frequent imputation and one-hot encoding.) Tj
+-66.00 -535.89 Td
+/F1 10 Tf
+66.00 519.89 Td
+(- Runtime defaults are saved in metadata and used when user values are missing.) Tj
+-66.00 -519.89 Td
+/F1 15 Tf
+54.00 493.89 Td
+(12. Output Fields) Tj
+-54.00 -493.89 Td
+/F1 10 Tf
+54.00 468.89 Td
+(Each health prediction response returns:) Tj
+-54.00 -468.89 Td
+/F1 9 Tf
+66.00 441.89 Td
+(riskType) Tj
+-66.00 -441.89 Td
+/F1 9 Tf
+66.00 426.89 Td
+(riskLevel) Tj
+-66.00 -426.89 Td
+/F1 9 Tf
+66.00 411.89 Td
+(confidence) Tj
+-66.00 -411.89 Td
+/F1 9 Tf
+66.00 396.89 Td
+(selectedAlgorithm) Tj
+-66.00 -396.89 Td
+/F1 9 Tf
+66.00 381.89 Td
+(factors) Tj
+-66.00 -381.89 Td
+/F1 9 Tf
+66.00 366.89 Td
+(probability) Tj
+-66.00 -366.89 Td
+/F1 9 Tf
+66.00 351.89 Td
+(featuresUsed) Tj
+-66.00 -351.89 Td
+/F1 9 Tf
+66.00 336.89 Td
+(derived) Tj
+-66.00 -336.89 Td
+/F1 10 Tf
+54.00 313.89 Td
+(Meaning:) Tj
+-54.00 -313.89 Td
+/F1 10 Tf
+66.00 290.89 Td
+(- riskType: Diabetes, Stroke, or Hypertension.) Tj
+-66.00 -290.89 Td
+/F1 10 Tf
+66.00 274.89 Td
+(- riskLevel: Low, Medium, or High.) Tj
+-66.00 -274.89 Td
+/F1 10 Tf
+66.00 258.89 Td
+(- confidence: probability converted to a percentage-like integer.) Tj
+-66.00 -258.89 Td
+/F1 10 Tf
+66.00 242.89 Td
+(- selectedAlgorithm: algorithm saved in the metadata.) Tj
+-66.00 -242.89 Td
+/F1 10 Tf
+66.00 226.89 Td
+(- factors: top human-readable contributing factors.) Tj
+-66.00 -226.89 Td
+/F1 10 Tf
+66.00 210.89 Td
+(- probability: raw model probability for the positive class.) Tj
+-66.00 -210.89 Td
+/F1 10 Tf
+66.00 194.89 Td
+(- featuresUsed: exact model feature list.) Tj
+-66.00 -194.89 Td
+/F1 10 Tf
+66.00 178.89 Td
+(- derived: calculated helper fields such as BMI, high BP flag, hypertension flag, or) Tj
+-66.00 -178.89 Td
+/F1 10 Tf
+66.00 164.89 Td
+(glucose value.) Tj
+-66.00 -164.89 Td
+/F1 15 Tf
+54.00 138.89 Td
+(13. Contributing Factors) Tj
+-54.00 -138.89 Td
+/F1 10 Tf
+54.00 113.89 Td
+(The displayed factors are not full SHAP explanations. They are rule-based explanation labels) Tj
+-54.00 -113.89 Td
+/F1 10 Tf
+54.00 99.89 Td
+(generated from the submitted values and derived fields.) Tj
+-54.00 -99.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 11) Tj
+ET
+endstream
+endobj
+25 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 24 0 R >>
+endobj
+26 0 obj
+<< /Length 2720 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+54.00 785.89 Td
+(Examples include:) Tj
+-54.00 -785.89 Td
+/F1 10 Tf
+66.00 762.89 Td
+(- High blood sugar) Tj
+-66.00 -762.89 Td
+/F1 10 Tf
+66.00 746.89 Td
+(- High BMI) Tj
+-66.00 -746.89 Td
+/F1 10 Tf
+66.00 730.89 Td
+(- Overweight BMI) Tj
+-66.00 -730.89 Td
+/F1 10 Tf
+66.00 714.89 Td
+(- High blood pressure) Tj
+-66.00 -714.89 Td
+/F1 10 Tf
+66.00 698.89 Td
+(- Low physical activity) Tj
+-66.00 -698.89 Td
+/F1 10 Tf
+66.00 682.89 Td
+(- Smoking history) Tj
+-66.00 -682.89 Td
+/F1 10 Tf
+66.00 666.89 Td
+(- Family history) Tj
+-66.00 -666.89 Td
+/F1 10 Tf
+66.00 650.89 Td
+(- Older age) Tj
+-66.00 -650.89 Td
+/F1 10 Tf
+66.00 634.89 Td
+(- Heart disease history) Tj
+-66.00 -634.89 Td
+/F1 10 Tf
+66.00 618.89 Td
+(- Very high glucose) Tj
+-66.00 -618.89 Td
+/F1 10 Tf
+66.00 602.89 Td
+(- High cholesterol) Tj
+-66.00 -602.89 Td
+/F1 10 Tf
+66.00 586.89 Td
+(- High stress) Tj
+-66.00 -586.89 Td
+/F1 10 Tf
+66.00 570.89 Td
+(- High salt intake) Tj
+-66.00 -570.89 Td
+/F1 10 Tf
+66.00 554.89 Td
+(- Short sleep duration) Tj
+-66.00 -554.89 Td
+/F1 10 Tf
+54.00 534.89 Td
+(The system returns up to five factors.) Tj
+-54.00 -534.89 Td
+/F1 15 Tf
+54.00 505.89 Td
+(14. Persistence and Auditability) Tj
+-54.00 -505.89 Td
+/F1 10 Tf
+54.00 480.89 Td
+(The health profile table stores reusable values:) Tj
+-54.00 -480.89 Td
+/F1 9 Tf
+66.00 453.89 Td
+(user_health_profiles) Tj
+-66.00 -453.89 Td
+/F1 10 Tf
+54.00 430.89 Td
+(Prediction results are stored separately:) Tj
+-54.00 -430.89 Td
+/F1 9 Tf
+66.00 403.89 Td
+(diabetes_risk_predictions) Tj
+-66.00 -403.89 Td
+/F1 9 Tf
+66.00 388.89 Td
+(stroke_risk_predictions) Tj
+-66.00 -388.89 Td
+/F1 9 Tf
+66.00 373.89 Td
+(hypertension_risk_predictions) Tj
+-66.00 -373.89 Td
+/F1 10 Tf
+54.00 350.89 Td
+(Each prediction row stores:) Tj
+-54.00 -350.89 Td
+/F1 9 Tf
+66.00 323.89 Td
+(user_id) Tj
+-66.00 -323.89 Td
+/F1 9 Tf
+66.00 308.89 Td
+(risk_type) Tj
+-66.00 -308.89 Td
+/F1 9 Tf
+66.00 293.89 Td
+(risk_level) Tj
+-66.00 -293.89 Td
+/F1 9 Tf
+66.00 278.89 Td
+(confidence) Tj
+-66.00 -278.89 Td
+/F1 9 Tf
+66.00 263.89 Td
+(probability) Tj
+-66.00 -263.89 Td
+/F1 9 Tf
+66.00 248.89 Td
+(selected_algorithm) Tj
+-66.00 -248.89 Td
+/F1 9 Tf
+66.00 233.89 Td
+(factors) Tj
+-66.00 -233.89 Td
+/F1 9 Tf
+66.00 218.89 Td
+(input_snapshot) Tj
+-66.00 -218.89 Td
+/F1 9 Tf
+66.00 203.89 Td
+(summary) Tj
+-66.00 -203.89 Td
+/F1 9 Tf
+66.00 188.89 Td
+(conversation_id) Tj
+-66.00 -188.89 Td
+/F1 9 Tf
+66.00 173.89 Td
+(created_at) Tj
+-66.00 -173.89 Td
+/F1 10 Tf
+54.00 150.89 Td
+(The input_snapshot is important because it records exactly what values were used for that) Tj
+-54.00 -150.89 Td
+/F1 10 Tf
+54.00 136.89 Td
+(prediction.) Tj
+-54.00 -136.89 Td
+/F1 15 Tf
+54.00 107.89 Td
+(15. Safety Positioning) Tj
+-54.00 -107.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 12) Tj
+ET
+endstream
+endobj
+27 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 26 0 R >>
+endobj
+28 0 obj
+<< /Length 2709 >>
+stream
+BT
+/F1 10 Tf
+/F1 10 Tf
+54.00 785.89 Td
+(The app correctly frames these predictions as health risk awareness, not medical diagnosis.) Tj
+-54.00 -785.89 Td
+/F1 10 Tf
+54.00 762.89 Td
+(The generated summary says that the result:) Tj
+-54.00 -762.89 Td
+/F1 9 Tf
+66.00 735.89 Td
+(is for health risk awareness only and is not a medical diagnosis) Tj
+-66.00 -735.89 Td
+/F1 10 Tf
+54.00 712.89 Td
+(This wording is important because the models are trained on public datasets and are not) Tj
+-54.00 -712.89 Td
+/F1 10 Tf
+54.00 698.89 Td
+(clinically validated for deployment as diagnostic medical devices.) Tj
+-54.00 -698.89 Td
+/F1 15 Tf
+54.00 669.89 Td
+(16. Final Comparison) Tj
+-54.00 -669.89 Td
+/F1 10 Tf
+54.00 644.89 Td
+(| Condition | Selected Algorithm | Accuracy | Precision | Recall | F1-score | ROC-AUC |) Tj
+-54.00 -644.89 Td
+/F1 10 Tf
+54.00 630.89 Td
+(Technical Quality |) Tj
+-54.00 -630.89 Td
+/F1 10 Tf
+54.00 611.89 Td
+(| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |) Tj
+-54.00 -611.89 Td
+/F1 10 Tf
+54.00 592.89 Td
+(| Diabetes | XGBoost | 0.7427 | 0.7195 | 0.7954 | 0.7556 | 0.8204 | Strongest health model in) Tj
+-54.00 -592.89 Td
+/F1 10 Tf
+54.00 578.89 Td
+(this feature |) Tj
+-54.00 -578.89 Td
+/F1 10 Tf
+54.00 559.89 Td
+(| Stroke | Logistic Regression | 0.7466 | 0.1384 | 0.8000 | 0.2360 | 0.8426 | Sensitive) Tj
+-54.00 -559.89 Td
+/F1 10 Tf
+54.00 545.89 Td
+(screening model, low precision |) Tj
+-54.00 -545.89 Td
+/F1 10 Tf
+54.00 526.89 Td
+(| Hypertension | Logistic Regression | 0.7188 | 0.7188 | 1.0000 | 0.8364 | 0.4955 | Prototype) Tj
+-54.00 -526.89 Td
+/F1 10 Tf
+54.00 512.89 Td
+(only; dataset label issue |) Tj
+-54.00 -512.89 Td
+/F1 15 Tf
+54.00 483.89 Td
+(17. Key Technical Conclusion) Tj
+-54.00 -483.89 Td
+/F1 10 Tf
+54.00 458.89 Td
+(The diabetes, stroke, and hypertension modules use a consistent machine learning deployment) Tj
+-54.00 -458.89 Td
+/F1 10 Tf
+54.00 444.89 Td
+(pattern: trained tabular classifiers are saved as artifacts, loaded by a FastAPI service,) Tj
+-54.00 -444.89 Td
+/F1 10 Tf
+54.00 430.89 Td
+(called by a secured Node backend, and displayed in React Native with plain-language factors.) Tj
+-54.00 -430.89 Td
+/F1 10 Tf
+54.00 407.89 Td
+(The diabetes model is the most technically reliable of the three. The stroke model has useful) Tj
+-54.00 -407.89 Td
+/F1 10 Tf
+54.00 393.89 Td
+(recall but low precision because of class imbalance. The hypertension model demonstrates the) Tj
+-54.00 -393.89 Td
+/F1 10 Tf
+54.00 379.89 Td
+(pipeline but has a major dataset limitation, so it should be described carefully as a phase-1) Tj
+-54.00 -379.89 Td
+/F1 10 Tf
+54.00 365.89 Td
+(implementation rather than a clinically reliable model.) Tj
+-54.00 -365.89 Td
+/F1 8 Tf
+461.28 34 Td
+(Page 13) Tj
+ET
+endstream
+endobj
+29 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 28 0 R >>
+endobj
+xref
+0 30
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000198 00000 n 
+0000000268 00000 n 
+0000003766 00000 n 
+0000003898 00000 n 
+0000007149 00000 n 
+0000007281 00000 n 
+0000010710 00000 n 
+0000010842 00000 n 
+0000014797 00000 n 
+0000014931 00000 n 
+0000017884 00000 n 
+0000018018 00000 n 
+0000021079 00000 n 
+0000021213 00000 n 
+0000024110 00000 n 
+0000024244 00000 n 
+0000027696 00000 n 
+0000027830 00000 n 
+0000030594 00000 n 
+0000030728 00000 n 
+0000034277 00000 n 
+0000034411 00000 n 
+0000037721 00000 n 
+0000037855 00000 n 
+0000040628 00000 n 
+0000040762 00000 n 
+0000043524 00000 n 
+trailer
+<< /Size 30 /Root 1 0 R >>
+startxref
+43658
+%%EOF

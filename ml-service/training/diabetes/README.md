@@ -34,11 +34,20 @@ This trains and compares:
 - Decision Tree
 - Random Forest
 - XGBoost
+- Soft Voting Ensemble: Logistic Regression + Random Forest + XGBoost
 
-The best model is selected with priority: recall, then F1-score, then ROC-AUC.
+The best individual model is selected with priority: recall, then F1-score, then ROC-AUC.
+The soft-voting ensemble is saved only when it is at least as strong as the best
+individual model on accuracy, recall, F1-score, and ROC-AUC, and improves at
+least one of those metrics.
 
 ## Artifacts written
 
 - `ml-service/app/models/diabetes_model.pkl`
 - `ml-service/app/models/diabetes_preprocessor.pkl`
 - `ml-service/app/models/diabetes_model_metadata.json`
+- `ml-service/app/models/training_visualizations/diabetes/confusion_matrix.png`
+- `ml-service/app/models/training_visualizations/diabetes/roc_curve.png`
+- `ml-service/app/models/training_visualizations/diabetes/model_metrics_comparison.png`
+- `ml-service/app/models/training_visualizations/diabetes/feature_correlation_heatmap.png`
+- `ml-service/app/models/training_visualizations/diabetes/target_correlation_bar.png`

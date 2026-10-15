@@ -2,7 +2,7 @@ const axios = require('axios');
 const { ensureMlServiceAvailable } = require('./mlServiceManager');
 const { buildFdaSeriousFeaturePayload } = require('./mlFeatureBuilder');
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 60000);
 
 const clampPercent = (value) => Math.max(0, Math.min(100, value));

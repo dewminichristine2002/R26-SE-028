@@ -7,6 +7,12 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
+    "test:unit": "jest --runInBand tests/unit",
+    "test:integration": "jest --runInBand tests/integration",
+    "test:nfr": "jest --runInBand --verbose tests/nfr",
+    "test:e2e": "jest --runInBand tests/e2e",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:nfr && npm run test:e2e",
+    "test:evidence": "node ../scripts/generate-testing-evidence.js",
     "db:migrate": "node scripts/runMigrations.js up",
     "db:migrate:down": "node scripts/runMigrations.js down",
     "db:seed:allergy-demo": "node scripts/seedAllergyDemoData.js",
@@ -25,6 +31,7 @@
     "ml:train": "node ml/scripts/runPython.js train_production_model.py",
     "ml:train-rf": "node ml/scripts/runPython.js train_baseline.py",
     "ml:confusion-matrices": "node ml/scripts/runPython.js generate_confusion_matrices.py",
+    "ml:intake-confusion-matrix": "node ml/scripts/runPython.js generate_intake_monitoring_confusion_matrix.py --cpu",
     "ml:hybrid-ablation": "node ml/scripts/runPython.js evaluate_hybrid_weights.py",
     "ml:retrain": "node ml/scripts/runPython.js retrain_pipeline.py",
     "ml:retrain:force": "node ml/scripts/runPython.js retrain_pipeline.py --force",
@@ -41,20 +48,21 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "jimp": "^1.6.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.12.0",
-    "tesseract.js": "^5.1.0",
-    "bcryptjs": "^2.4.3",
-    "axios": "^1.6.0"
+    "tesseract.js": "^5.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "node-pg-migrate": "^8.0.4",
+    "nodemon": "^3.0.1"
   }
 }

@@ -414,6 +414,10 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
     : [];
 
   detectedMedicines.forEach((item) => {
+    if (item?.appearanceConsistent === false) {
+      return;
+    }
+
     const key = String(item?.id || '').trim();
     const count = Number(item?.count);
     if (!key || !Number.isFinite(count) || count <= 0) {
@@ -435,6 +439,10 @@ const getDetectedMedicineCountMap = (identityAnalysis) => {
     : [];
 
   detectedObjects.forEach((object) => {
+    if (object?.appearanceConsistent === false) {
+      return;
+    }
+
     const match = object?.match || null;
     const key = String(match?.id || '').trim();
     const confidence = Number(match?.confidence ?? object?.confidence) || 0;
@@ -560,7 +568,7 @@ const getMedicineAvailabilityItems = ({ entry, detectedCount = null, identityAna
   detectedObjects.forEach((object) => {
     const match = object?.match || null;
     const key = String(match?.id || '').trim();
-    if (!key || !scheduledKeys.has(key)) {
+    if (!key || !scheduledKeys.has(key) || object?.appearanceConsistent === false) {
       unassignedAppearances.push(getDetectedObjectAppearance(object));
     }
   });
