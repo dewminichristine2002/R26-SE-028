@@ -52,6 +52,7 @@ const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, ' ')
 const normalizeLower = (value) => normalizeText(value).toLowerCase();
 
 const normalizeCommandText = (message) => normalizeLower(message).replace(/[.!?,]/g, '').trim();
+const MERIDIEM_CAPTURE = '(?:a\\s*\\.?\\s*m\\.?|p\\s*\\.?\\s*m\\.?)';
 
 const isConfirmMessage = (message) =>
   /^(yes|yeah|yep|ok|okay|confirm|confirmed|yes confirm it|do it|go ahead|please do|save it|delete it|update it|send it)$/i.test(normalizeCommandText(message));
@@ -89,17 +90,28 @@ const matchNumber = (text, pattern) => {
   return toNumber(match?.[1]);
 };
 
-const formatClock = (hour, minute, period) => {
+const normalizeMeridiem = (period) => {
+  const compact = String(period || '').toLowerCase().replace(/[^apm]/g, '');
+  if (compact === 'am') return 'AM';
+  if (compact === 'pm') return 'PM';
+  return '';
+};
+
+const defaultPeriodForMeal = (mealKey) => (mealKey === 'breakfast' ? 'AM' : 'PM');
+
+const formatClock = (hour, minute, period, fallbackPeriod = '') => {
   let normalizedHour = Number(hour);
   const normalizedMinute = Number(minute || 0);
-  let normalizedPeriod = period ? String(period).toUpperCase() : '';
+  let normalizedPeriod = normalizeMeridiem(period);
 
   if (!Number.isFinite(normalizedHour) || !Number.isFinite(normalizedMinute)) {
     return '';
   }
 
   if (!normalizedPeriod) {
-    normalizedPeriod = normalizedHour < 12 ? 'AM' : 'PM';
+    normalizedPeriod = normalizedHour > 12 || normalizedHour === 0
+      ? (normalizedHour < 12 ? 'AM' : 'PM')
+      : normalizeMeridiem(fallbackPeriod) || (normalizedHour < 12 ? 'AM' : 'PM');
   }
 
   if (normalizedHour === 0) {
@@ -115,13 +127,13 @@ const formatClock = (hour, minute, period) => {
   return `${String(normalizedHour).padStart(2, '0')}:${String(normalizedMinute).padStart(2, '0')} ${normalizedPeriod}`;
 };
 
-const extractTime = (message) => {
+const extractTime = (message, fallbackPeriod = '') => {
   const text = normalizeLower(message);
-  const match = text.match(/\b(\d{1,2})(?::(\d{1,2}))?\s*(am|pm)?\b/i);
+  const match = text.match(new RegExp(`\\b(\\d{1,2})(?:\\s*[:.]\\s*(\\d{1,2}))?\\s*(${MERIDIEM_CAPTURE})?\\b`, 'i'));
   if (!match) {
     return '';
   }
-  return formatClock(match[1], match[2] || '00', match[3] || '');
+  return formatClock(match[1], match[2] || '00', match[3] || '', fallbackPeriod);
 };
 
 const mealFromText = (message) => {
@@ -290,7 +302,7 @@ const buildDeleteMedicationAction = (message) => {
 
 const buildRoutineAction = (message) => {
   const mealKey = mealFromText(message);
-  const time = extractTime(message);
+  const time = extractTime(message, defaultPeriodForMeal(mealKey));
   if (!mealKey || !time) {
     return {
       needsMoreInfo: true,

@@ -1,0 +1,720 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R 27 0 R 29 0 R 31 0 R 33 0 R] /Count 14 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+6 0 obj
+<< /Length 3667 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F2 20 Tf 50.00 785.89 Td (Assistant Chat Screen and RAG Technical Overview) Tj ET
+BT /F2 13.5 Tf 50.00 733.89 Td (Purpose of This Report) Tj ET
+BT /F1 10.2 Tf 50.00 704.89 Td (This report explains the end-to-end technical process of the ElderMeds assistant chat) Tj ET
+BT /F1 10.2 Tf 50.00 688.39 Td (screen, why an LLM is used, how Retrieval-Augmented Generation \(RAG\) works in this project,) Tj ET
+BT /F1 10.2 Tf 50.00 671.89 Td (and the main technical terms used in the implementation.) Tj ET
+BT /F1 10.2 Tf 50.00 648.39 Td (The assistant is not just a visual chat box. It is a full workflow that connects the React) Tj ET
+BT /F1 10.2 Tf 50.00 631.89 Td (Native mobile interface, authenticated Node/Express backend, PostgreSQL health records,) Tj ET
+BT /F1 10.2 Tf 50.00 615.39 Td (Python FastAPI ML service, and a local LLM through Ollama/Llama 3 style endpoints.) Tj ET
+BT /F2 13.5 Tf 50.00 582.89 Td (Why an LLM Is Used) Tj ET
+BT /F1 10.2 Tf 50.00 553.89 Td (The assistant uses a Large Language Model \(LLM\) because users can ask questions in natural) Tj ET
+BT /F1 10.2 Tf 50.00 537.39 Td (language instead of using fixed forms or buttons.) Tj ET
+BT /F1 10.2 Tf 50.00 513.89 Td (Example user messages:) Tj ET
+BT /F3 8.3 Tf 60.00 485.39 Td (Did I miss any medicine this week?) Tj ET
+BT /F3 8.3 Tf 60.00 473.89 Td (Which medicines are running low?) Tj ET
+BT /F3 8.3 Tf 60.00 462.39 Td (I feel lonely today.) Tj ET
+BT /F3 8.3 Tf 60.00 450.89 Td (How can I reduce this risk?) Tj ET
+BT /F3 8.3 Tf 60.00 439.39 Td (Add 20 tablets to Metformin stock.) Tj ET
+BT /F1 10.2 Tf 50.00 415.89 Td (A traditional rule-based chatbot would require many manually written patterns for every) Tj ET
+BT /F1 10.2 Tf 50.00 399.39 Td (possible sentence. An LLM can understand flexible wording, identify the user's intent,) Tj ET
+BT /F1 10.2 Tf 50.00 382.89 Td (generate database queries for record-based questions, and produce readable answers.) Tj ET
+BT /F1 10.2 Tf 50.00 359.39 Td (This is especially useful for elderly users and caregivers because they do not need to know) Tj ET
+BT /F1 10.2 Tf 50.00 342.89 Td (exact app terminology. They can ask questions in a natural way, and the system can still) Tj ET
+BT /F1 10.2 Tf 50.00 326.39 Td (route the request to the correct workflow.) Tj ET
+BT /F2 13.5 Tf 50.00 293.89 Td (Technical Justification for the LLM) Tj ET
+BT /F1 10.2 Tf 50.00 264.89 Td (The LLM is justified for these technical reasons:) Tj ET
+BT /F1 10.2 Tf 50.00 241.39 Td (1. Natural language understanding: It converts human language into structured intent.) Tj ET
+BT /F1 10.2 Tf 50.00 224.89 Td (2. NL2SQL generation: It can translate healthcare-record questions into SQL queries.) Tj ET
+BT /F1 10.2 Tf 50.00 208.39 Td (3. Personalized response generation: It explains retrieved user-specific records in) Tj ET
+BT /F1 10.2 Tf 50.00 191.89 Td (   simple language.) Tj ET
+BT /F1 10.2 Tf 50.00 175.39 Td (4. Follow-up generation: It suggests useful next questions based on the previous answer.) Tj ET
+BT /F1 10.2 Tf 50.00 158.89 Td (5. Caregiver-aware wording: It can adapt answers for elder or caregiver role.) Tj ET
+BT /F1 10.2 Tf 50.00 142.39 Td (6. Reduced UI complexity: Users do not need multiple filters and forms for every) Tj ET
+BT /F1 10.2 Tf 50.00 125.89 Td (   possible query.) Tj ET
+BT /F1 10.2 Tf 50.00 109.39 Td (7. Better accessibility: Voice and text questions are easier than navigating many) Tj ET
+BT /F1 10.2 Tf 50.00 92.89 Td (   screens.) Tj ET
+BT /F1 10.2 Tf 50.00 69.39 Td (The important design decision is that the LLM is not trusted directly. It does not access) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 1 of 14) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 3705 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (the database by itself and it cannot execute SQL. The backend validates all generated SQL) Tj ET
+BT /F1 10.2 Tf 50.00 769.39 Td (before execution.) Tj ET
+BT /F2 13.5 Tf 50.00 736.89 Td (What RAG Means) Tj ET
+BT /F1 10.2 Tf 50.00 707.89 Td (RAG means Retrieval-Augmented Generation.) Tj ET
+BT /F1 10.2 Tf 50.00 684.39 Td (In simple words:) Tj ET
+BT /F3 8.3 Tf 60.00 655.89 Td (Retrieve trusted information first.) Tj ET
+BT /F3 8.3 Tf 60.00 644.39 Td (Then generate an answer using only that retrieved information.) Tj ET
+BT /F1 10.2 Tf 50.00 620.89 Td (Without RAG, an LLM may answer from general training knowledge and may hallucinate.) Tj ET
+BT /F1 10.2 Tf 50.00 604.39 Td (Hallucination means the model invents information that is not supported by real data.) Tj ET
+BT /F1 10.2 Tf 50.00 580.89 Td (With RAG, the system first retrieves relevant records from PostgreSQL, then asks the LLM to) Tj ET
+BT /F1 10.2 Tf 50.00 564.39 Td (explain those records. Therefore, the final answer is grounded in the user's own health) Tj ET
+BT /F1 10.2 Tf 50.00 547.89 Td (data.) Tj ET
+BT /F1 10.2 Tf 50.00 524.39 Td (In this project, the RAG flow is:) Tj ET
+BT /F3 8.3 Tf 60.00 495.89 Td (User question) Tj ET
+BT /F3 8.3 Tf 60.00 484.39 Td (-> ML-service converts question to SQL) Tj ET
+BT /F3 8.3 Tf 60.00 472.89 Td (-> Backend validates SQL) Tj ET
+BT /F3 8.3 Tf 60.00 461.39 Td (-> Backend retrieves user-specific records from PostgreSQL) Tj ET
+BT /F3 8.3 Tf 60.00 449.89 Td (-> Sensitive values are redacted) Tj ET
+BT /F3 8.3 Tf 60.00 438.39 Td (-> ML-service generates a final answer from retrieved rows) Tj ET
+BT /F3 8.3 Tf 60.00 426.89 Td (-> Backend saves the conversation) Tj ET
+BT /F3 8.3 Tf 60.00 415.39 Td (-> Frontend displays the assistant response) Tj ET
+BT /F2 13.5 Tf 50.00 382.89 Td (Main Technical Terms) Tj ET
+BT /F1 10.2 Tf 50.00 353.89 Td (LLM: Large Language Model. A model that understands and generates human language. In this) Tj ET
+BT /F1 10.2 Tf 50.00 337.39 Td (system it helps understand questions, generate SQL, and write friendly answers.) Tj ET
+BT /F1 10.2 Tf 50.00 313.89 Td (RAG: Retrieval-Augmented Generation. A pattern where the system retrieves trusted data first) Tj ET
+BT /F1 10.2 Tf 50.00 297.39 Td (and then uses an LLM to generate an answer from that data.) Tj ET
+BT /F1 10.2 Tf 50.00 273.89 Td (NL2SQL: Natural Language to SQL. The process of converting a user question into a SQL query.) Tj ET
+BT /F1 10.2 Tf 50.00 250.39 Td (SQL: Structured Query Language. The language used to read records from PostgreSQL.) Tj ET
+BT /F1 10.2 Tf 50.00 226.89 Td (PostgreSQL: The relational database that stores user records such as medicines, routines,) Tj ET
+BT /F1 10.2 Tf 50.00 210.39 Td (medication status events, allergy cards, mood logs, caregiver alerts, and assistant) Tj ET
+BT /F1 10.2 Tf 50.00 193.89 Td (messages.) Tj ET
+BT /F1 10.2 Tf 50.00 170.39 Td (Schema digest: A controlled description of the database tables and columns that the LLM is) Tj ET
+BT /F1 10.2 Tf 50.00 153.89 Td (allowed to use. It prevents the LLM from guessing unknown or unsafe tables.) Tj ET
+BT /F1 10.2 Tf 50.00 130.39 Td (Intent: The detected purpose of the message. Example intents include missed medications, low) Tj ET
+BT /F1 10.2 Tf 50.00 113.89 Td (stock, diabetes prediction, health advice, emotional support, or agentic action.) Tj ET
+BT /F1 10.2 Tf 50.00 90.39 Td (User scoping: A safety rule that every user-specific database query must include the current) Tj ET
+BT /F1 10.2 Tf 50.00 73.89 Td (authenticated user id. In this codebase, the backend binds the logged-in user's id as $1.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 2 of 14) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 3439 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (Fallback: A safe backup response returned when the assistant cannot answer safely or when an) Tj ET
+BT /F1 10.2 Tf 50.00 769.39 Td (external dependency fails.) Tj ET
+BT /F1 10.2 Tf 50.00 745.89 Td (Hallucination: An incorrect or invented answer from an LLM. RAG reduces this by forcing) Tj ET
+BT /F1 10.2 Tf 50.00 729.39 Td (answers to be based on retrieved records.) Tj ET
+BT /F1 10.2 Tf 50.00 705.89 Td (Redaction: Removing or replacing sensitive values before sending data to the LLM. Examples) Tj ET
+BT /F1 10.2 Tf 50.00 689.39 Td (include passwords, tokens, emails, and phone numbers.) Tj ET
+BT /F1 10.2 Tf 50.00 665.89 Td (Agentic action: A chat request that changes something in the system, such as adding medicine) Tj ET
+BT /F1 10.2 Tf 50.00 649.39 Td (stock or updating routine time. These actions require confirmation before execution.) Tj ET
+BT /F1 10.2 Tf 50.00 625.89 Td (JWT: JSON Web Token. The authentication token used by the frontend when calling protected) Tj ET
+BT /F1 10.2 Tf 50.00 609.39 Td (backend APIs.) Tj ET
+BT /F1 10.2 Tf 50.00 585.89 Td (API: Application Programming Interface. The HTTP endpoints used by frontend, backend, and) Tj ET
+BT /F1 10.2 Tf 50.00 569.39 Td (ML-service to communicate.) Tj ET
+BT /F2 13.5 Tf 50.00 536.89 Td (Main Files in the Implementation) Tj ET
+BT /F1 10.2 Tf 50.00 507.89 Td (Frontend:) Tj ET
+BT /F3 8.3 Tf 60.00 479.39 Td (frontend/App.js) Tj ET
+BT /F3 8.3 Tf 60.00 467.89 Td (frontend/src/screens/AssistantChatScreen.js) Tj ET
+BT /F3 8.3 Tf 60.00 456.39 Td (frontend/src/components/ChatBubble.js) Tj ET
+BT /F3 8.3 Tf 60.00 444.89 Td (frontend/src/services/assistantService.js) Tj ET
+BT /F3 8.3 Tf 60.00 433.39 Td (frontend/src/services/apiConfig.js) Tj ET
+BT /F3 8.3 Tf 60.00 421.89 Td (frontend/src/services/authService.js) Tj ET
+BT /F1 10.2 Tf 50.00 398.39 Td (Backend:) Tj ET
+BT /F3 8.3 Tf 60.00 369.89 Td (backend/src/index.js) Tj ET
+BT /F3 8.3 Tf 60.00 358.39 Td (backend/src/routes/assistant.js) Tj ET
+BT /F3 8.3 Tf 60.00 346.89 Td (backend/src/controllers/assistantController.js) Tj ET
+BT /F3 8.3 Tf 60.00 335.39 Td (backend/src/services/assistantOrchestrator.js) Tj ET
+BT /F3 8.3 Tf 60.00 323.89 Td (backend/src/services/sqlValidator.js) Tj ET
+BT /F3 8.3 Tf 60.00 312.39 Td (backend/src/services/assistantAgenticActionService.js) Tj ET
+BT /F3 8.3 Tf 60.00 300.89 Td (backend/src/data/schemaDescription.js) Tj ET
+BT /F3 8.3 Tf 60.00 289.39 Td (backend/migrations/1746590400000_assistant_tables.js) Tj ET
+BT /F1 10.2 Tf 50.00 265.89 Td (ML-service:) Tj ET
+BT /F3 8.3 Tf 60.00 237.39 Td (ml-service/app/routers/assistant.py) Tj ET
+BT /F3 8.3 Tf 60.00 225.89 Td (ml-service/app/services/nl2sql.py) Tj ET
+BT /F3 8.3 Tf 60.00 214.39 Td (ml-service/app/services/rag_answer.py) Tj ET
+BT /F3 8.3 Tf 60.00 202.89 Td (ml-service/app/services/health_advice_answer.py) Tj ET
+BT /F3 8.3 Tf 60.00 191.39 Td (ml-service/app/services/ollama_client.py) Tj ET
+BT /F3 8.3 Tf 60.00 179.89 Td (ml-service/app/prompts/nl2sql_system.txt) Tj ET
+BT /F3 8.3 Tf 60.00 168.39 Td (ml-service/app/prompts/answer_system.txt) Tj ET
+BT /F2 13.5 Tf 50.00 135.89 Td (End-to-End Flow Summary) Tj ET
+BT /F1 10.2 Tf 50.00 106.89 Td (The complete assistant runtime path is:) Tj ET
+BT /F3 8.3 Tf 60.00 78.39 Td (React Native Chat Screen) Tj ET
+BT /F3 8.3 Tf 60.00 66.89 Td (-> Frontend assistant service) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 3 of 14) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 3482 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F3 8.3 Tf 60.00 785.89 Td (-> Node/Express assistant route) Tj ET
+BT /F3 8.3 Tf 60.00 774.39 Td (-> Auth and rate limit middleware) Tj ET
+BT /F3 8.3 Tf 60.00 762.89 Td (-> Assistant controller) Tj ET
+BT /F3 8.3 Tf 60.00 751.39 Td (-> Assistant orchestrator) Tj ET
+BT /F3 8.3 Tf 60.00 739.89 Td (-> Optional deterministic workflow) Tj ET
+BT /F3 8.3 Tf 60.00 728.39 Td (-> Optional ML-service NL2SQL) Tj ET
+BT /F3 8.3 Tf 60.00 716.89 Td (-> SQL safety validator) Tj ET
+BT /F3 8.3 Tf 60.00 705.39 Td (-> PostgreSQL query) Tj ET
+BT /F3 8.3 Tf 60.00 693.89 Td (-> Optional ML-service answer generation) Tj ET
+BT /F3 8.3 Tf 60.00 682.39 Td (-> Conversation persistence) Tj ET
+BT /F3 8.3 Tf 60.00 670.89 Td (-> Response returned to frontend) Tj ET
+BT /F3 8.3 Tf 60.00 659.39 Td (-> Chat bubble rendered to user) Tj ET
+BT /F2 13.5 Tf 50.00 626.89 Td (Step 1: Opening the Chat Screen) Tj ET
+BT /F1 10.2 Tf 50.00 597.89 Td (The assistant opens from frontend/App.js. The openAssistant function stores the screen the) Tj ET
+BT /F1 10.2 Tf 50.00 581.39 Td (user came from, optionally stores an initial prompt, and changes activeScreen to) Tj ET
+BT /F1 10.2 Tf 50.00 564.89 Td (assistant-chat.) Tj ET
+BT /F1 10.2 Tf 50.00 541.39 Td (When activeScreen is assistant-chat, App.js renders AssistantChatScreen and passes:) Tj ET
+BT /F3 8.3 Tf 60.00 512.89 Td (initialPrompt) Tj ET
+BT /F3 8.3 Tf 60.00 501.39 Td (onBack) Tj ET
+BT /F3 8.3 Tf 60.00 489.89 Td (onAgentNavigate) Tj ET
+BT /F3 8.3 Tf 60.00 478.39 Td (user) Tj ET
+BT /F1 10.2 Tf 50.00 454.89 Td (The chat screen uses the user role to decide whether to show elder wording or caregiver) Tj ET
+BT /F1 10.2 Tf 50.00 438.39 Td (wording.) Tj ET
+BT /F2 13.5 Tf 50.00 405.89 Td (Step 2: Chat Screen State) Tj ET
+BT /F1 10.2 Tf 50.00 376.89 Td (AssistantChatScreen.js keeps local state for:) Tj ET
+BT /F3 8.3 Tf 60.00 348.39 Td (messages: all visible user and assistant bubbles) Tj ET
+BT /F3 8.3 Tf 60.00 336.89 Td (input: current text box value) Tj ET
+BT /F3 8.3 Tf 60.00 325.39 Td (conversationId: current saved conversation id) Tj ET
+BT /F3 8.3 Tf 60.00 313.89 Td (sending: whether a request is in progress) Tj ET
+BT /F3 8.3 Tf 60.00 302.39 Td (error: visible error message) Tj ET
+BT /F3 8.3 Tf 60.00 290.89 Td (isListening: whether speech recognition is active) Tj ET
+BT /F3 8.3 Tf 60.00 279.39 Td (speakingId: which assistant message is being read aloud) Tj ET
+BT /F3 8.3 Tf 60.00 267.89 Td (showHistory: whether the past-chat modal is visible) Tj ET
+BT /F3 8.3 Tf 60.00 256.39 Td (conversations: loaded chat history list) Tj ET
+BT /F3 8.3 Tf 60.00 244.89 Td (followUpsCollapsed: whether suggested follow-up questions are hidden) Tj ET
+BT /F3 8.3 Tf 60.00 233.39 Td (assistantProgressIndex: progress stage while waiting for answer) Tj ET
+BT /F1 10.2 Tf 50.00 209.89 Td (If an initial prompt is provided, the screen automatically sends it once. This is used when) Tj ET
+BT /F1 10.2 Tf 50.00 193.39 Td (the floating assistant button starts the chat with a summary question.) Tj ET
+BT /F2 13.5 Tf 50.00 160.89 Td (Step 3: User Sends a Message) Tj ET
+BT /F1 10.2 Tf 50.00 131.89 Td (The user can send a message in four ways:) Tj ET
+BT /F1 10.2 Tf 50.00 108.39 Td (1. Type in the text box and press Send.) Tj ET
+BT /F1 10.2 Tf 50.00 91.89 Td (2. Tap an initial suggested prompt.) Tj ET
+BT /F1 10.2 Tf 50.00 75.39 Td (3. Tap a follow-up question after an assistant reply.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 4 of 14) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 2579 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (4. Speak through the microphone button.) Tj ET
+BT /F1 10.2 Tf 50.00 762.39 Td (All of these paths call the same sendMessage function.) Tj ET
+BT /F1 10.2 Tf 50.00 738.89 Td (sendMessage does the following:) Tj ET
+BT /F3 8.3 Tf 60.00 710.39 Td (Trim the message) Tj ET
+BT /F3 8.3 Tf 60.00 698.89 Td (Ignore empty messages) Tj ET
+BT /F3 8.3 Tf 60.00 687.39 Td (Stop current speech playback) Tj ET
+BT /F3 8.3 Tf 60.00 675.89 Td (Clear previous errors) Tj ET
+BT /F3 8.3 Tf 60.00 664.39 Td (Set sending = true) Tj ET
+BT /F3 8.3 Tf 60.00 652.89 Td (Add the user bubble immediately) Tj ET
+BT /F3 8.3 Tf 60.00 641.39 Td (Clear the input box) Tj ET
+BT /F3 8.3 Tf 60.00 629.89 Td (Scroll to bottom) Tj ET
+BT /F3 8.3 Tf 60.00 618.39 Td (Call assistantService.chat) Tj ET
+BT /F2 13.5 Tf 50.00 585.89 Td (Step 4: Frontend API Request) Tj ET
+BT /F1 10.2 Tf 50.00 556.89 Td (frontend/src/services/assistantService.js sends:) Tj ET
+BT /F3 8.3 Tf 60.00 528.39 Td (POST /assistant/chat) Tj ET
+BT /F1 10.2 Tf 50.00 504.89 Td (The base URL comes from apiConfig.js. In development it can use an explicit) Tj ET
+BT /F1 10.2 Tf 50.00 488.39 Td (EXPO_PUBLIC_API_URL, the Metro host, or a default localhost/LAN address.) Tj ET
+BT /F1 10.2 Tf 50.00 464.89 Td (The request body is:) Tj ET
+BT /F3 8.3 Tf 60.00 436.39 Td ({) Tj ET
+BT /F3 8.3 Tf 60.00 424.89 Td (  "message": "Did I miss any medicine this week?",) Tj ET
+BT /F3 8.3 Tf 60.00 413.39 Td (  "conversationId": 12) Tj ET
+BT /F3 8.3 Tf 60.00 401.89 Td (}) Tj ET
+BT /F1 10.2 Tf 50.00 378.39 Td (The authService adds:) Tj ET
+BT /F3 8.3 Tf 60.00 349.89 Td (Authorization: Bearer <jwt>) Tj ET
+BT /F2 13.5 Tf 50.00 317.39 Td (Step 5: Backend Route and Middleware) Tj ET
+BT /F1 10.2 Tf 50.00 288.39 Td (backend/src/index.js mounts the assistant route at:) Tj ET
+BT /F3 8.3 Tf 60.00 259.89 Td (/api/assistant) Tj ET
+BT /F1 10.2 Tf 50.00 236.39 Td (backend/src/routes/assistant.js applies:) Tj ET
+BT /F3 8.3 Tf 60.00 207.89 Td (requireDatabase) Tj ET
+BT /F3 8.3 Tf 60.00 196.39 Td (requireAuth) Tj ET
+BT /F3 8.3 Tf 60.00 184.89 Td (rateLimitChat) Tj ET
+BT /F1 10.2 Tf 50.00 161.39 Td (requireDatabase ensures the database connection is available.) Tj ET
+BT /F1 10.2 Tf 50.00 137.89 Td (requireAuth verifies the JWT and attaches the authenticated user to req.user.) Tj ET
+BT /F1 10.2 Tf 50.00 114.39 Td (rateLimitChat limits the number of chat requests per user per minute. The default is 30) Tj ET
+BT /F1 10.2 Tf 50.00 97.89 Td (requests per minute.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 5 of 14) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 2986 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F2 13.5 Tf 50.00 776.89 Td (Step 6: Assistant Controller) Tj ET
+BT /F1 10.2 Tf 50.00 747.89 Td (assistantController.js receives the request and calls:) Tj ET
+BT /F3 8.3 Tf 60.00 719.39 Td (handleChat\({) Tj ET
+BT /F3 8.3 Tf 60.00 707.89 Td (  userId: req.user.id,) Tj ET
+BT /F3 8.3 Tf 60.00 696.39 Td (  role: req.user.role || 'user',) Tj ET
+BT /F3 8.3 Tf 60.00 684.89 Td (  message: req.body?.message,) Tj ET
+BT /F3 8.3 Tf 60.00 673.39 Td (  conversationId: req.body?.conversationId ? Number\(req.body.conversationId\) : nul) Tj ET
+BT /F3 8.3 Tf 60.00 661.89 Td (l,) Tj ET
+BT /F3 8.3 Tf 60.00 650.39 Td (}\);) Tj ET
+BT /F1 10.2 Tf 50.00 626.89 Td (This means the backend, not the frontend, decides the real user id. That is important for) Tj ET
+BT /F1 10.2 Tf 50.00 610.39 Td (security.) Tj ET
+BT /F2 13.5 Tf 50.00 577.89 Td (Step 7: Assistant Orchestrator Classification) Tj ET
+BT /F1 10.2 Tf 50.00 548.89 Td (assistantOrchestrator.js is the main brain of the chat feature. It first classifies the) Tj ET
+BT /F1 10.2 Tf 50.00 532.39 Td (message before deciding whether to use the general RAG pipeline.) Tj ET
+BT /F1 10.2 Tf 50.00 508.89 Td (The main branches are:) Tj ET
+BT /F3 8.3 Tf 60.00 480.39 Td (Pending confirmation) Tj ET
+BT /F3 8.3 Tf 60.00 468.89 Td (Agentic action) Tj ET
+BT /F3 8.3 Tf 60.00 457.39 Td (Emotional support check-in) Tj ET
+BT /F3 8.3 Tf 60.00 445.89 Td (Health risk advice) Tj ET
+BT /F3 8.3 Tf 60.00 434.39 Td (Stroke prediction) Tj ET
+BT /F3 8.3 Tf 60.00 422.89 Td (Hypertension prediction) Tj ET
+BT /F3 8.3 Tf 60.00 411.39 Td (Diabetes prediction) Tj ET
+BT /F3 8.3 Tf 60.00 399.89 Td (General healthcare-record RAG question) Tj ET
+BT /F1 10.2 Tf 50.00 376.39 Td (This hybrid approach is important. Not every question should go through generic NL2SQL. Some) Tj ET
+BT /F1 10.2 Tf 50.00 359.89 Td (workflows are safer and more accurate as deterministic service calls.) Tj ET
+BT /F2 13.5 Tf 50.00 327.39 Td (Step 8: Agentic Action Flow) Tj ET
+BT /F1 10.2 Tf 50.00 298.39 Td (Agentic actions are messages that change saved data.) Tj ET
+BT /F1 10.2 Tf 50.00 274.89 Td (Examples:) Tj ET
+BT /F3 8.3 Tf 60.00 246.39 Td (Add 20 tablets to Metformin stock.) Tj ET
+BT /F3 8.3 Tf 60.00 234.89 Td (Set breakfast routine to 8 AM.) Tj ET
+BT /F3 8.3 Tf 60.00 223.39 Td (Delete Metformin.) Tj ET
+BT /F3 8.3 Tf 60.00 211.89 Td (Send a refill alert for Paracetamol.) Tj ET
+BT /F1 10.2 Tf 50.00 188.39 Td (The backend parses the action and asks for confirmation first:) Tj ET
+BT /F3 8.3 Tf 60.00 159.89 Td (Add 20 tablets to Metformin stock. Please confirm before I make this change.) Tj ET
+BT /F1 10.2 Tf 50.00 136.39 Td (Only if the user replies yes, confirm, or similar wording does the backend execute the) Tj ET
+BT /F1 10.2 Tf 50.00 119.89 Td (change.) Tj ET
+BT /F1 10.2 Tf 50.00 96.39 Td (Supported action domains include:) Tj ET
+BT /F3 8.3 Tf 60.00 67.89 Td (medication create/update/delete) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 6 of 14) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 2856 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F3 8.3 Tf 60.00 785.89 Td (routine update) Tj ET
+BT /F3 8.3 Tf 60.00 774.39 Td (stock refill/set_stock) Tj ET
+BT /F3 8.3 Tf 60.00 762.89 Td (caregiver alert create/mark_read/delete) Tj ET
+BT /F1 10.2 Tf 50.00 739.39 Td (After a successful action, the backend can return navigation data so the frontend moves the) Tj ET
+BT /F1 10.2 Tf 50.00 722.89 Td (user to the affected screen.) Tj ET
+BT /F2 13.5 Tf 50.00 690.39 Td (Step 9: Emotional Support Flow) Tj ET
+BT /F1 10.2 Tf 50.00 661.39 Td (If the message expresses emotional need, such as "I feel lonely today", the backend runs an) Tj ET
+BT /F1 10.2 Tf 50.00 644.89 Td (emotional support check-in.) Tj ET
+BT /F1 10.2 Tf 50.00 621.39 Td (It uses:) Tj ET
+BT /F3 8.3 Tf 60.00 592.89 Td (emotionAnalysisService) Tj ET
+BT /F3 8.3 Tf 60.00 581.39 Td (interventionService) Tj ET
+BT /F3 8.3 Tf 60.00 569.89 Td (alertService) Tj ET
+BT /F3 8.3 Tf 60.00 558.39 Td (sessionRepository) Tj ET
+BT /F3 8.3 Tf 60.00 546.89 Td (activityRepository) Tj ET
+BT /F3 8.3 Tf 60.00 535.39 Td (alertRepository) Tj ET
+BT /F1 10.2 Tf 50.00 511.89 Td (The result can include:) Tj ET
+BT /F3 8.3 Tf 60.00 483.39 Td (detected emotion) Tj ET
+BT /F3 8.3 Tf 60.00 471.89 Td (confidence score) Tj ET
+BT /F3 8.3 Tf 60.00 460.39 Td (stress score) Tj ET
+BT /F3 8.3 Tf 60.00 448.89 Td (loneliness score) Tj ET
+BT /F3 8.3 Tf 60.00 437.39 Td (risk level) Tj ET
+BT /F3 8.3 Tf 60.00 425.89 Td (intervention message) Tj ET
+BT /F3 8.3 Tf 60.00 414.39 Td (cognitive activity recommendation) Tj ET
+BT /F3 8.3 Tf 60.00 402.89 Td (caregiver alerts created) Tj ET
+BT /F1 10.2 Tf 50.00 379.39 Td (This branch saves the interaction as a health-related check-in, not just a chat answer.) Tj ET
+BT /F2 13.5 Tf 50.00 346.89 Td (Step 10: Health Risk Prediction Flow) Tj ET
+BT /F1 10.2 Tf 50.00 317.89 Td (Messages about checking risk are routed to specific prediction services:) Tj ET
+BT /F3 8.3 Tf 60.00 289.39 Td (diabetesPredictionService) Tj ET
+BT /F3 8.3 Tf 60.00 277.89 Td (strokePredictionService) Tj ET
+BT /F3 8.3 Tf 60.00 266.39 Td (hypertensionPredictionService) Tj ET
+BT /F1 10.2 Tf 50.00 242.89 Td (The backend extracts values from text where possible.) Tj ET
+BT /F1 10.2 Tf 50.00 219.39 Td (Examples:) Tj ET
+BT /F3 8.3 Tf 60.00 190.89 Td (My sugar is 150 today.) Tj ET
+BT /F3 8.3 Tf 60.00 179.39 Td (My BP is 145 over 90.) Tj ET
+BT /F3 8.3 Tf 60.00 167.89 Td (Now my weight is 60kg.) Tj ET
+BT /F1 10.2 Tf 50.00 144.39 Td (The prediction service prepares model input, calls the ML prediction endpoint, creates a) Tj ET
+BT /F1 10.2 Tf 50.00 127.89 Td (summary, saves prediction history, and saves the chat messages into assistant_conversations) Tj ET
+BT /F1 10.2 Tf 50.00 111.39 Td (and assistant_messages.) Tj ET
+BT /F2 13.5 Tf 50.00 78.89 Td (Step 11: Health Advice Flow) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 7 of 14) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 3077 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (Questions like "How can I reduce this risk?" are handled by healthAdviceService.) Tj ET
+BT /F1 10.2 Tf 50.00 762.39 Td (This service retrieves trusted health advice chunks, uses the latest saved prediction) Tj ET
+BT /F1 10.2 Tf 50.00 745.89 Td (context, and may call the ML-service health-advice endpoint.) Tj ET
+BT /F1 10.2 Tf 50.00 722.39 Td (The answer includes a safety note:) Tj ET
+BT /F3 8.3 Tf 60.00 693.89 Td (This is general health guidance, not a medical diagnosis.) Tj ET
+BT /F1 10.2 Tf 50.00 670.39 Td (This is separate from general NL2SQL because advice should come from a controlled health) Tj ET
+BT /F1 10.2 Tf 50.00 653.89 Td (advice knowledge base, not only raw user records.) Tj ET
+BT /F2 13.5 Tf 50.00 621.39 Td (Step 12: General RAG Question Flow) Tj ET
+BT /F1 10.2 Tf 50.00 592.39 Td (If the message is a general healthcare-record question, the system uses the two-stage RAG) Tj ET
+BT /F1 10.2 Tf 50.00 575.89 Td (pipeline.) Tj ET
+BT /F1 10.2 Tf 50.00 552.39 Td (Example questions:) Tj ET
+BT /F3 8.3 Tf 60.00 523.89 Td (Did I miss any medicine this week?) Tj ET
+BT /F3 8.3 Tf 60.00 512.39 Td (Which medicines are running low?) Tj ET
+BT /F3 8.3 Tf 60.00 500.89 Td (Show my recent caregiver alerts.) Tj ET
+BT /F3 8.3 Tf 60.00 489.39 Td (Are any saved medicines dangerous for me?) Tj ET
+BT /F3 8.3 Tf 60.00 477.89 Td (How has my mood been recently?) Tj ET
+BT /F1 10.2 Tf 50.00 454.39 Td (The backend first ensures there is a conversation. If no conversation id exists, it creates) Tj ET
+BT /F1 10.2 Tf 50.00 437.89 Td (one in assistant_conversations. The conversation title is based on the first message.) Tj ET
+BT /F1 10.2 Tf 50.00 414.39 Td (Then it loads recent messages from assistant_messages so the LLM has short conversation) Tj ET
+BT /F1 10.2 Tf 50.00 397.89 Td (context.) Tj ET
+BT /F2 13.5 Tf 50.00 365.39 Td (Step 13: NL2SQL Stage) Tj ET
+BT /F1 10.2 Tf 50.00 336.39 Td (The backend calls the ML-service:) Tj ET
+BT /F3 8.3 Tf 60.00 307.89 Td (POST /assistant/nl2sql) Tj ET
+BT /F1 10.2 Tf 50.00 284.39 Td (The payload includes:) Tj ET
+BT /F3 8.3 Tf 60.00 255.89 Td (question) Tj ET
+BT /F3 8.3 Tf 60.00 244.39 Td (user_role) Tj ET
+BT /F3 8.3 Tf 60.00 232.89 Td (recent_messages) Tj ET
+BT /F3 8.3 Tf 60.00 221.39 Td (schema_digest) Tj ET
+BT /F1 10.2 Tf 50.00 197.89 Td (The schema digest comes from backend/src/data/schemaDescription.js. It lists the only) Tj ET
+BT /F1 10.2 Tf 50.00 181.39 Td (database tables and columns the LLM is allowed to use.) Tj ET
+BT /F1 10.2 Tf 50.00 157.89 Td (The ML-service uses nl2sql.py. It may first try rule-based SQL for common questions. If no) Tj ET
+BT /F1 10.2 Tf 50.00 141.39 Td (rule-based match exists, it calls the LLM with:) Tj ET
+BT /F3 8.3 Tf 60.00 112.89 Td (NL2SQL system prompt) Tj ET
+BT /F3 8.3 Tf 60.00 101.39 Td (user question) Tj ET
+BT /F3 8.3 Tf 60.00 89.89 Td (recent messages) Tj ET
+BT /F3 8.3 Tf 60.00 78.39 Td (schema digest) Tj ET
+BT /F3 8.3 Tf 60.00 66.89 Td (spaCy preprocessing hints) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 8 of 14) Tj ET
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 2829 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (The expected output is JSON:) Tj ET
+BT /F3 8.3 Tf 60.00 757.39 Td ({) Tj ET
+BT /F3 8.3 Tf 60.00 745.89 Td (  "sql": "SELECT ... WHERE user_id = $1 LIMIT 100",) Tj ET
+BT /F3 8.3 Tf 60.00 734.39 Td (  "params": ["$1"],) Tj ET
+BT /F3 8.3 Tf 60.00 722.89 Td (  "intent": "missed_medications",) Tj ET
+BT /F3 8.3 Tf 60.00 711.39 Td (  "fallback": false,) Tj ET
+BT /F3 8.3 Tf 60.00 699.89 Td (  "fallback_message": "") Tj ET
+BT /F3 8.3 Tf 60.00 688.39 Td (}) Tj ET
+BT /F2 13.5 Tf 50.00 655.89 Td (Step 14: SQL Safety Validation) Tj ET
+BT /F1 10.2 Tf 50.00 626.89 Td (The backend never executes LLM SQL directly.) Tj ET
+BT /F1 10.2 Tf 50.00 603.39 Td (sqlValidator.js enforces these rules:) Tj ET
+BT /F3 8.3 Tf 60.00 574.89 Td (Exactly one statement) Tj ET
+BT /F3 8.3 Tf 60.00 563.39 Td (Only SELECT queries) Tj ET
+BT /F3 8.3 Tf 60.00 551.89 Td (Only allowed tables from schemaDescription.js) Tj ET
+BT /F3 8.3 Tf 60.00 540.39 Td (No INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, or other write commands) Tj ET
+BT /F3 8.3 Tf 60.00 528.89 Td (No SQL comments) Tj ET
+BT /F3 8.3 Tf 60.00 517.39 Td (No pg_* catalog access) Tj ET
+BT /F3 8.3 Tf 60.00 505.89 Td (No information_schema access) Tj ET
+BT /F3 8.3 Tf 60.00 494.39 Td (Every user-scoped table must include user id = $1) Tj ET
+BT /F3 8.3 Tf 60.00 482.89 Td (Only $1 parameter is allowed) Tj ET
+BT /F3 8.3 Tf 60.00 471.39 Td (LIMIT 100 is added if missing) Tj ET
+BT /F1 10.2 Tf 50.00 447.89 Td (If validation fails, the user receives a safe fallback answer:) Tj ET
+BT /F3 8.3 Tf 60.00 419.39 Td (I cannot answer that safely.) Tj ET
+BT /F1 10.2 Tf 50.00 395.89 Td (The failure reason is stored for debugging and evaluation.) Tj ET
+BT /F2 13.5 Tf 50.00 363.39 Td (Step 15: Database Retrieval) Tj ET
+BT /F1 10.2 Tf 50.00 334.39 Td (After validation, the backend executes the SQL using PostgreSQL.) Tj ET
+BT /F1 10.2 Tf 50.00 310.89 Td (The query is always bound with:) Tj ET
+BT /F3 8.3 Tf 60.00 282.39 Td ($1 = authenticated user id) Tj ET
+BT /F1 10.2 Tf 50.00 258.89 Td (The backend also sets a statement timeout, defaulting to 5 seconds, and limits returned rows) Tj ET
+BT /F1 10.2 Tf 50.00 242.39 Td (to 100.) Tj ET
+BT /F1 10.2 Tf 50.00 218.89 Td (This protects performance and prevents long-running generated queries.) Tj ET
+BT /F2 13.5 Tf 50.00 186.39 Td (Step 16: Redaction Before Answer Generation) Tj ET
+BT /F1 10.2 Tf 50.00 157.39 Td (Before retrieved rows are sent back to the LLM for explanation, sensitive values are) Tj ET
+BT /F1 10.2 Tf 50.00 140.89 Td (redacted.) Tj ET
+BT /F1 10.2 Tf 50.00 117.39 Td (Sensitive keys include:) Tj ET
+BT /F3 8.3 Tf 60.00 88.89 Td (password) Tj ET
+BT /F3 8.3 Tf 60.00 77.39 Td (password_hash) Tj ET
+BT /F3 8.3 Tf 60.00 65.89 Td (token) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 9 of 14) Tj ET
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 22 0 R >>
+endobj
+24 0 obj
+<< /Length 2570 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F3 8.3 Tf 60.00 785.89 Td (authorization) Tj ET
+BT /F3 8.3 Tf 60.00 774.39 Td (caregiver_phone) Tj ET
+BT /F3 8.3 Tf 60.00 762.89 Td (phone) Tj ET
+BT /F3 8.3 Tf 60.00 751.39 Td (email) Tj ET
+BT /F3 8.3 Tf 60.00 739.89 Td (caregiver_email) Tj ET
+BT /F1 10.2 Tf 50.00 716.39 Td (This reduces privacy risk because the LLM only receives data needed to answer the question.) Tj ET
+BT /F2 13.5 Tf 50.00 683.89 Td (Step 17: Answer Generation Stage) Tj ET
+BT /F1 10.2 Tf 50.00 654.89 Td (The backend calls:) Tj ET
+BT /F3 8.3 Tf 60.00 626.39 Td (POST /assistant/answer) Tj ET
+BT /F1 10.2 Tf 50.00 602.89 Td (The payload includes:) Tj ET
+BT /F3 8.3 Tf 60.00 574.39 Td (question) Tj ET
+BT /F3 8.3 Tf 60.00 562.89 Td (validated SQL) Tj ET
+BT /F3 8.3 Tf 60.00 551.39 Td (retrieved rows) Tj ET
+BT /F3 8.3 Tf 60.00 539.89 Td (intent) Tj ET
+BT /F3 8.3 Tf 60.00 528.39 Td (user_role) Tj ET
+BT /F1 10.2 Tf 50.00 504.89 Td (The ML-service uses rag_answer.py and answer_system.txt to generate a friendly response. The) Tj ET
+BT /F1 10.2 Tf 50.00 488.39 Td (answer generator is instructed to use only the retrieved rows and avoid inventing facts.) Tj ET
+BT /F1 10.2 Tf 50.00 464.89 Td (The expected response is:) Tj ET
+BT /F3 8.3 Tf 60.00 436.39 Td ({) Tj ET
+BT /F3 8.3 Tf 60.00 424.89 Td (  "answer": "You missed two medicine doses this week...",) Tj ET
+BT /F3 8.3 Tf 60.00 413.39 Td (  "follow_ups": [) Tj ET
+BT /F3 8.3 Tf 60.00 401.89 Td (    "Which medicine did I miss most?",) Tj ET
+BT /F3 8.3 Tf 60.00 390.39 Td (    "What should my caregiver monitor?") Tj ET
+BT /F3 8.3 Tf 60.00 378.89 Td (  ]) Tj ET
+BT /F3 8.3 Tf 60.00 367.39 Td (}) Tj ET
+BT /F2 13.5 Tf 50.00 334.89 Td (Step 18: Conversation Persistence) Tj ET
+BT /F1 10.2 Tf 50.00 305.89 Td (The system stores chat history in two tables:) Tj ET
+BT /F3 8.3 Tf 60.00 277.39 Td (assistant_conversations) Tj ET
+BT /F3 8.3 Tf 60.00 265.89 Td (assistant_messages) Tj ET
+BT /F1 10.2 Tf 50.00 242.39 Td (assistant_conversations stores:) Tj ET
+BT /F3 8.3 Tf 60.00 213.89 Td (id) Tj ET
+BT /F3 8.3 Tf 60.00 202.39 Td (user_id) Tj ET
+BT /F3 8.3 Tf 60.00 190.89 Td (title) Tj ET
+BT /F3 8.3 Tf 60.00 179.39 Td (created_at) Tj ET
+BT /F3 8.3 Tf 60.00 167.89 Td (updated_at) Tj ET
+BT /F1 10.2 Tf 50.00 144.39 Td (assistant_messages stores:) Tj ET
+BT /F3 8.3 Tf 60.00 115.89 Td (id) Tj ET
+BT /F3 8.3 Tf 60.00 104.39 Td (conversation_id) Tj ET
+BT /F3 8.3 Tf 60.00 92.89 Td (user_id) Tj ET
+BT /F3 8.3 Tf 60.00 81.39 Td (role) Tj ET
+BT /F3 8.3 Tf 60.00 69.89 Td (content) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 10 of 14) Tj ET
+endstream
+endobj
+25 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 24 0 R >>
+endobj
+26 0 obj
+<< /Length 2961 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F3 8.3 Tf 60.00 785.89 Td (sql_used) Tj ET
+BT /F3 8.3 Tf 60.00 774.39 Td (rows_returned) Tj ET
+BT /F3 8.3 Tf 60.00 762.89 Td (intent) Tj ET
+BT /F3 8.3 Tf 60.00 751.39 Td (fallback_reason) Tj ET
+BT /F3 8.3 Tf 60.00 739.89 Td (latency_ms) Tj ET
+BT /F3 8.3 Tf 60.00 728.39 Td (created_at) Tj ET
+BT /F1 10.2 Tf 50.00 704.89 Td (This means the app can show previous chats, reload messages, inspect what SQL was used, and) Tj ET
+BT /F1 10.2 Tf 50.00 688.39 Td (track fallback reasons.) Tj ET
+BT /F2 13.5 Tf 50.00 655.89 Td (Step 19: Frontend Response Handling) Tj ET
+BT /F1 10.2 Tf 50.00 626.89 Td (The backend returns data like:) Tj ET
+BT /F3 8.3 Tf 60.00 598.39 Td ({) Tj ET
+BT /F3 8.3 Tf 60.00 586.89 Td (  conversationId,) Tj ET
+BT /F3 8.3 Tf 60.00 575.39 Td (  answer,) Tj ET
+BT /F3 8.3 Tf 60.00 563.89 Td (  sql,) Tj ET
+BT /F3 8.3 Tf 60.00 552.39 Td (  rows,) Tj ET
+BT /F3 8.3 Tf 60.00 540.89 Td (  sources,) Tj ET
+BT /F3 8.3 Tf 60.00 529.39 Td (  safetyNote,) Tj ET
+BT /F3 8.3 Tf 60.00 517.89 Td (  fallback,) Tj ET
+BT /F3 8.3 Tf 60.00 506.39 Td (  followUps,) Tj ET
+BT /F3 8.3 Tf 60.00 494.89 Td (  actionResult,) Tj ET
+BT /F3 8.3 Tf 60.00 483.39 Td (  pendingAction,) Tj ET
+BT /F3 8.3 Tf 60.00 471.89 Td (  intent) Tj ET
+BT /F3 8.3 Tf 60.00 460.39 Td (}) Tj ET
+BT /F1 10.2 Tf 50.00 436.89 Td (AssistantChatScreen.js then:) Tj ET
+BT /F3 8.3 Tf 60.00 408.39 Td (Updates conversationId if needed) Tj ET
+BT /F3 8.3 Tf 60.00 396.89 Td (Creates an assistant bubble) Tj ET
+BT /F3 8.3 Tf 60.00 385.39 Td (Stores SQL and rows on the message object) Tj ET
+BT /F3 8.3 Tf 60.00 373.89 Td (Shows trusted sources or safety note if available) Tj ET
+BT /F3 8.3 Tf 60.00 362.39 Td (Displays follow-up suggestions) Tj ET
+BT /F3 8.3 Tf 60.00 350.89 Td (Stops loading state) Tj ET
+BT /F3 8.3 Tf 60.00 339.39 Td (Scrolls to the bottom) Tj ET
+BT /F3 8.3 Tf 60.00 327.89 Td (Optionally navigates after action completion) Tj ET
+BT /F2 13.5 Tf 50.00 295.39 Td (Step 20: Chat Bubble Rendering) Tj ET
+BT /F1 10.2 Tf 50.00 266.39 Td (ChatBubble.js displays:) Tj ET
+BT /F3 8.3 Tf 60.00 237.89 Td (User messages on the right) Tj ET
+BT /F3 8.3 Tf 60.00 226.39 Td (Assistant messages on the left) Tj ET
+BT /F3 8.3 Tf 60.00 214.89 Td (Assistant avatar) Tj ET
+BT /F3 8.3 Tf 60.00 203.39 Td (Fallback styling for safe-error replies) Tj ET
+BT /F3 8.3 Tf 60.00 191.89 Td (Trusted sources if available) Tj ET
+BT /F3 8.3 Tf 60.00 180.39 Td (Safety note if available) Tj ET
+BT /F3 8.3 Tf 60.00 168.89 Td (Listen button for text-to-speech) Tj ET
+BT /F1 10.2 Tf 50.00 145.39 Td (The SQL and rows are kept in the message object for traceability, even if the current bubble) Tj ET
+BT /F1 10.2 Tf 50.00 128.89 Td (UI mainly displays the readable answer and source labels.) Tj ET
+BT /F2 13.5 Tf 50.00 96.39 Td (Step 21: Voice Input and Output) Tj ET
+BT /F1 10.2 Tf 50.00 67.39 Td (Voice input uses expo-speech-recognition.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 11 of 14) Tj ET
+endstream
+endobj
+27 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 26 0 R >>
+endobj
+28 0 obj
+<< /Length 3015 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (Flow:) Tj ET
+BT /F3 8.3 Tf 60.00 757.39 Td (User taps Talk) Tj ET
+BT /F3 8.3 Tf 60.00 745.89 Td (App requests microphone permission) Tj ET
+BT /F3 8.3 Tf 60.00 734.39 Td (Speech recognition starts) Tj ET
+BT /F3 8.3 Tf 60.00 722.89 Td (Interim transcript appears in input box) Tj ET
+BT /F3 8.3 Tf 60.00 711.39 Td (Final transcript is submitted to sendMessage) Tj ET
+BT /F1 10.2 Tf 50.00 687.89 Td (Voice output uses expo-speech.) Tj ET
+BT /F1 10.2 Tf 50.00 664.39 Td (Each assistant message can be read aloud using the Listen button. If the same message is) Tj ET
+BT /F1 10.2 Tf 50.00 647.89 Td (already speaking, tapping again stops it.) Tj ET
+BT /F1 10.2 Tf 50.00 624.39 Td (This improves accessibility for elderly users.) Tj ET
+BT /F2 13.5 Tf 50.00 591.89 Td (Step 22: Chat History Management) Tj ET
+BT /F1 10.2 Tf 50.00 562.89 Td (The chat screen supports persistent history.) Tj ET
+BT /F1 10.2 Tf 50.00 539.39 Td (Endpoints:) Tj ET
+BT /F3 8.3 Tf 60.00 510.89 Td (GET /api/assistant/conversations) Tj ET
+BT /F3 8.3 Tf 60.00 499.39 Td (GET /api/assistant/conversations/:id/messages) Tj ET
+BT /F3 8.3 Tf 60.00 487.89 Td (PATCH /api/assistant/conversations/:id) Tj ET
+BT /F3 8.3 Tf 60.00 476.39 Td (DELETE /api/assistant/conversations/:id) Tj ET
+BT /F1 10.2 Tf 50.00 452.89 Td (The user can:) Tj ET
+BT /F3 8.3 Tf 60.00 424.39 Td (Open a previous chat) Tj ET
+BT /F3 8.3 Tf 60.00 412.89 Td (Start a new chat) Tj ET
+BT /F3 8.3 Tf 60.00 401.39 Td (Rename a chat) Tj ET
+BT /F3 8.3 Tf 60.00 389.89 Td (Delete a chat) Tj ET
+BT /F1 10.2 Tf 50.00 366.39 Td (When an old chat is selected, messages are mapped from database rows into frontend bubble) Tj ET
+BT /F1 10.2 Tf 50.00 349.89 Td (objects.) Tj ET
+BT /F2 13.5 Tf 50.00 317.39 Td (Security and Safety Design) Tj ET
+BT /F1 10.2 Tf 50.00 288.39 Td (The system has several safety layers:) Tj ET
+BT /F1 10.2 Tf 50.00 264.89 Td (1. JWT authentication ensures only logged-in users can call assistant APIs.) Tj ET
+BT /F1 10.2 Tf 50.00 248.39 Td (2. The backend uses req.user.id, not a user id from the frontend body.) Tj ET
+BT /F1 10.2 Tf 50.00 231.89 Td (3. Chat requests are rate limited.) Tj ET
+BT /F1 10.2 Tf 50.00 215.39 Td (4. LLM-generated SQL is validated before execution.) Tj ET
+BT /F1 10.2 Tf 50.00 198.89 Td (5. Only SELECT queries are allowed in the RAG SQL path.) Tj ET
+BT /F1 10.2 Tf 50.00 182.39 Td (6. Every user-specific query must include the authenticated user id.) Tj ET
+BT /F1 10.2 Tf 50.00 165.89 Td (7. Sensitive fields are redacted before LLM answer generation.) Tj ET
+BT /F1 10.2 Tf 50.00 149.39 Td (8. Database statement timeout prevents long-running queries.) Tj ET
+BT /F1 10.2 Tf 50.00 132.89 Td (9. Fallback responses are returned when safety checks fail.) Tj ET
+BT /F1 10.2 Tf 50.00 116.39 Td (10. Medical advice includes a non-diagnostic safety note.) Tj ET
+BT /F1 10.2 Tf 50.00 99.89 Td (11. Agentic write actions require confirmation.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 12 of 14) Tj ET
+endstream
+endobj
+29 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 28 0 R >>
+endobj
+30 0 obj
+<< /Length 3334 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F2 13.5 Tf 50.00 776.89 Td (Caregiver Mode) Tj ET
+BT /F1 10.2 Tf 50.00 747.89 Td (If the logged-in role is caregiver, the frontend adapts prompt wording.) Tj ET
+BT /F1 10.2 Tf 50.00 724.39 Td (Example elder prompt:) Tj ET
+BT /F3 8.3 Tf 60.00 695.89 Td (Did I miss any medicine this week?) Tj ET
+BT /F1 10.2 Tf 50.00 672.39 Td (Caregiver prompt:) Tj ET
+BT /F3 8.3 Tf 60.00 643.89 Td (Did your mother miss any medicine this week?) Tj ET
+BT /F1 10.2 Tf 50.00 620.39 Td (The backend still scopes data using the authenticated elder user id. The user_role is mainly) Tj ET
+BT /F1 10.2 Tf 50.00 603.89 Td (used for wording and response style.) Tj ET
+BT /F2 13.5 Tf 50.00 571.39 Td (Failure Handling) Tj ET
+BT /F1 10.2 Tf 50.00 542.39 Td (The system handles failures safely:) Tj ET
+BT /F3 8.3 Tf 60.00 513.89 Td (Empty message -> rejected) Tj ET
+BT /F3 8.3 Tf 60.00 502.39 Td (ML-service unreachable -> friendly "try again" response) Tj ET
+BT /F3 8.3 Tf 60.00 490.89 Td (NL2SQL parse failure -> fallback response) Tj ET
+BT /F3 8.3 Tf 60.00 479.39 Td (Unsafe SQL -> "I cannot answer that safely") Tj ET
+BT /F3 8.3 Tf 60.00 467.89 Td (SQL execution failure -> simpler-question fallback) Tj ET
+BT /F3 8.3 Tf 60.00 456.39 Td (Answer-generation failure -> raw retrieval fallback) Tj ET
+BT /F3 8.3 Tf 60.00 444.89 Td (Voice module unavailable -> user can still type) Tj ET
+BT /F3 8.3 Tf 60.00 433.39 Td (Microphone permission denied -> typed input remains available) Tj ET
+BT /F1 10.2 Tf 50.00 409.89 Td (This makes the assistant resilient even when AI or voice dependencies fail.) Tj ET
+BT /F2 13.5 Tf 50.00 377.39 Td (Why This Architecture Is Better Than a Direct LLM Chatbot) Tj ET
+BT /F1 10.2 Tf 50.00 348.39 Td (A direct LLM chatbot would be risky because it could hallucinate, expose data incorrectly,) Tj ET
+BT /F1 10.2 Tf 50.00 331.89 Td (or generate unsupported medical guidance.) Tj ET
+BT /F1 10.2 Tf 50.00 308.39 Td (This architecture is safer because:) Tj ET
+BT /F3 8.3 Tf 60.00 279.89 Td (The frontend never calls the LLM directly) Tj ET
+BT /F3 8.3 Tf 60.00 268.39 Td (The backend controls identity and data access) Tj ET
+BT /F3 8.3 Tf 60.00 256.89 Td (The LLM sees only an approved schema digest) Tj ET
+BT /F3 8.3 Tf 60.00 245.39 Td (The SQL validator blocks unsafe queries) Tj ET
+BT /F3 8.3 Tf 60.00 233.89 Td (The database query is user-scoped) Tj ET
+BT /F3 8.3 Tf 60.00 222.39 Td (The final answer is based on retrieved rows) Tj ET
+BT /F3 8.3 Tf 60.00 210.89 Td (Sensitive fields are redacted) Tj ET
+BT /F3 8.3 Tf 60.00 199.39 Td (Actions require confirmation) Tj ET
+BT /F1 10.2 Tf 50.00 175.89 Td (So the LLM improves usability, while the backend preserves safety and control.) Tj ET
+BT /F2 13.5 Tf 50.00 143.39 Td (Final Technical Summary) Tj ET
+BT /F1 10.2 Tf 50.00 114.39 Td (The assistant chat screen is an AI-assisted healthcare interface built with React Native,) Tj ET
+BT /F1 10.2 Tf 50.00 97.89 Td (Node/Express, PostgreSQL, FastAPI, and an LLM. The frontend manages the conversation UI,) Tj ET
+BT /F1 10.2 Tf 50.00 81.39 Td (voice input, voice output, loading state, follow-up chips, and chat history. The backend) Tj ET
+BT /F1 10.2 Tf 50.00 64.89 Td (authenticates the user, classifies the message, handles deterministic health workflows,) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 13 of 14) Tj ET
+endstream
+endobj
+31 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 30 0 R >>
+endobj
+32 0 obj
+<< /Length 675 >>
+stream
+0.08 w
+0.12 0.16 0.14 rg
+BT /F1 10.2 Tf 50.00 785.89 Td (validates LLM-generated SQL, retrieves user-specific records, redacts sensitive data, saves) Tj ET
+BT /F1 10.2 Tf 50.00 769.39 Td (conversation history, and returns the final response.) Tj ET
+BT /F1 10.2 Tf 50.00 745.89 Td (The RAG pipeline improves answer reliability by grounding the LLM in real application) Tj ET
+BT /F1 10.2 Tf 50.00 729.39 Td (records. The LLM is used for flexible natural language understanding and readable response) Tj ET
+BT /F1 10.2 Tf 50.00 712.89 Td (generation, but safety-critical responsibilities remain in deterministic backend code.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 14 of 14) Tj ET
+endstream
+endobj
+33 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 32 0 R >>
+endobj
+xref
+0 34
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000206 00000 n 
+0000000276 00000 n 
+0000000351 00000 n 
+0000000419 00000 n 
+0000004138 00000 n 
+0000004290 00000 n 
+0000008047 00000 n 
+0000008199 00000 n 
+0000011691 00000 n 
+0000011845 00000 n 
+0000015380 00000 n 
+0000015534 00000 n 
+0000018166 00000 n 
+0000018320 00000 n 
+0000021359 00000 n 
+0000021513 00000 n 
+0000024422 00000 n 
+0000024576 00000 n 
+0000027706 00000 n 
+0000027860 00000 n 
+0000030742 00000 n 
+0000030896 00000 n 
+0000033519 00000 n 
+0000033673 00000 n 
+0000036687 00000 n 
+0000036841 00000 n 
+0000039909 00000 n 
+0000040063 00000 n 
+0000043450 00000 n 
+0000043604 00000 n 
+0000044331 00000 n 
+trailer
+<< /Size 34 /Root 1 0 R >>
+startxref
+44485
+%%EOF

@@ -250,6 +250,8 @@ const TRUSTED_MEDICINE_ALIASES = {
   amoxicillin: 'amoxicillin',
   warfarin: 'warfarin',
   metformin: 'metformin',
+  obmet: 'metformin',
+  opana: 'oxymorphone',
   cetirizine: 'cetirizine',
 };
 
@@ -505,7 +507,7 @@ const buildUnresolvedMedication = (input) => {
 };
 
 const resolveTrustedAlias = (input) => {
-  const cleaned = normalizeLookupText(input);
+  const cleaned = cleanMedicineCandidate(input);
   if (!cleaned || !TRUSTED_MEDICINE_ALIASES[cleaned]) {
     return null;
   }
@@ -560,6 +562,8 @@ const resolveTrustedAlias = (input) => {
 };
 
 const resolveMedicationSync = (input) => {
+  const trusted = resolveTrustedAlias(input);
+  if (trusted) return trusted;
   const match = findDrugEntry(input);
   if (!match) {
     return buildUnresolvedMedication(input);
@@ -610,7 +614,7 @@ const resolveMedication = async (input, options = {}) => {
   const match = genericMatch || localMatch;
 
   if (!match) {
-    if (canonical.ingredientName && canonical.source !== 'empty') {
+    if (canonical.ingredientName && canonical.source === 'rxnorm') {
       return {
         rxnormCui: canonical.ingredientRxcui || canonical.rxcui || '',
         displayName: canonical.ingredientName,
@@ -682,20 +686,27 @@ const compareSeverity = (left, right) => {
   return (weights[left] || 0) - (weights[right] || 0);
 };
 
-const findInteractions = (drugName, currentMedicationText) => {
-  const normalizedDrug = normalizeText(drugName);
-  const currentMeds = tokenizeMedicineText(currentMedicationText)
-    .map((item) => resolveMedicationSync(item))
-    .filter((item) => item.normalizedName);
+const canonicalIngredient = (drug) => {
+  const cleaned = cleanMedicineCandidate(drug.canonicalIngredient || drug.ingredientName || drug.normalizedName);
+  return TRUSTED_MEDICINE_ALIASES[cleaned] || cleaned;
+};
+
+const normalizeCurrentMedications = async (text) => Promise.all(
+  tokenizeMedicineText(text).map((item) => resolveMedication(cleanMedicineCandidate(item)))
+);
+
+const findInteractions = (drug, currentMeds) => {
+  const normalizedDrug = canonicalIngredient(drug);
 
   const interactions = [];
   for (const currentMed of currentMeds) {
+    if (!currentMed.matched || /fuzzy/i.test(currentMed.matchType || '')) continue;
     const match = knowledge.interactions.find(({ drugA, drugB }) => {
-      const a = normalizeText(drugA);
-      const b = normalizeText(drugB);
+      const a = canonicalIngredient({ ingredientName: drugA });
+      const b = canonicalIngredient({ ingredientName: drugB });
       return (
-        (normalizedDrug === a && currentMed.normalizedName === b) ||
-        (normalizedDrug === b && currentMed.normalizedName === a)
+        (normalizedDrug === a && canonicalIngredient(currentMed) === b) ||
+        (normalizedDrug === b && canonicalIngredient(currentMed) === a)
       );
     });
 
@@ -733,7 +744,8 @@ const findSymptomSideEffectMatches = (symptomText, sideEffects) => {
 
 const enrichMedication = async ({ medicineName, currentMedicationsText, symptomMatch }) => {
   const drug = await resolveMedication(medicineName);
-  const interactionSummary = findInteractions(drug.normalizedName, currentMedicationsText);
+  const currentMedications = await normalizeCurrentMedications(currentMedicationsText);
+  const interactionSummary = findInteractions(drug, currentMedications);
   const sideEffectMatches = findSymptomSideEffectMatches(
     symptomMatch,
     [...drug.sideEffects, ...drug.severeSideEffects]
@@ -785,6 +797,14 @@ const enrichMedication = async ({ medicineName, currentMedicationsText, symptomM
     interactionCount: interactionSummary.interactionCount,
     maxInteractionSeverity: interactionSummary.maxInteractionSeverity,
     interactions: interactionSummary.interactions,
+    currentMedications: currentMedications.map((item) => ({
+      originalInput: item.originalInput || item.displayName,
+      canonicalIngredient: canonicalIngredient(item),
+      matched: item.matched && !/fuzzy/i.test(item.matchType || ''),
+    })),
+    sameIngredientCurrentMedications: currentMedications
+      .filter((item) => item.matched && !/fuzzy/i.test(item.matchType || '') && canonicalIngredient(item) === canonicalIngredient(drug))
+      .map((item) => item.originalInput || item.displayName),
     knowledgeSources,
   };
 };

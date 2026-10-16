@@ -48,9 +48,9 @@ export function OrganicIcon({ color = colors.primary, soft = colors.mint, label 
   );
 }
 
-export function InlineState({ loading, error, empty, emptyTitle, emptyText, onRetry }) {
+export function InlineState({ loading, error, empty, emptyTitle, emptyText, errorTitle, errorText, onRetry }) {
   if (!loading && !error && !empty) return null;
-  return <View style={[s.state, error && s.errorState]}>{loading ? <ActivityIndicator color={colors.primary} /> : <View style={s.stateIcon}><Text style={s.stateIconText}>{error ? '!' : '○'}</Text></View>}<View style={s.stateCopy}><Text style={s.stateTitle}>{loading ? 'Loading…' : error ? "Something didn't load" : emptyTitle || 'Nothing here yet'}</Text><Text style={s.stateText}>{loading ? emptyText || 'Preparing this for you…' : error ? "Please try again in a moment." : emptyText}</Text>{error && onRetry ? <Pressable onPress={onRetry} style={s.retry}><Text style={s.retryText}>Try Again</Text></Pressable> : null}</View></View>;
+  return <View style={[s.state, error && s.errorState]}>{loading ? <ActivityIndicator color={colors.primary} /> : <View style={s.stateIcon}><Text style={s.stateIconText}>{error ? '!' : '○'}</Text></View>}<View style={s.stateCopy}><Text style={s.stateTitle}>{loading ? 'Loading…' : error ? errorTitle || "Something didn't load" : emptyTitle || 'Nothing here yet'}</Text><Text style={s.stateText}>{loading ? emptyText || 'Preparing this for you…' : error ? errorText || "Please try again in a moment." : emptyText}</Text>{error && onRetry ? <Pressable onPress={onRetry} style={s.retry}><Text style={s.retryText}>Try Again</Text></Pressable> : null}</View></View>;
 }
 
 const s = StyleSheet.create({
