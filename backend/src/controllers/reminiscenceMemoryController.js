@@ -1,5 +1,6 @@
 const repository = require('../repositories/reminiscenceMemoryRepository');
 const entryRepository = require('../repositories/reminiscenceMemoryEntryRepository');
+const photoStorage = require('../services/reminiscencePhotoStorageService');
 const {
   buildGenericPrompt,
   buildTopicPrompt,
@@ -8,6 +9,19 @@ const {
 
 function validateUserId(userId) {
   return !Number.isInteger(userId) || userId <= 0;
+}
+
+function authorizeOwnUser(req, res, requestedUserId) {
+  const authenticatedUserId = Number(req.user?.id);
+  if (validateUserId(authenticatedUserId)) {
+    res.status(401).json({ success: false, error: 'An authenticated user is required.' });
+    return null;
+  }
+  if (requestedUserId !== authenticatedUserId) {
+    res.status(403).json({ success: false, error: 'You can only access your own reminiscence data.' });
+    return null;
+  }
+  return authenticatedUserId;
 }
 
 function publicTopic(topic) {
@@ -20,6 +34,12 @@ function publicTopic(topic) {
     source_activity_id: topic.sourceActivityId,
     created_at: topic.createdAt,
   };
+}
+
+function publicMemoryEntry(entry) {
+  if (!entry) return null;
+  const { photoReference, ...safeEntry } = entry;
+  return { ...safeEntry, photoSaved: Boolean(photoReference) };
 }
 
 /**
@@ -45,12 +65,13 @@ async function previewTopic(req, res) {
  */
 async function saveTopic(req, res) {
   try {
-    const userId = Number(req.body?.user_id);
+    const userId = Number(req.body?.user_id ?? req.user?.id);
     const consent = req.body?.consent === true;
     const topicType = String(req.body?.topic_type || '').trim().toLowerCase();
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     if (!consent) {
       // Hard gate: without an explicit consent signal nothing is stored.
       return res.status(403).json({
@@ -83,6 +104,7 @@ async function listTopics(req, res) {
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     const topics = await repository.listActiveTopics(userId);
     return res.json({ success: true, count: topics.length, topics: topics.map(publicTopic) });
   } catch (_error) {
@@ -97,6 +119,7 @@ async function deleteTopic(req, res) {
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     if (!topicId) {
       return res.status(400).json({ success: false, error: 'A topic id is required.' });
     }
@@ -116,6 +139,7 @@ async function clearTopics(req, res) {
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     const removed = await repository.deactivateAllTopics(userId);
     return res.json({ success: true, removed_count: removed.length });
   } catch (_error) {
@@ -135,6 +159,7 @@ async function getPrompt(req, res) {
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     const topic = await repository.selectNextPromptTopic(userId);
     if (topic) {
       const prompt = buildTopicPrompt(topic);
@@ -161,12 +186,13 @@ async function getPrompt(req, res) {
 
 async function createEntry(req, res) {
   try {
-    const userId = Number(req.body?.user_id);
+    const userId = Number(req.body?.user_id ?? req.user?.id);
     const entryType = String(req.body?.entry_type || '').trim().toLowerCase();
     const title = String(req.body?.title || '').trim().slice(0, 200);
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     if (!entryType) {
       return res.status(400).json({ success: false, error: 'entry_type is required.' });
     }
@@ -196,6 +222,64 @@ async function createEntry(req, res) {
   }
 }
 
+function photoErrorResponse(res, error) {
+  const responses = {
+    PHOTO_INVALID: [400, 'Choose a valid JPEG, PNG, or WebP image.'],
+    PHOTO_TOO_LARGE: [413, 'Choose an image smaller than 8 MB.'],
+    PHOTO_STORAGE_NOT_CONFIGURED: [503, 'Photo saving is not available yet. You can save this memory without the photo.'],
+    PHOTO_ALREADY_EXISTS: [409, 'This photo save is already being processed. Please retry.'],
+    PHOTO_NOT_FOUND: [404, 'The photo was not found.'],
+    PHOTO_URL_FAILED: [503, 'The saved photo is temporarily unavailable.'],
+  };
+  const [status, message] = responses[error?.code] || [502, 'Private photo storage could not complete the request.'];
+  return res.status(status).json({ success: false, error: message, code: error?.code || 'PHOTO_STORAGE_FAILED' });
+}
+
+async function createEntryWithPhoto(req, res) {
+  let uploadedKey = null;
+  try {
+    const userId = Number(req.body?.user_id ?? req.user?.id);
+    const entryType = String(req.body?.entry_type || '').trim().toLowerCase();
+    const title = String(req.body?.title || '').trim().slice(0, 200);
+    if (validateUserId(userId)) return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
+    if (!authorizeOwnUser(req, res, userId)) return;
+    if (req.body?.consent !== 'true') return res.status(403).json({ success: false, error: 'Please agree to save this photo with your memory.' });
+    if (!['life_book', 'good_deed'].includes(entryType)) return res.status(400).json({ success: false, error: 'A valid memory entry type is required.' });
+    if (!title) return res.status(400).json({ success: false, error: 'title is required.' });
+    if (!req.file?.buffer) return res.status(400).json({ success: false, error: 'Choose a photo before saving.' });
+    const requestId = String(req.body?.photo_request_id || '');
+    const upload = await photoStorage.uploadPhoto({ userId, requestId, buffer: req.file.buffer });
+    uploadedKey = upload.objectKey;
+    const existing = await entryRepository.findEntryByPhotoReference(userId, uploadedKey);
+    if (existing) return res.status(200).json({ success: true, entry: publicMemoryEntry(existing), duplicate: true });
+    const entry = await entryRepository.createEntry({
+      userId,
+      entryType,
+      title,
+      category: String(req.body?.category || '').trim().slice(0, 80) || null,
+      story: String(req.body?.story || '').trim() || null,
+      memoryDate: req.body?.memory_date || null,
+      photoReference: uploadedKey,
+      consentStatus: true,
+    });
+    return res.status(201).json({ success: true, entry: publicMemoryEntry(entry) });
+  } catch (error) {
+    if (uploadedKey) {
+      // Compensate for an upload whose row could not be committed. A read-after-error
+      // check avoids deleting an object if the database committed before a disconnect.
+      try {
+        const persisted = await entryRepository.findEntryByPhotoReference(Number(req.body?.user_id ?? req.user?.id), uploadedKey);
+        if (!persisted) await photoStorage.deletePhoto(Number(req.body?.user_id ?? req.user?.id), uploadedKey);
+      } catch (_) {
+        // If the database outcome is unknown, leave the object for operator review
+        // instead of risking a committed row that points to a deleted photo.
+      }
+    }
+    if (error?.code) return photoErrorResponse(res, error);
+    return res.status(500).json({ success: false, error: 'Could not save the memory with its photo. Retry the photo or save text only.' });
+  }
+}
+
 async function listEntries(req, res) {
   try {
     const userId = Number(req.params.userId);
@@ -203,10 +287,36 @@ async function listEntries(req, res) {
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     const entries = await entryRepository.listEntriesForUser(userId, entryType);
-    return res.json({ success: true, count: entries.length, entries });
+    const safeEntries = await Promise.all(entries.map(async (entry) => {
+      const { photoReference, ...entryWithoutReference } = entry;
+      const publicEntry = { ...entryWithoutReference, photoSaved: Boolean(photoReference) };
+      if (!photoReference) return { ...publicEntry, photoUrl: null, photoUnavailable: false };
+      try {
+        return { ...publicEntry, photoUrl: await photoStorage.createSignedPhotoUrl(userId, photoReference), photoUnavailable: false };
+      } catch (_) {
+        return { ...publicEntry, photoUrl: null, photoUnavailable: true };
+      }
+    }));
+    return res.json({ success: true, count: safeEntries.length, entries: safeEntries });
   } catch (_error) {
     return res.status(500).json({ success: false, error: 'Failed to load memory entries.' });
+  }
+}
+
+async function getEntryPhotoUrl(req, res) {
+  try {
+    const userId = Number(req.query?.user_id ?? req.user?.id);
+    if (validateUserId(userId)) return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
+    if (!authorizeOwnUser(req, res, userId)) return;
+    const entry = await entryRepository.getEntryForUser(String(req.params.entryId || ''), userId);
+    if (!entry?.photoReference) return res.status(404).json({ success: false, error: 'This memory has no saved photo.' });
+    const photoUrl = await photoStorage.createSignedPhotoUrl(userId, entry.photoReference);
+    return res.json({ success: true, photoUrl });
+  } catch (error) {
+    if (error?.code) return photoErrorResponse(res, error);
+    return res.status(500).json({ success: false, error: 'The saved photo is temporarily unavailable.' });
   }
 }
 
@@ -217,14 +327,33 @@ async function deleteEntry(req, res) {
     if (validateUserId(userId)) {
       return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
     }
+    if (!authorizeOwnUser(req, res, userId)) return;
     if (!entryId) {
       return res.status(400).json({ success: false, error: 'An entry id is required.' });
     }
-    const removed = await entryRepository.deleteEntry(entryId, userId);
-    if (!removed) {
+    const existing = await entryRepository.getEntryForUser(entryId, userId);
+    if (!existing) {
       return res.status(404).json({ success: false, error: 'Memory entry was not found.' });
     }
-    return res.json({ success: true, removed_entry: removed });
+    let photoBackup = null;
+    if (existing.photoReference) {
+      try {
+        photoBackup = await photoStorage.downloadPhoto(userId, existing.photoReference);
+        await photoStorage.deletePhoto(userId, existing.photoReference);
+      } catch (error) {
+        if (error?.code !== 'PHOTO_NOT_FOUND') throw error;
+      }
+    }
+    let removed;
+    try {
+      removed = await entryRepository.deleteEntry(entryId, userId);
+    } catch (error) {
+      if (photoBackup) {
+        try { await photoStorage.uploadAtKey(userId, existing.photoReference, photoBackup.buffer, photoBackup.contentType); } catch (_) { /* Keep failure response generic; recovery may require operator review. */ }
+      }
+      throw error;
+    }
+    return res.json({ success: true, removed_entry: publicMemoryEntry(removed) });
   } catch (_error) {
     return res.status(500).json({ success: false, error: 'Failed to remove the memory entry.' });
   }
@@ -238,6 +367,8 @@ module.exports = {
   previewTopic,
   saveTopic,
   createEntry,
+  createEntryWithPhoto,
   listEntries,
+  getEntryPhotoUrl,
   deleteEntry,
 };

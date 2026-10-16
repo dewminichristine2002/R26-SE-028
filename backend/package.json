@@ -12,6 +12,8 @@
     "test:nfr": "jest --runInBand --verbose tests/nfr",
     "test:e2e": "jest --runInBand tests/e2e",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:nfr && npm run test:e2e",
+    "test:ml-runtime": "node scripts/testEmotionMlRuntimeIntegration.js",
+    "ml:export-adaptive-question-bank": "node scripts/exportAdaptiveQuestionBank.js",
     "test:evidence": "node ../scripts/generate-testing-evidence.js",
     "db:migrate": "node scripts/runMigrations.js up",
     "db:migrate:down": "node scripts/runMigrations.js down",

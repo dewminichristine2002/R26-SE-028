@@ -113,7 +113,7 @@ describe('voice integration safety policy', () => {
   test('cognitive responses use one backend submission path for voice and touch', () => {
     expect((cognitiveSource.match(/submitAdaptiveActivity\(/g) || [])).toHaveLength(1);
     expect(cognitiveSource).toContain('mapTranscriptToVisibleOption');
-    expect(cognitiveSource).toContain('selectedAnswer: selected[0]');
+    expect(cognitiveSource).toContain("type === 'word_completion' ? typedAnswer.trim() : selected[0]");
   });
 
   test('memory study speech is confined to the study component', () => {

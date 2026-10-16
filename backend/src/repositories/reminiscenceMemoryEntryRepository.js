@@ -44,6 +44,28 @@ async function listEntriesForUser(userId, entryType = null) {
   return res.rows.map(mapEntry);
 }
 
+async function getEntryForUser(entryId, userId) {
+  const res = await query(
+    `SELECT ${publicColumns}
+     FROM reminiscence_memory_entries
+     WHERE id = $1 AND user_id = $2
+     LIMIT 1`,
+    [entryId, userId]
+  );
+  return mapEntry(res.rows[0]);
+}
+
+async function findEntryByPhotoReference(userId, photoReference) {
+  const res = await query(
+    `SELECT ${publicColumns}
+     FROM reminiscence_memory_entries
+     WHERE user_id = $1 AND photo_reference = $2
+     LIMIT 1`,
+    [userId, photoReference]
+  );
+  return mapEntry(res.rows[0]);
+}
+
 async function createEntry({ userId, entryType, title, category = null, story = null, memoryDate = null, photoReference = null, consentStatus = false }) {
   const res = await query(
     `INSERT INTO reminiscence_memory_entries (
@@ -67,6 +89,8 @@ async function deleteEntry(entryId, userId) {
 
 module.exports = {
   listEntriesForUser,
+  getEntryForUser,
+  findEntryByPhotoReference,
   createEntry,
   deleteEntry,
 };

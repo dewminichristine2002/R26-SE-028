@@ -17,12 +17,23 @@ describe('Today for You home experience', () => {
     expect(source).toContain('Today for You');
   });
 
-  test('Talk With Me is the primary hero with conversation framing', () => {
+  test('the three main action cards use the shared accessible card layout', () => {
+    expect(source).toContain('function HomeActionCard');
+    expect(source).toContain('style={s.actionCards}');
+    expect(source).toContain('s.actionButton, { backgroundColor: buttonColor, borderColor: buttonColor }, pressed && s.pressed');
+    expect(source).toContain('buttonColor="#2D654F"');
+    expect(source).toContain('buttonColor="#68478B"');
+    expect(source).toContain('buttonColor="#98566C"');
+    expect(source).toContain("minHeight: 54");
+    expect(source).toContain("width: '100%'");
+    expect(source).toContain('Explore Games');
+    expect(source).toContain('Explore Memories');
     expect(source).toContain('Start Conversation');
-    expect(source).toContain('A short conversation about your day.');
-    expect(source).toContain('5 short moments');
-    expect(source).toContain('Voice supported');
-    expect(source).toContain('About 3 minutes');
+  });
+
+  test('Talk With Me remains the primary action with concise conversation framing', () => {
+    expect(source).toContain('Start Conversation');
+    expect(source).toContain('A short, voice-supported conversation about your day.');
     // No questionnaire wording on the primary action.
     expect(source).not.toContain('Start Check-In');
     expect(source).not.toContain('Daily Adaptive Check-In');
@@ -40,7 +51,7 @@ describe('Today for You home experience', () => {
 
   test('personalized time-aware greeting is shown safely', () => {
     expect(source).toContain('getPersonalizedGreeting(user)');
-    expect(source).toContain('What would you like to do today?');
+    expect(source).toContain('Choose one small moment for yourself.');
   });
 
   test('gentle weekly summary uses factual counts only — no streaks or scores', () => {

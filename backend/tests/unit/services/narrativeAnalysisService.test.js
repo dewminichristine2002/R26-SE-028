@@ -6,7 +6,7 @@ jest.mock('../../../src/services/emotionPredictionService', () => ({
 const predictionService = require('../../../src/services/emotionPredictionService');
 const { analyzeNarrative, buildRuleFallbackAnalysis } = require('../../../src/services/narrativeAnalysisService');
 
-const version = 'tfidf_linear_svm_calibrated_v2';
+const version = 'tfidf_linear_svm_calibrated_v3';
 
 describe('canonical narrative analysis', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -38,5 +38,16 @@ describe('canonical narrative analysis', () => {
   test('happier variation remains an ML result when valid', async () => {
     predictionService.requestEmotionPrediction.mockResolvedValue({ emotion: 'happiness', confidence: 0.41, detectionSource: 'ml_model', modelVersion: version });
     await expect(analyzeNarrative('My daughter called and I felt much happier after talking with her.')).resolves.toMatchObject({ emotion: 'happiness', detectionSource: 'ml_model' });
+  });
+
+  test('short-input clarification metadata is exposed without changing predicted emotion', async () => {
+    predictionService.requestEmotionPrediction.mockResolvedValue({
+      emotion: 'anxiety', confidence: 0.61, detectionSource: 'ml_model', modelVersion: version,
+      clarificationSuggested: true, uncertainty: { needs_clarification: true, reasons: ['very_short_answer'] },
+    });
+    await expect(analyzeNarrative('Not anymore.')).resolves.toMatchObject({
+      emotion: 'anxiety', detectionSource: 'ml_model', uncertainty: true, clarificationSuggested: true,
+      uncertaintyDetails: { needs_clarification: true },
+    });
   });
 });

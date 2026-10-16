@@ -6,13 +6,20 @@ param(
 )
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$venvPython = Join-Path $scriptRoot '.venv\Scripts\python.exe'
+$venvPython = $env:EMOTION_ML_PYTHON
+if (-not $venvPython) {
+    $venvPython = Join-Path $scriptRoot '.venv\Scripts\python.exe'
+}
 if (-not (Test-Path $venvPython)) {
-    Write-Error "Virtualenv python not found at $venvPython. Ensure the project .venv exists and is set up."
-    exit 1
+    $resolvedPython = Get-Command $venvPython -ErrorAction SilentlyContinue
+    if (-not $resolvedPython) {
+        Write-Error "Python interpreter '$venvPython' was not found. Set EMOTION_ML_PYTHON or create the classifier .venv."
+        exit 1
+    }
+    $venvPython = $resolvedPython.Source
 }
 
-$uvicornArgs = "-m uvicorn api_service:app --host $Host --port $Port --log-level $LogLevel"
+$uvicornArgs = @('-m', 'uvicorn', 'api_service:app', '--host', $Host, '--port', $Port, '--log-level', $LogLevel)
 
 if ($Detach) {
     # Start detached background process using the venv python
@@ -20,5 +27,5 @@ if ($Detach) {
     Write-Output "Started detached ML service (python: $venvPython) listening on $Host`:$Port"
 } else {
     # Run in the foreground so logs appear in the current console
-    & $venvPython $uvicornArgs
+    & $venvPython @uvicornArgs
 }

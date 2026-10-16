@@ -13,6 +13,7 @@ const CATEGORY_BY_EMOTION = Object.freeze({
 const WEIGHTS = Object.freeze({ emotionCategoryMatch: 40, riskFit: 20, engagementFit: 15, variety: 10, difficultyFit: 10, recentRepeat: -15, riskMismatch: -30 });
 
 function desiredDifficulty({ finalEmotionalState, riskLevel, conversationEngagement, recommendedDifficulty }) {
+  if (recommendedDifficulty === 'hard' && riskLevel !== 'high' && conversationEngagement === 'engaged' && !['anxiety', 'anger', 'cognitive_fog'].includes(finalEmotionalState)) return 'hard';
   if (recommendedDifficulty === 'medium' && riskLevel !== 'high' && conversationEngagement === 'engaged' && !['anxiety', 'anger', 'cognitive_fog'].includes(finalEmotionalState)) return 'medium';
   return finalEmotionalState === 'happiness' && riskLevel === 'low' && conversationEngagement === 'engaged' ? 'medium' : 'easy';
 }

@@ -11,8 +11,42 @@ function canonicalOption(item, value) {
   return match ? normalize(typeof match === 'string' ? match : match.id) : null;
 }
 
-function scoreItem(item, response) {
+function missingLetterFor(item) {
+  const prompt = String(item?.prompt || '');
+  const puzzle = (prompt.includes(':') ? prompt.slice(prompt.lastIndexOf(':') + 1) : prompt)
+    .replace(/\s+/g, '')
+    .toLowerCase();
+  const answer = String(item?.correctAnswer || '').replace(/[^a-z]/gi, '').toLowerCase();
+  const blanks = [...puzzle.matchAll(/_/g)].map((match) => match.index);
+  if (blanks.length !== 1 || puzzle.length !== answer.length) return null;
+  const blankIndex = blanks[0];
+  for (let index = 0; index < puzzle.length; index += 1) {
+    if (index !== blankIndex && puzzle[index] !== answer[index]) return null;
+  }
+  return answer[blankIndex] || null;
+}
+
+function scoreWordCompletionItem(item, response) {
+  if (response?.skipped === true) return { score: null, isCorrect: null, skipped: true, response: { skipped: true, responseTimeMs: 0 } };
+  const submitted = String(response?.selectedAnswer ?? '').trim().toLowerCase();
+  if (!submitted) throw new Error('Please enter the missing letter.');
+  if (!/^[a-z]$/.test(submitted)) throw new Error('Please enter one letter only.');
+  const correctLetter = missingLetterFor(item);
+  if (!correctLetter) throw new Error('This word puzzle is not configured for a single missing letter.');
+  const isCorrect = submitted === correctLetter;
+  return {
+    score: isCorrect ? 1 : 0,
+    isCorrect,
+    response: { selectedAnswer: submitted, responseTimeMs: Math.max(0, Number(response?.responseTimeMs) || 0) },
+  };
+}
+
+function scoreItem(item, response, activityType = null) {
   if (!item || !['single_choice', 'multi_recall', 'ordering'].includes(item.kind)) throw new Error('This activity does not contain a supported objective task.');
+  if (activityType === 'word_completion' || /^complete the word\s*:/i.test(String(item.prompt || ''))) {
+    return scoreWordCompletionItem(item, response);
+  }
+  if (response?.skipped === true) return { score: null, isCorrect: null, skipped: true, response: { skipped: true, responseTimeMs: 0 } };
   if (item.kind === 'single_choice') {
     const answer = canonicalOption(item, response?.selectedAnswer);
     if (!answer) throw new Error('A valid answer option is required.');
@@ -43,11 +77,13 @@ function scoreObjectiveResponse(task, response) {
     const results = task.items.map((item) => {
       const itemResponse = byId.get(String(item.id));
       if (!itemResponse) throw new Error(`A response for item ${item.id} is required.`);
-      return { itemId: item.id, ...scoreItem(item, itemResponse) };
+      return { itemId: item.id, ...scoreItem(item, itemResponse, task.activityType) };
     });
-    const accuracy = results.reduce((sum, result) => sum + result.score, 0) / results.length;
+    const answered = results.filter((result) => !result.skipped);
+    const accuracy = answered.length ? answered.reduce((sum, result) => sum + result.score, 0) / answered.length : 0;
     return {
-      accuracy: Number(accuracy.toFixed(4)), isCorrect: results.every((result) => result.isCorrect),
+      accuracy: Number(accuracy.toFixed(4)), isCorrect: answered.length > 0 && answered.every((result) => result.isCorrect),
+      correctCount: answered.filter((result) => result.isCorrect).length, completedCount: answered.length,
       normalizedResponse: { itemResponses: results.map(({ itemId, response: itemResponse }) => ({ itemId, ...itemResponse })) },
     };
   }

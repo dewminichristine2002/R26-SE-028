@@ -22,12 +22,13 @@ async function startActivity(req, res) {
     const userId = Number(req.body?.user_id);
     const sessionId = String(req.body?.session_id || '').trim();
     const activityCode = String(req.body?.activity_code || '').trim();
+    const requestedDifficulty = ['easy', 'medium', 'hard'].includes(req.body?.difficulty) ? req.body.difficulty : null;
     const activitySource = String(req.body?.activity_source || 'recommended').trim();
     if (!Number.isInteger(userId) || userId <= 0 || !activityCode) return res.status(400).json({ success: false, error: 'user_id and activity_code are required.' });
     if (!['recommended', 'self_selected'].includes(activitySource)) return res.status(400).json({ success: false, error: 'activity_source must be recommended or self_selected.' });
     if (activitySource === 'recommended' && !sessionId) return res.status(400).json({ success: false, error: 'session_id is required for a recommended activity.' });
     const attempt = activitySource === 'self_selected'
-      ? await repository.startSelfSelectedActivityAttempt({ userId, activityCode })
+      ? await repository.startSelfSelectedActivityAttempt({ userId, activityCode, requestedDifficulty })
       : await repository.startActivityAttempt({ userId, sessionId, activityCode });
     return res.status(attempt.reused ? 200 : 201).json({ success: true, attempt_id: attempt.attemptId, category: attempt.category, activity_code: attempt.activityCode, activity_type: attempt.activityType, activity_source: attempt.activitySource || activitySource, difficulty: attempt.difficulty, started_at: attempt.startedAt, task: publicTask(attempt), reused: Boolean(attempt.reused) });
   } catch (error) {
@@ -110,24 +111,39 @@ async function submitActivity(req, res) {
   const userId = Number(req.body?.user_id);
   if (!Number.isInteger(userId) || userId <= 0) return res.status(400).json({ success: false, error: 'A valid user_id is required.' });
   try {
+    let attempt;
+    let scored;
     const result = await repository.withTransaction(async (client) => {
-      const attempt = await repository.getAttemptForUpdate(client, req.params.attemptId, userId);
+      attempt = await repository.getAttemptForUpdate(client, req.params.attemptId, userId);
       if (!attempt) throw Object.assign(new Error('Activity attempt was not found.'), { status: 404 });
       if (attempt.completedAt) throw Object.assign(new Error('This attempt has already been completed.'), { status: 409 });
       const responseTimeMs = Math.max(0, Math.round(Date.now() - new Date(attempt.startedAt).getTime()));
-      let scored = { accuracy: null, isCorrect: null, normalizedResponse: req.body?.response || {} };
+      scored = { accuracy: null, isCorrect: null, normalizedResponse: req.body?.response || {} };
+      let responseTimeForRecord = responseTimeMs;
       let difficulty = { nextDifficulty: attempt.difficulty, explanation: { reasons: ['non_objective_activity_not_scored'], responseTimeUsedForDecision: false } };
       if (attempt.category === 'cognitive_engagement') {
         scored = scoreObjectiveResponse(attempt.taskSnapshot, req.body?.response);
+        const submittedResponses = Array.isArray(req.body?.response?.itemResponses)
+          ? req.body.response.itemResponses
+          : [req.body?.response || {}];
+        const measuredTimes = submittedResponses
+          .map((itemResponse) => Number(itemResponse.responseTimeMs))
+          .filter((value) => Number.isFinite(value) && value >= 0);
+        if (measuredTimes.length) responseTimeForRecord = Math.round(measuredTimes.reduce((sum, value) => sum + value, 0));
         const recentCognitiveAttempts = await repository.getRecentCognitiveAttempts(userId, 5, client);
         difficulty = recommendNextDifficulty({ currentDifficulty: attempt.difficulty, currentActivityType: attempt.activityType, accuracy: scored.accuracy, responseTime: responseTimeMs, completionStatus: 'completed', finalEmotionalState: attempt.finalEmotionalState, riskLevel: attempt.riskLevel, conversationEngagement: attempt.conversationEngagement, recentCognitiveAttempts });
       }
-      return repository.completeAttempt(client, { attemptId: attempt.attemptId, response: scored.normalizedResponse, isCorrect: scored.isCorrect, accuracy: scored.accuracy, responseTimeMs, nextDifficulty: difficulty.nextDifficulty, explanation: difficulty.explanation });
+      return repository.completeAttempt(client, { attemptId: attempt.attemptId, response: scored.normalizedResponse, isCorrect: scored.isCorrect, accuracy: scored.accuracy, responseTimeMs: responseTimeForRecord, nextDifficulty: difficulty.nextDifficulty, explanation: difficulty.explanation });
     });
-    const completedItems = Array.isArray(result.response?.itemResponses) ? result.response.itemResponses.length : undefined;
-    return res.json({ success: true, completed: true, attempt_id: result.attemptId, activity_code: result.activityCode, activity_type: result.activityType, activity_source: result.activitySource || 'recommended', category: result.category, difficulty: result.difficulty, accuracy: result.accuracy, is_correct: result.isCorrect, response_time_ms: result.responseTimeMs, duration_seconds: Number((result.responseTimeMs / 1000).toFixed(1)), completion_status: result.completionStatus, next_difficulty: result.nextDifficulty, completed_items: completedItems, total_items: completedItems, feedback: result.accuracy == null ? 'Activity complete. Thank you for taking part.' : result.isCorrect ? 'Nice work! You completed every activity item.' : "Good try. You've completed the activity." });
+    const itemResponses = Array.isArray(result.response?.itemResponses) ? result.response.itemResponses : [];
+    const answeredItems = itemResponses.filter((response) => !response.skipped);
+    const completedItems = itemResponses.length || undefined;
+    const actualCorrect = Number.isInteger(scored.correctCount) ? scored.correctCount : (scored.isCorrect ? 1 : 0);
+    const totalQuestions = attempt.taskSnapshot?.totalItems || (attempt.taskSnapshot ? 1 : completedItems);
+    const title = ({ word_completion: 'Word Completion', odd_one_out: 'Odd One Out', short_memory_recall: 'Short Memory Recall' })[attempt.activityType] || attempt.activityType;
+    return res.json({ success: true, completed: true, attempt_id: result.attemptId, activity_code: result.activityCode, activity_type: result.activityType, activity_title: title, activity_source: result.activitySource || 'recommended', category: result.category, difficulty: result.difficulty, accuracy: result.accuracy, correct_answers: actualCorrect, is_correct: result.isCorrect, response_time_ms: result.responseTimeMs, duration_seconds: Number((result.responseTimeMs / 1000).toFixed(1)), completion_status: result.completionStatus, next_difficulty: result.nextDifficulty, completed_items: answeredItems.length || completedItems, skipped_items: itemResponses.filter((response) => response.skipped).length, total_items: totalQuestions, feedback: result.accuracy == null ? 'Activity complete. Thank you for taking part.' : result.isCorrect ? 'Nice work! You completed every activity item.' : "Good try. You've completed the activity." });
   } catch (error) {
-    const status = error.status || (/valid|supported|required/i.test(error.message) ? 400 : 500);
+    const status = error.status || (/valid|supported|required|letter/i.test(error.message) ? 400 : 500);
     if (status === 500) console.error('Activity submission failed:', {
       attemptId: req.params.attemptId, userId, code: error.code, message: error.message,
     });

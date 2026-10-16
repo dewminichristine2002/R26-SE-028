@@ -11,10 +11,10 @@ import CalmingActivityScreen from './screens/CalmingActivityScreen';
 import CognitiveActivityLibraryScreen from './screens/CognitiveActivityLibraryScreen';
 import ReminiscenceHubScreen from './screens/ReminiscenceHubScreen';
 import MemoryMomentScreen from './screens/MemoryMomentScreen';
-import PhotoMemoryScreen from './screens/PhotoMemoryScreen';
 import RememberedTopicsScreen from './screens/RememberedTopicsScreen';
 import MyLifeBook from './screens/MyLifeBookScreen';
-import GoodDeeds from './screens/GoodDeedsScreen';
+import RevisitMemoriesScreen from './screens/RevisitMemoriesScreen';
+import MemoryConversationScreen from './screens/MemoryConversationScreen';
 
 const routes = {
   ElderHome: ElderHomeScreen,
@@ -28,10 +28,13 @@ const routes = {
   EmotionalTrendScreen,
   ReminiscenceHubScreen,
   MemoryMomentScreen,
-  PhotoMemoryScreen,
+  // Legacy routes open the unified Life Book without dropping existing links.
+  PhotoMemoryScreen: MyLifeBook,
   RememberedTopicsScreen,
   MyLifeBook,
-  GoodDeeds,
+  GoodDeeds: MyLifeBook,
+  RevisitMemoriesScreen,
+  MemoryConversationScreen,
 };
 
 export default function EmotionalSupportNavigator({ user }) {

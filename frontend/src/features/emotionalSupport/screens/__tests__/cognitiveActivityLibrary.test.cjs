@@ -20,16 +20,37 @@ describe('self-selected cognitive activity navigation contract', () => {
     expect(source).toContain('estimated_duration_minutes');
   });
 
+  test('all eight game families have individual card icons and a full-width play action', () => {
+    const source = read('screens/CognitiveActivityLibraryScreen.js');
+    const codes = ['word_category', 'odd_one_out', 'word_completion', 'pattern_sequence', 'short_memory_recall', 'orientation_activity', 'simple_math', 'sequence_ordering'];
+    for (const code of codes) expect(source).toContain(`${code}:`);
+    expect(source).toContain('<ActivityIcon activity={activity} look={look} />');
+    expect(source).toContain('accessibilityLabel={`Play ${activity.title}`}');
+    expect(source).toContain('s.playButton, { backgroundColor: look.accent }');
+    expect(source).not.toContain('numberOfLines={2} style={s.activityDescription}');
+  });
+
+  test('cards wrap their content and show pace, available duration, and category metadata', () => {
+    const source = read('screens/CognitiveActivityLibraryScreen.js');
+    expect(source).toContain('style={s.activityTitle}>{activity.title}</Text>');
+    expect(source).toContain('style={s.activityDescription}>{activity.description}</Text>');
+    expect(source).toContain('difficultyName(activity.recommended_difficulty');
+    expect(source).toContain('Number.isFinite(duration) && duration > 0');
+    expect(source).toContain('ACTIVITY_VISUALS[activity.activity_code]?.category');
+  });
+
   test('screen exposes gentle difficulty labels, round flow, and non-clinical summary actions', () => {
     const source = read('screens/CognitiveActivityScreen.js');
     expect(source).toContain("Round {index + 1} of {total}");
     expect(source).toContain('A Little More Challenge');
     expect(source).toContain('Gentle');
-    expect(source).toContain("That's right.");
-    expect(source).toContain("Nice try. Let's try another one.");
+    expect(source).toContain('Enter the missing letter');
+    expect(source).toContain('Show hint');
+    expect(source).toContain('Skip this question');
     expect(source).toContain('Nice work today');
-    expect(source).toContain('Try Another');
-    expect(source).toContain('Finish');
+    expect(source).toContain('Play Again');
+    expect(source).toContain('Return to Results');
+    expect(source).toContain('Return Home');
     expect(source).toContain("navigation.goBack()");
   });
 });

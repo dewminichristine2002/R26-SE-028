@@ -39,6 +39,13 @@ const BANK = {
       single('oo_m4', 'Which item does not belong?', [option('walk', 'Walk'), option('run', 'Run'), option('sleep', 'Sleep'), option('bicycle', 'Bicycle')], 'bicycle'),
       single('oo_m5', 'Which item does not belong?', [option('teaspoon', 'Teaspoon'), option('tablespoon', 'Tablespoon'), option('cup', 'Cup'), option('kilometre', 'Kilometre')], 'kilometre'),
     ],
+    hard: [
+      single('oo_h1', 'Which item does not belong?', [option('fork', 'Fork'), option('spoon', 'Spoon'), option('plate', 'Plate'), option('scarf', 'Scarf')], 'scarf', { hint: 'Three items are used at a meal.' }),
+      single('oo_h2', 'Which item does not belong?', [option('oak', 'Oak'), option('maple', 'Maple'), option('rose', 'Rose'), option('pine', 'Pine')], 'rose', { hint: 'Three are commonly known as trees.' }),
+      single('oo_h3', 'Which item does not belong?', [option('Tuesday', 'Tuesday'), option('April', 'April'), option('Friday', 'Friday'), option('Sunday', 'Sunday')], 'April', { hint: 'Three are days of the week.' }),
+      single('oo_h4', 'Which item does not belong?', [option('piano', 'Piano'), option('violin', 'Violin'), option('guitar', 'Guitar'), option('microphone', 'Microphone')], 'microphone', { hint: 'Three create musical sounds as instruments.' }),
+      single('oo_h5', 'Which item does not belong?', [option('kilogram', 'Kilogram'), option('litre', 'Litre'), option('metre', 'Metre'), option('thermometer', 'Thermometer')], 'thermometer', { hint: 'Three are measurement units.' }),
+    ],
   },
   word_completion: {
     easy: [
@@ -54,6 +61,13 @@ const BANK = {
       single('wd_m3', 'Complete the word: M _ RNING', [option('morning', 'Morning'), option('meaning', 'Meaning'), option('moving', 'Moving'), option('meeting', 'Meeting')], 'morning'),
       single('wd_m4', 'Complete the word: K _ TCHEN', [option('kitchen', 'Kitchen'), option('kitten', 'Kitten'), option('catching', 'Catching'), option('knitting', 'Knitting')], 'kitchen'),
       single('wd_m5', 'Complete the word: F _ OWER', [option('flower', 'Flower'), option('fewer', 'Fewer'), option('flour', 'Flour'), option('floor', 'Floor')], 'flower'),
+    ],
+    hard: [
+      single('wd_h1', 'Complete the word: PL _ NT', [option('plant', 'Plant')], 'plant', { hint: 'It may grow in a garden.' }),
+      single('wd_h2', 'Complete the word: BASKE _', [option('basket', 'Basket')], 'basket', { hint: 'You can carry shopping in it.' }),
+      single('wd_h3', 'Complete the word: LIBRA _ Y', [option('library', 'Library')], 'library', { hint: 'A place where people borrow books.' }),
+      single('wd_h4', 'Complete the word: COMFO _ T', [option('comfort', 'Comfort')], 'comfort', { hint: 'A feeling of ease.' }),
+      single('wd_h5', 'Complete the word: MARKE _', [option('market', 'Market')], 'market', { hint: 'A place to buy everyday goods.' }),
     ],
   },
   pattern_sequence: {
@@ -82,6 +96,13 @@ const BANK = {
       memory('mr_m1', ['Orange', 'Basket', 'Garden', 'Mirror'], ['Apple', 'Bottle']), memory('mr_m2', ['Kettle', 'Scarf', 'Pencil', 'Window'], ['Saucepan', 'Marker']),
       memory('mr_m3', ['Bicycle', 'Pillow', 'Rose', 'Plate'], ['Bus', 'Blanket']), memory('mr_m4', ['Calendar', 'Banana', 'Jacket', 'Spoon'], ['Clock', 'Orange']),
       memory('mr_m5', ['Teapot', 'Newspaper', 'Glasses', 'Cushion'], ['Cup', 'Book']),
+    ],
+    hard: [
+      memory('mr_h1', ['Apple', 'Book', 'Flower', 'Key', 'Cup'], ['Chair', 'Car']),
+      memory('mr_h2', ['Bus', 'Tree', 'Clock', 'Bread', 'Hat'], ['Boat', 'Plate']),
+      memory('mr_h3', ['Dog', 'Pen', 'Towel', 'Radio', 'Rose'], ['Cat', 'Fork']),
+      memory('mr_h4', ['Kettle', 'Scarf', 'Pencil', 'Window', 'Orange'], ['Saucepan', 'Marker']),
+      memory('mr_h5', ['Bicycle', 'Pillow', 'Garden', 'Plate', 'Mirror'], ['Bus', 'Blanket']),
     ],
   },
   orientation_activity: {

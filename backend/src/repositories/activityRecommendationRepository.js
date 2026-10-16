@@ -48,7 +48,7 @@ async function getLatestRecommendedCognitiveDifficulty(userId, client = null) {
     `SELECT recommended_next_difficulty AS difficulty
      FROM adaptive_activity_attempts
      WHERE user_id = $1 AND category = 'cognitive_engagement' AND completed_at IS NOT NULL
-       AND recommended_next_difficulty IN ('easy', 'medium')
+       AND recommended_next_difficulty IN ('easy', 'medium', 'hard')
      ORDER BY completed_at DESC LIMIT 1`,
     [userId]
   );

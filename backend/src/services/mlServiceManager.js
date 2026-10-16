@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ML_SERVICE_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/+$/, '');
+const EXPECTED_GENERIC_SERVICE_DIR = process.env.ML_SERVICE_DIRECTORY
+  ? path.resolve(process.env.ML_SERVICE_DIRECTORY)
+  : null;
 const HEALTH_TIMEOUT_MS = Number(process.env.ML_SERVICE_HEALTH_TIMEOUT_MS || 1500);
 const STARTUP_TIMEOUT_MS = Number(process.env.ML_SERVICE_STARTUP_TIMEOUT_MS || 90000);
 const POLL_INTERVAL_MS = Number(process.env.ML_SERVICE_STARTUP_POLL_MS || 1500);
@@ -42,14 +45,15 @@ const getHealthUrl = () => `${ML_SERVICE_URL}/health`;
 const checkMlHealth = async () => {
   try {
     const response = await axios.get(getHealthUrl(), { timeout: HEALTH_TIMEOUT_MS });
-    return response.status >= 200 && response.status < 300;
+    return response.status >= 200 && response.status < 300
+      && response.data?.service !== 'emotion_classifier';
   } catch (_) {
     return false;
   }
 };
 
 const repoRoot = () => path.resolve(__dirname, '../../..');
-const mlServiceDir = () => path.join(repoRoot(), 'ml-service');
+const mlServiceDir = () => EXPECTED_GENERIC_SERVICE_DIR || path.join(repoRoot(), 'ml-service');
 
 const readVenvConfig = (venvDir) => {
   const configPath = path.join(venvDir, 'pyvenv.cfg');
@@ -165,7 +169,7 @@ const spawnMlService = () => {
 
   const cwd = mlServiceDir();
   if (!fs.existsSync(cwd)) {
-    throw new Error(`ML service directory not found at ${cwd}`);
+    throw new Error(`Generic ML service directory not found at ${cwd}. Set up the generic ML service before enabling ML_SERVICE_AUTO_START.`);
   }
 
   const python = pickPythonExecutable();
@@ -265,6 +269,10 @@ const ensureMlServiceAvailable = async () => {
 
 const startMlServiceInBackground = () => {
   if (!isAutoStartEnabled() || !isLocalMlService()) {
+    return;
+  }
+  if (!fs.existsSync(mlServiceDir())) {
+    console.error(`[ML service] background auto-start skipped: generic service directory not found at ${mlServiceDir()}. Set ML_SERVICE_DIRECTORY to its checkout path.`);
     return;
   }
 

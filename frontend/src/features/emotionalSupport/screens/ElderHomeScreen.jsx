@@ -1,10 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { getWellnessTrends } from '../api/emotionalSupportApi';
-import { Card, Greeting, InlineState, MetaChip, OrganicIcon, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
+import { Card, Greeting, WellnessBackdrop } from '../components/WellnessUI';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
-import { colors, radius, screenInsets, shadows, spacing, type } from '../theme';
+import { colors, radius, screenInsets, spacing, type } from '../theme';
 import { getPersonalizedGreeting } from '../utils/personalization';
+
+const getGreetingIcon = () => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return '\u{1F305}';
+  if (hour < 17) return '\u2600\uFE0F';
+  if (hour < 21) return '\u{1F307}';
+  return '\u{1F319}';
+};
 
 /**
  * "Today for You" home — four simple choices for the elder:
@@ -22,12 +30,44 @@ function MicrophoneGlyph({ color }) {
   );
 }
 
+function HomeActionCard({ icon, iconColor, iconBackground, buttonColor, title, description, action, accessibilityLabel, onPress, style }) {
+  return (
+    <Card style={[s.actionCard, style]}>
+      <View style={s.actionHeading}>
+        <View style={[s.actionIcon, { backgroundColor: iconBackground }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {icon(iconColor)}
+        </View>
+        <View style={s.actionCopy}>
+          <Text accessibilityRole="header" style={s.actionTitle}>{title}</Text>
+          <Text style={s.actionDescription}>{description}</Text>
+        </View>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        onPress={onPress}
+        style={({ pressed }) => [s.actionButton, { backgroundColor: buttonColor, borderColor: buttonColor }, pressed && s.pressed]}
+      >
+        <Text style={s.actionButtonText}>{action}</Text>
+        <Text style={s.actionArrow} accessibilityElementsHidden>›</Text>
+      </Pressable>
+    </Card>
+  );
+}
+
 export default function ElderHomeScreen({ navigation }) {
   const { elderId, user } = useEmotionalSupportContext();
+  const { width, fontScale } = useWindowDimensions();
+  const stackWeekStats = width < 350 || fontScale > 1.25;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const greeting = useMemo(() => getPersonalizedGreeting(user), [user]);
+  const greetingIcon = useMemo(getGreetingIcon, []);
+  const isCaregiver = user?.role === 'caregiver';
+  const greetingSubtitle = isCaregiver
+    ? `Here is how ${user?.fullName?.split(' ')[0] || 'your elder'} is doing today.`
+    : 'Here is how you are doing today.';
 
   // Gentle engagement tracking uses only factual app activity counts.
   const load = useCallback(async () => {
@@ -54,67 +94,56 @@ export default function ElderHomeScreen({ navigation }) {
   return (
     <SafeAreaView style={s.safe}><WellnessBackdrop />
       <ScrollView contentContainerStyle={s.container}>
-        <Greeting text={greeting} subtitle="What would you like to do today?" />
-        <ScreenHeader title="Today for You" subtitle="Choose one small moment for yourself." />
+        <Greeting text={greeting} subtitle={greetingSubtitle} emoji={greetingIcon} />
+        <View style={s.pageIntro}><Text accessibilityRole="header" style={s.pageTitle}>Today for You</Text><Text style={s.pageSubtitle}>Choose one small moment for yourself.</Text></View>
 
-        {/* TALK — primary hero */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Talk With Me"
-          onPress={() => navigation.navigate('AdaptiveSupportChatScreen')}
-          style={({ pressed }) => [s.hero, pressed && s.pressed]}
-        >
-          <View style={s.heroGlow} />
-          <MicrophoneGlyph color={colors.white} />
-          <Text style={s.heroEyebrow}>TALK WITH ME</Text>
-          <Text style={s.heroTitle}>A short conversation about your day.</Text>
-          <View style={s.featureRow}>
-            <MetaChip label="5 short moments" tint="#FFFFFF1F" color={colors.white} />
-            <MetaChip label="Voice supported" tint="#FFFFFF1F" color={colors.white} />
-            <MetaChip label="About 3 minutes" tint="#FFFFFF1F" color={colors.white} />
-          </View>
-          <View style={s.heroButton}><Text style={s.heroButtonText}>Start Conversation</Text><Text style={s.heroArrow}>›</Text></View>
-        </Pressable>
-
-        {/* PLAY + REMEMBER — secondary cards */}
-        <View style={s.secondaryRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Play an Activity"
+        <View style={s.actionCards}>
+          <HomeActionCard
+            icon={(color) => <MicrophoneGlyph color={color} />}
+            iconColor={colors.primary}
+            iconBackground="#d3f1e4"
+            buttonColor="#2D654F"
+            title="Talk With Me"
+            description="A short, voice-supported conversation about your day."
+            action="Start Conversation"
+            accessibilityLabel="Talk With Me. Start Conversation."
+            onPress={() => navigation.navigate('AdaptiveSupportChatScreen')}
+            style={s.talkCard}
+          />
+          <HomeActionCard
+            icon={(color) => <Text style={[s.actionGlyph, { color }]}>▶</Text>}
+            iconColor="#5b3ca4"
+            iconBackground="#e8def8"
+            buttonColor="#68478B"
+            title="Play an Activity"
+            description="Choose a short activity you enjoy."
+            action="Explore Games"
+            accessibilityLabel="Play an Activity. Explore Games."
             onPress={() => navigation.navigate('CognitiveActivityLibraryScreen')}
-            style={({ pressed }) => [s.secondaryPressable, pressed && s.pressed]}
-          >
-            <Card style={[s.secondaryCard, s.playCard]}>
-              <OrganicIcon color="#6C5B91" soft="#EEE8F8" label="PLAY" />
-              <Text style={s.secondaryTitle}>Play an Activity</Text>
-              <Text style={s.secondaryText}>Choose a short activity you enjoy.</Text>
-              <Text style={s.secondaryLink}>Open activities ›</Text>
-            </Card>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Remember Something Nice"
+            style={s.playCard}
+          />
+          <HomeActionCard
+            icon={(color) => <Text style={[s.actionGlyph, s.heartGlyph, { color }]}>♡</Text>}
+            iconColor="#985b39"
+            iconBackground="#f8e5d8"
+            buttonColor="#98566C"
+            title="Remember Something Nice"
+            description="Recall a pleasant memory or use a photo."
+            action="Explore Memories"
+            accessibilityLabel="Remember Something Nice. Explore Memories."
             onPress={() => navigation.navigate('ReminiscenceHubScreen')}
-            style={({ pressed }) => [s.secondaryPressable, pressed && s.pressed]}
-          >
-            <Card style={[s.secondaryCard, s.rememberCard]}>
-              <OrganicIcon color="#9A654C" soft="#FCE8DC" label="MEM" />
-              <Text style={s.secondaryTitle}>Remember Something Nice</Text>
-              <Text style={s.secondaryText}>Recall a pleasant memory or use a photo.</Text>
-              <Text style={s.secondaryLink}>Open memories ›</Text>
-            </Card>
-          </Pressable>
+            style={s.rememberCard}
+          />
         </View>
 
         {/* Your Week — gentle factual summary (no streaks, no scores) */}
         {hasWeekSummary ? (
           <Card style={s.weekCard}>
             <Text style={s.weekTitle}>Your Week</Text>
-            <View style={s.weekRow}>
-              <View style={s.weekMetric}><Text style={s.weekValue}>{checkins}</Text><Text style={s.weekLabel}>Check-ins</Text></View>
-              <View style={s.weekDivider} />
-              <View style={s.weekMetric}><Text style={s.weekValue}>{activities}</Text><Text style={s.weekLabel}>Activities</Text></View>
-              {differentActivities > 0 ? (<><View style={s.weekDivider} /><View style={s.weekMetric}><Text style={s.weekValue}>{differentActivities}</Text><Text style={s.weekLabel}>Different ones tried</Text></View></>) : null}
+            <View style={[s.weekGrid, stackWeekStats && s.weekGridStacked]}>
+              <WeekMetric value={checkins} label="Check-ins" />
+              <WeekMetric value={activities} label="Activities" />
+              {differentActivities > 0 ? <WeekMetric value={differentActivities} label="Different activities tried" wide={!stackWeekStats} /> : null}
             </View>
             <Text style={s.weekThanks}>Thanks for taking time for yourself.</Text>
           </Card>
@@ -125,65 +154,110 @@ export default function ElderHomeScreen({ navigation }) {
           </Card>
         ) : null}
 
+        {loading ? (
+          <View accessibilityLiveRegion="polite" style={s.weekStatus}>
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text style={s.weekStatusText}>Loading your weekly summary…</Text>
+          </View>
+        ) : null}
+        {error ? (
+          <View accessibilityLiveRegion="polite" style={s.weekError}>
+            <Text style={s.weekErrorText}>Your weekly summary could not load.</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Retry weekly summary" onPress={load} style={({ pressed }) => [s.weekRetry, pressed && s.pressed]}>
+              <Text style={s.weekRetryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* REVIEW */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="My Wellness"
+          accessibilityLabel="My Wellness. View My Wellness."
           onPress={() => navigation.navigate('EmotionalTrendScreen')}
           style={({ pressed }) => pressed && s.pressed}
         >
           <Card style={s.wellnessCard}>
-            <OrganicIcon color="#376F86" soft="#DDEFF8" label="UP" />
-            <View style={s.wellnessCopy}>
-              <Text style={s.secondaryTitle}>My Wellness</Text>
-              <Text style={s.secondaryText}>See your recent check-ins and activities.</Text>
+            <View style={s.wellnessHeading}>
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.wellnessIcon}>
+                <Text style={s.wellnessHeart}>♥</Text>
+                <View style={s.wellnessPulse} />
+              </View>
+              <View style={s.wellnessCopy}>
+                <Text style={s.wellnessTitle}>My Wellness</Text>
+                <Text style={s.wellnessDescription}>See your recent check-ins and activities.</Text>
+              </View>
             </View>
-            <Text style={s.chevron}>›</Text>
+            <View style={s.wellnessButton}>
+              <Text style={s.wellnessButtonText}>View My Wellness</Text>
+              <Text accessibilityElementsHidden style={s.wellnessArrow}>›</Text>
+            </View>
           </Card>
         </Pressable>
 
-        <InlineState loading={loading} error={error} onRetry={load} empty={!loading && !error && false} emptyTitle="" emptyText="" />
         <Text style={s.disclaimer}>This feature supports wellbeing and engagement and is not a medical diagnosis.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function WeekMetric({ value, label, wide }) {
+  return (
+    <View style={[s.weekMetric, wide && s.weekMetricWide]}>
+      <Text style={s.weekValue}>{value}</Text>
+      <Text style={s.weekLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
-  hero: { ...shadows.level3, backgroundColor: colors.primary, borderRadius: radius.hero, marginBottom: spacing.xxl, overflow: 'hidden', padding: spacing.xxl },
-  heroGlow: { backgroundColor: '#FFFFFF12', borderRadius: 100, height: 180, position: 'absolute', right: -45, top: -65, width: 180 },
-  micWrap: { alignItems: 'center', height: 44, justifyContent: 'center', marginTop: spacing.lg, width: 44 },
-  micCapsule: { borderRadius: 9, borderWidth: 2.5, height: 22, width: 15 },
-  micStem: { height: 7, width: 2.5 },
-  micBase: { borderRadius: 2, height: 2.5, width: 18 },
-  heroEyebrow: { ...type.meta, color: '#CFEAE4', letterSpacing: 1.2, marginTop: spacing.md },
-  heroTitle: { ...type.section, color: colors.white, fontSize: 25, lineHeight: 33, marginTop: spacing.xs },
-  featureRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg },
-  heroButton: { alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.button, flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl, minHeight: 58 },
-  heroButtonText: { ...type.button, color: colors.primary },
-  heroArrow: { color: colors.primary, fontSize: 28, marginLeft: spacing.sm },
-  secondaryRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
-  secondaryPressable: { flex: 1 },
-  secondaryCard: { minHeight: 200, padding: spacing.lg },
-  playCard: { backgroundColor: '#F4F1FB' },
-  rememberCard: { backgroundColor: '#FFF4EC' },
-  secondaryTitle: { ...type.card, color: colors.text, fontSize: 18, lineHeight: 24, marginTop: spacing.md },
-  secondaryText: { ...type.meta, color: colors.secondary, marginTop: spacing.xs },
-  secondaryLink: { color: colors.primary, fontSize: 14, fontWeight: '900', marginTop: 'auto', paddingTop: spacing.md },
+  pageIntro: { marginBottom: spacing.md }, pageTitle: { ...type.section, color: colors.text }, pageSubtitle: { ...type.body, color: colors.secondary, marginTop: spacing.xs },
+  actionCards: { gap: spacing.md, marginBottom: spacing.lg },
+  actionCard: { borderRadius: radius.card, borderWidth: 1.5, marginBottom: 0, padding: spacing.lg },
+  talkCard: { backgroundColor: colors.mint, borderColor: '#b8e4d2' },
+  playCard: { backgroundColor: colors.lavender, borderColor: '#dccff6' },
+  rememberCard: { backgroundColor: colors.peach, borderColor: '#f0d9c7' },
+  actionHeading: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
+  actionIcon: { alignItems: 'center', borderColor: colors.border, borderRadius: 17, borderWidth: 1, flexShrink: 0, height: 58, justifyContent: 'center', width: 58 },
+  actionGlyph: { fontSize: 27, fontWeight: '800', textAlign: 'center' }, heartGlyph: { fontSize: 35, lineHeight: 40 },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: { ...type.card, color: colors.text, fontSize: 19, lineHeight: 25, flexShrink: 1 },
+  actionDescription: { ...type.body, color: colors.secondary, fontSize: 15, lineHeight: 21, marginTop: 3 },
+  actionButton: { alignItems: 'center', borderRadius: radius.button, borderWidth: 1.5, flexDirection: 'row', justifyContent: 'center', minHeight: 54, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, width: '100%' },
+  actionButtonText: { ...type.button, color: colors.white, flexShrink: 1, textAlign: 'center' },
+  actionArrow: { color: colors.white, fontSize: 25, fontWeight: '800', marginLeft: spacing.sm },
+  micWrap: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
+  micCapsule: { borderColor: colors.white, borderRadius: 9, borderWidth: 2.5, height: 22, width: 15 },
+  micStem: { backgroundColor: colors.white, height: 7, width: 2.5 },
+  micBase: { backgroundColor: colors.white, borderRadius: 2, height: 2.5, width: 18 },
   weekCard: { marginBottom: spacing.lg },
   weekTitle: { ...type.card, color: colors.text },
-  weekRow: { alignItems: 'center', flexDirection: 'row', marginTop: spacing.md },
-  weekMetric: { alignItems: 'center', flex: 1 },
+  weekGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  weekGridStacked: { flexDirection: 'column' },
+  weekMetric: { backgroundColor: '#f4f6f2', borderRadius: radius.button, flexBasis: '46%', flexGrow: 1, minHeight: 86, minWidth: 0, padding: spacing.md },
+  weekMetricWide: { flexBasis: '100%' },
   weekValue: { ...type.section, color: colors.primary },
-  weekLabel: { ...type.meta, color: colors.secondary, marginTop: 2 },
-  weekDivider: { backgroundColor: colors.border, height: 44, width: 1 },
+  weekLabel: { ...type.body, color: colors.secondary, marginTop: spacing.xs },
   weekThanks: { ...type.meta, color: colors.secondary, marginTop: spacing.md },
+  weekStatus: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  weekStatusText: { ...type.meta, color: colors.secondary },
+  weekError: { alignItems: 'center', backgroundColor: colors.errorBg, borderColor: colors.border, borderRadius: radius.button, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between', marginBottom: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  weekErrorText: { ...type.meta, color: colors.text, flex: 1, minWidth: 155 },
+  weekRetry: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: spacing.sm },
+  weekRetryText: { ...type.meta, color: colors.primary, fontWeight: '900' },
   weekEmpty: { ...type.body, color: colors.secondary, marginTop: spacing.sm },
-  wellnessCard: { alignItems: 'center', flexDirection: 'row' },
-  wellnessCopy: { flex: 1, marginLeft: spacing.md, minWidth: 0 },
-  chevron: { color: colors.primary, fontSize: 31 },
+  wellnessCard: { backgroundColor: colors.mint, borderColor: '#c8e6d8', borderRadius: radius.card, borderWidth: 1, marginBottom: spacing.lg, padding: spacing.lg },
+  wellnessHeading: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  wellnessIcon: { alignItems: 'center', backgroundColor: '#d2eddf', borderColor: '#b8dac8', borderRadius: radius.button, borderWidth: 1, flexShrink: 0, height: 58, justifyContent: 'center', overflow: 'hidden', width: 58 },
+  wellnessHeart: { color: colors.primary, fontSize: 27, lineHeight: 34 },
+  wellnessPulse: { backgroundColor: colors.primary, borderRadius: 2, height: 3, marginTop: -5, width: 24 },
+  wellnessCopy: { flex: 1, minWidth: 0 },
+  wellnessTitle: { ...type.card, color: colors.text, fontSize: 20, lineHeight: 27 },
+  wellnessDescription: { ...type.body, color: colors.secondary, marginTop: spacing.xs },
+  wellnessButton: { alignItems: 'center', backgroundColor: colors.primary, borderColor: colors.primary, borderRadius: radius.button, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', marginTop: spacing.md, minHeight: 54, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  wellnessButtonText: { ...type.button, color: colors.white, textAlign: 'center' },
+  wellnessArrow: { color: colors.white, fontSize: 25, fontWeight: '800', marginLeft: spacing.sm },
   disclaimer: { ...type.meta, color: colors.secondary, marginTop: spacing.xl, textAlign: 'center' },
   pressed: { opacity: 0.84, transform: [{ scale: 0.988 }] },
 });

@@ -2,7 +2,7 @@ const { query, withTransaction } = require('../db/postgres');
 const { getTaskItems } = require('../data/cognitiveActivityBank');
 
 function bankActivityType(activityCode) {
-  return String(activityCode || '').replace(/_(easy|medium)$/, '');
+  return String(activityCode || '').replace(/_(easy|medium|hard)$/, '');
 }
 
 function rotate(values, offset) {
@@ -15,7 +15,7 @@ function buildTaskSnapshot({ activityCode, difficulty, priorCount }) {
   const activityType = bankActivityType(activityCode);
   const bank = getTaskItems(activityType, difficulty);
   if (!bank.length) return null;
-  const totalItems = difficulty === 'medium' ? 4 : 3;
+  const totalItems = difficulty === 'hard' ? 5 : difficulty === 'medium' ? 4 : 3;
   const start = (priorCount * totalItems) % bank.length;
   const items = Array.from({ length: totalItems }, (_value, index) => {
     const source = bank[(start + index) % bank.length];
@@ -81,7 +81,7 @@ async function getSelfSelectedDifficulty(userId, client = null) {
   const result = await executor.query(
     `SELECT recommended_next_difficulty AS difficulty FROM adaptive_activity_attempts
      WHERE user_id = $1 AND category = 'cognitive_engagement' AND completed_at IS NOT NULL
-       AND recommended_next_difficulty IN ('easy', 'medium')
+       AND recommended_next_difficulty IN ('easy', 'medium', 'hard')
      ORDER BY completed_at DESC LIMIT 1`,
     [userId]
   );
@@ -126,9 +126,9 @@ async function startActivityAttempt({ userId, sessionId, activityCode }) {
   });
 }
 
-async function startSelfSelectedActivityAttempt({ userId, activityCode }) {
+async function startSelfSelectedActivityAttempt({ userId, activityCode, requestedDifficulty = null }) {
   return withTransaction(async (client) => {
-    const preferredDifficulty = await getSelfSelectedDifficulty(userId, client);
+    const preferredDifficulty = ['easy', 'medium', 'hard'].includes(requestedDifficulty) ? requestedDifficulty : await getSelfSelectedDifficulty(userId, client);
     const selected = await client.query(
       `SELECT activity_id AS "activityId", activity_key AS "activityCode", category,
               activity_type AS "activityType", difficulty, task_definition AS "taskDefinition"
@@ -199,7 +199,7 @@ async function completeAttempt(client, { attemptId, response, isCorrect, accurac
   const result = await client.query(
     `UPDATE adaptive_activity_attempts SET user_response = $2::jsonb, is_correct = $3,
        accuracy_score = $4,
-       response_time_ms = GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::INTEGER),
+       response_time_ms = GREATEST(0, $7::INTEGER),
        completion_status = 'completed',
        recommended_next_difficulty = $5, difficulty_explanation = $6::jsonb, completed_at = NOW()
      WHERE attempt_id = $1 AND completed_at IS NULL
@@ -208,7 +208,7 @@ async function completeAttempt(client, { attemptId, response, isCorrect, accurac
        accuracy_score AS accuracy, response_time_ms AS "responseTimeMs", user_response AS response,
        completion_status AS "completionStatus", recommended_next_difficulty AS "nextDifficulty",
        started_at AS "startedAt", completed_at AS "completedAt"`,
-    [attemptId, JSON.stringify(response || {}), isCorrect, accuracy, nextDifficulty, JSON.stringify(explanation || {})]
+    [attemptId, JSON.stringify(response || {}), isCorrect, accuracy, nextDifficulty, JSON.stringify(explanation || {}), Math.max(0, Math.round(Number(responseTimeMs) || 0))]
   );
   if (!result.rows[0]) throw Object.assign(new Error('This attempt has already been completed.'), { status: 409 });
   return mapAttempt(result.rows[0]);

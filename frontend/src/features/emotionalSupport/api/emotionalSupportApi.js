@@ -1,11 +1,21 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../../../services/apiConfig';
+import { authService } from '../../../services/authService';
 
 const normalizedApiBaseUrl = API_BASE_URL.replace(/\/$/, '');
 
 const emotionalSupportApi = axios.create({
   baseURL: `${normalizedApiBaseUrl}/emotional-support`,
   timeout: 10000,
+});
+
+emotionalSupportApi.interceptors.request.use(async (config) => {
+  const token = await authService.getToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export const emotionalSupportApiBaseUrl = `${normalizedApiBaseUrl}/emotional-support`;
@@ -92,14 +102,36 @@ export const clearReminiscenceTopics = (userId) =>
 export const getReminiscencePrompt = (userId) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-prompt/${Number(userId)}`));
 
-// Memory entries (Life Book, Good Deeds) — photos remain local-only and are not uploaded.
+// Memory entries (Life Book and Good Deeds).
 export const createMemoryEntry = (payload) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-entries', payload));
+const makePhotoRequestId = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+  const random = Math.floor(Math.random() * 16);
+  return (char === 'x' ? random : ((random & 0x3) | 0x8)).toString(16);
+});
+export const createMemoryPhotoRequestId = makePhotoRequestId;
+export const createMemoryEntryWithPhoto = (payload, photo, requestId = makePhotoRequestId()) => {
+  const form = new FormData();
+  Object.entries({ ...payload, consent: 'true', photo_request_id: requestId }).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) form.append(key, String(value));
+  });
+  form.append('photo', {
+    uri: photo.uri,
+    name: photo.fileName || `memory-photo.${(photo.mimeType || '').split('/')[1] || 'jpg'}`,
+    type: photo.mimeType || 'image/jpeg',
+  });
+  return withComponent4ErrorHandling(() => emotionalSupportApi.post('/reminiscence-entries/with-photo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
+  }));
+};
 export const listMemoryEntries = (userId, entryType = null) =>
   withComponent4ErrorHandling(() =>
     emotionalSupportApi.get(`/reminiscence-entries/${Number(userId)}`, { params: entryType ? { entry_type: entryType } : {} })
   );
 export const deleteMemoryEntry = (entryId, userId) =>
   withComponent4ErrorHandling(() => emotionalSupportApi.delete(`/reminiscence-entries/${entryId}`, { data: { user_id: Number(userId) } }));
+export const refreshMemoryPhotoUrl = (entryId, userId) =>
+  withComponent4ErrorHandling(() => emotionalSupportApi.get(`/reminiscence-entries/${entryId}/photo-url`, { params: { user_id: Number(userId) } }));
 
 export default emotionalSupportApi;
