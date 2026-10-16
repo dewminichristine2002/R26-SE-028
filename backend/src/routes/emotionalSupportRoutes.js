@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireDatabase } = require('../middleware/databaseMiddleware');
 const checkInController = require('../controllers/checkInController');
@@ -16,6 +17,21 @@ const adaptiveCaregiverAlertController = require('../controllers/adaptiveCaregiv
 const reminiscenceMemoryController = require('../controllers/reminiscenceMemoryController');
 
 const router = express.Router();
+const reminiscencePhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+}).single('photo');
+
+function parseReminiscencePhoto(req, res, next) {
+  reminiscencePhotoUpload(req, res, (error) => {
+    if (!error) return next();
+    const tooLarge = error.code === 'LIMIT_FILE_SIZE';
+    return res.status(tooLarge ? 413 : 400).json({
+      success: false,
+      error: tooLarge ? 'Choose an image smaller than 8 MB.' : 'Choose one valid photo and try again.',
+    });
+  });
+}
 
 router.use(requireDatabase);
 router.use(requireAuth);
@@ -51,8 +67,10 @@ router.delete('/reminiscence-topics/user/:userId', reminiscenceMemoryController.
 router.delete('/reminiscence-topics/:topicId', reminiscenceMemoryController.deleteTopic);
 router.get('/reminiscence-prompt/:userId', reminiscenceMemoryController.getPrompt);
 
-// Memory entries for Life Book and Good Deeds (no photo upload)
+// Memory entries for Life Book and Good Deeds.
 router.post('/reminiscence-entries', reminiscenceMemoryController.createEntry);
+router.post('/reminiscence-entries/with-photo', parseReminiscencePhoto, reminiscenceMemoryController.createEntryWithPhoto);
+router.get('/reminiscence-entries/:entryId/photo-url', reminiscenceMemoryController.getEntryPhotoUrl);
 router.get('/reminiscence-entries/:userId', reminiscenceMemoryController.listEntries);
 router.delete('/reminiscence-entries/:entryId', reminiscenceMemoryController.deleteEntry);
 

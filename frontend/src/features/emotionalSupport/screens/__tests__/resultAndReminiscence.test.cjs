@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 
 const featureRoot = path.resolve(__dirname, '..', '..');
@@ -12,7 +12,7 @@ describe('result screen: primary + alternative recommendation', () => {
     expect(source).toContain("params.recommended_activity || {}");
   });
 
-  test('offers exactly one safe alternative — never the whole library', () => {
+  test('offers exactly one safe alternative â€” never the whole library', () => {
     expect(source).toContain('Another option');
     expect(source).toContain('alternative_recommendation || null');
     // Only two activity cards exist.
@@ -44,14 +44,44 @@ describe('reminiscence hub + consent flow', () => {
   const hub = read('screens/ReminiscenceHubScreen.js');
   const memoryMoment = read('screens/MemoryMomentScreen.js');
   const topics = read('screens/RememberedTopicsScreen.js');
+  const revisit = read('screens/RevisitMemoriesScreen.js');
+  const conversation = read('screens/MemoryConversationScreen.js');
+  const navigator = read('EmotionalSupportNavigator.jsx');
 
-  test('hub offers exactly three gentle entry points after entering Reminiscence', () => {
+  test('hub routes to the three consolidated reminiscence choices', () => {
     expect(hub).toContain('My Life Book');
-    expect(hub).toContain('My Good Deeds / Pin Potha');
-    expect(hub).toContain('Remembered Topics');
-    expect(hub).toContain("navigate('MyLifeBook')");
-    expect(hub).toContain("navigate('GoodDeeds')");
-    expect(hub).toContain("navigate('RememberedTopicsScreen')");
+    expect(hub).toContain('Revisit My Memories');
+    expect(hub).toContain("route: 'MyLifeBook'");
+    expect(hub).toContain("route: 'MemoryMomentScreen'");
+    expect(hub).toContain("route: 'RevisitMemoriesScreen'");
+    expect(hub).not.toContain("route: 'GoodDeeds'");
+    expect(hub).not.toContain("route: 'PhotoMemoryScreen'");
+    expect(navigator).toContain('RevisitMemoriesScreen,');
+    expect(navigator).toContain('MemoryConversationScreen,');
+    expect(navigator).toContain('GoodDeeds: MyLifeBook');
+    expect(navigator).toContain('PhotoMemoryScreen: MyLifeBook');
+  });
+
+  test('revisit screen opens only owner-loaded saved entries and keeps topic management available', () => {
+    expect(revisit).toContain('listMemoryEntries(elderId)');
+    expect(revisit).toContain("navigation.navigate('MemoryConversationScreen', { entryId: entry.id })");
+    expect(revisit).toContain("navigation.navigate('RememberedTopicsScreen')");
+    expect(revisit).toContain('not independently verified facts');
+    expect(revisit).toContain('A written story is saved with this moment.');
+    expect(revisit).not.toContain('{entry.story}');
+  });
+
+  test('memory revisit uses deterministic optional prompts without scoring or persistence', () => {
+    expect(conversation).toContain('FOLLOW_UPS');
+    expect(conversation).toContain('Remind me');
+    expect(conversation).toContain("I don't remember");
+    expect(conversation).toContain('Skip this prompt');
+    expect(conversation).toContain('Change topic');
+    expect(conversation).toContain('Finish for now');
+    expect(conversation).toContain('VoiceAnswerControl');
+    expect(conversation).toContain('There is no score or assessment');
+    expect(conversation).not.toContain('submitActivityAttempt');
+    expect(conversation).not.toContain('processNarrative');
   });
 
   test('consent question uses non-manipulative wording with explicit Yes/Not now', () => {

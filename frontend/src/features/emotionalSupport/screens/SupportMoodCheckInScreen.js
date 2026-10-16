@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import { createMoodCheckin } from '../api/emotionalSupportApi';
+import { Card, ScreenHeader, WellnessBackdrop } from '../components/WellnessUI';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
+import { colors, screenInsets, spacing, type } from '../theme';
 
 const moodOptions = [
   { label: 'Terrible', score: 1 },
@@ -63,22 +65,20 @@ export default function SupportMoodCheckInScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}><WellnessBackdrop />
       <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.title}>Optional Mood Check-In</Text>
-            <Text style={styles.subtitle}>You can save a quick mood note before adaptive chat.</Text>
-          </View>
+          <ScreenHeader navigation={navigation} eyebrow="A MOMENT FOR YOU" title="Optional Mood Check-In" subtitle="You can save a quick mood note before adaptive chat." />
 
-          <View style={styles.moodGrid}>
+          <Card style={styles.moodGrid}>
+            <Text style={styles.inputLabel}>How are you feeling today?</Text>
             {moodOptions.map((mood) => {
               const selected = selectedMood?.score === mood.score;
 
               return (
                 <Pressable
                   key={mood.score}
-                  style={[styles.moodButton, selected && styles.moodButtonSelected]}
+                  style={({ pressed }) => [styles.moodButton, selected && styles.moodButtonSelected, pressed && styles.pressed]}
                   onPress={() => {
                     setSelectedMood(mood);
                     setSuccessMessage('');
@@ -89,9 +89,9 @@ export default function SupportMoodCheckInScreen({ navigation }) {
                 </Pressable>
               );
             })}
-          </View>
+          </Card>
 
-          <View style={styles.reflectionCard}>
+          <Card style={styles.reflectionCard}>
             <Text style={styles.inputLabel}>Short note</Text>
             <TextInput
               style={styles.reflectionInput}
@@ -103,7 +103,7 @@ export default function SupportMoodCheckInScreen({ navigation }) {
               placeholderTextColor="#7A8B9A"
               editable={!loading}
             />
-          </View>
+          </Card>
 
           {errorMessage ? (
             <View style={styles.errorBox}>
@@ -131,48 +131,46 @@ export default function SupportMoodCheckInScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F1F8F5' },
+  safeArea: { flex: 1, backgroundColor: '#f7efe4' },
   keyboardView: { flex: 1 },
-  container: { paddingHorizontal: 22, paddingTop: 30, paddingBottom: 40 },
+  container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
   header: { marginBottom: 24 },
-  title: { color: '#173D35', fontSize: 34, fontWeight: '900', lineHeight: 42 },
-  subtitle: { color: '#526963', fontSize: 18, fontWeight: '600', lineHeight: 27, marginTop: 10 },
-  moodGrid: { gap: 14 },
+  moodGrid: { gap: spacing.sm, marginBottom: spacing.lg },
   moodButton: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#D5E8E0',
+    borderColor: colors.border,
     borderRadius: 20,
-    borderWidth: 2,
-    minHeight: 70,
+    borderWidth: 1.5,
+    minHeight: 62,
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  moodButtonSelected: { backgroundColor: '#DFF4ED', borderColor: '#287260' },
-  moodLabel: { color: '#1E4038', fontSize: 24, fontWeight: '900' },
-  moodLabelSelected: { color: '#0F5D4D' },
+  moodButtonSelected: { backgroundColor: '#E3F8EE', borderColor: '#2F6654' },
+  moodLabel: { color: '#27231F', fontSize: 21, fontWeight: '900' },
+  moodLabelSelected: { color: '#2F6654' },
   reflectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D5E8E0',
+    backgroundColor: '#FFFDF8',
+    borderColor: colors.border,
     borderRadius: 20,
-    borderWidth: 2,
+    borderWidth: 1,
     marginTop: 24,
-    padding: 18,
+    padding: spacing.lg,
   },
-  inputLabel: { color: '#163B35', fontSize: 20, fontWeight: '900', marginBottom: 12 },
+  inputLabel: { ...type.card, color: '#27231F', fontSize: 20, marginBottom: spacing.md },
   reflectionInput: {
-    backgroundColor: '#FAFDFC',
-    borderColor: '#DCEBE6',
+    backgroundColor: '#F7EFE4',
+    borderColor: colors.border,
     borderRadius: 16,
     borderWidth: 1,
-    color: '#163B35',
+    color: '#27231F',
     fontSize: 18,
     minHeight: 120,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
   errorBox: {
-    backgroundColor: '#FDECEC',
+    backgroundColor: '#FFF1F4',
     borderColor: '#F3A6A6',
     borderRadius: 16,
     borderWidth: 1,
@@ -181,7 +179,7 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#991B1B', fontSize: 16, fontWeight: '700', lineHeight: 22 },
   successBox: {
-    backgroundColor: '#E4F8EA',
+    backgroundColor: '#E3F8EE',
     borderColor: '#8ED6A5',
     borderRadius: 16,
     borderWidth: 1,
@@ -191,7 +189,7 @@ const styles = StyleSheet.create({
   successText: { color: '#166534', fontSize: 17, fontWeight: '800', lineHeight: 23 },
   submitButton: {
     alignItems: 'center',
-    backgroundColor: '#236F60',
+    backgroundColor: '#2F6654',
     borderRadius: 18,
     justifyContent: 'center',
     marginTop: 22,
@@ -210,4 +208,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   continueButtonText: { color: '#3B2A08', fontSize: 19, fontWeight: '900' },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
 });

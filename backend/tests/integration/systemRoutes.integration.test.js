@@ -140,6 +140,8 @@ jest.mock('../../src/controllers/reminiscenceMemoryController', () => ({
   deleteTopic: (req, res) => res.json({ topicId: req.params.topicId, deleted: true }),
   getPrompt: (req, res) => res.json({ userId: req.params.userId, prompt: 'Tell me about a happy memory.' }),
   createEntry: (req, res) => res.status(201).json({ entry: { id: 1 } }),
+  createEntryWithPhoto: (req, res) => res.status(201).json({ entry: { id: 1, photoUrl: null } }),
+  getEntryPhotoUrl: (req, res) => res.json({ photoUrl: 'https://example.test/signed' }),
   listEntries: (req, res) => res.json({ userId: req.params.userId, entries: [] }),
   deleteEntry: (req, res) => res.json({ entryId: req.params.entryId, deleted: true }),
 }));

@@ -238,7 +238,11 @@ const switchPoolToPort = (portOverride) => {
   dbState.activePort = portOverride;
 };
 
-const initializeDatabase = async () => {
+// Server startup must never perform schema synchronization or backfills on the
+// shared database. The legacy schema block below is retained for compatibility
+// with the existing explicit initialization path, but it requires a deliberate
+// opt-in by a caller. Normal startup only verifies connectivity.
+const initializeDatabase = async ({ applyLegacySchema = false } = {}) => {
   const identity = getResolvedDatabaseIdentity();
   dbState.lastAttemptAt = new Date().toISOString();
   console.log(`[DB] Connecting to ${identity.host}:${identity.port}/${identity.database} as ${identity.user}`);
@@ -366,6 +370,13 @@ const initializeDatabase = async () => {
       } else {
         throw connectionError;
       }
+    }
+
+    if (!applyLegacySchema) {
+      dbState.connected = true;
+      dbState.lastError = null;
+      console.log('[DB] Connection verified; automatic schema changes are disabled');
+      return;
     }
 
     await pool.query(createTableQuery);

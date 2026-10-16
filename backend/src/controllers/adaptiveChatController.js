@@ -200,6 +200,11 @@ async function respondAdaptiveChat(req, res) {
       rawDetectionSource: analysis.detectionSource,
       fallbackEmotion: analysis.detectionSource === 'rule_fallback' ? rawTurnState : null,
       previousInterpretedEmotion,
+      previousAnswers: existingTurns.slice(-2).map((turn) => ({
+        questionText: turn.questionText,
+        answerText: turn.userAnswer,
+        interpretedEmotion: turn.detectedState,
+      })),
     });
     const detectedState = normalizeState(interpretation.interpretedEmotion);
     const interpretedEvidenceConfidence = interpretation.explicitEvidenceWeight
@@ -397,6 +402,7 @@ async function respondAdaptiveChat(req, res) {
         detected_state: responsePayload.turn.detectedState,
         confidence_score: responsePayload.turn.confidenceScore,
         answer_polarity: responsePayload.turn.answerPolarity,
+        clarification_suggested: Boolean(responsePayload.turn.analysisMetadata?.contextualInterpretation?.clarificationSuggested),
         detection_source: responsePayload.turn.detectionSource,
         model_version: responsePayload.turn.modelVersion,
         acknowledgement: responsePayload.turn.analysisMetadata?.acknowledgement?.message || null,
@@ -441,6 +447,7 @@ async function respondAdaptiveChat(req, res) {
       current_state: responsePayload.session.currentState,
       turn_count: responsePayload.session.turnCount,
       final_emotional_state: responsePayload.session.finalEmotionalState,
+      clarification_suggested: Boolean(responsePayload.turn.analysisMetadata?.contextualInterpretation?.clarificationSuggested),
       final_confidence: responsePayload.session.finalConfidence,
       risk_level: responsePayload.session.riskLevel,
       conversation_engagement: responsePayload.session.conversationEngagement,

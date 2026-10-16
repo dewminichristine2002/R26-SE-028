@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -158,7 +160,7 @@ export default function MemoryMomentScreen({ navigation, route }) {
     <SafeAreaView style={s.safe}><WellnessBackdrop variant="warm" />
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
-          <ScreenHeader navigation={navigation} eyebrow="MEMORY MOMENT" title="Remember Something Nice" subtitle="Share as much or as little as feels comfortable." />
+          <ScreenHeader navigation={navigation} eyebrow="A GENTLE MEMORY MOMENT" title="Remember Something Nice" subtitle="Share as much or as little as feels comfortable." />
 
           {!savedMessage ? (
             <>
@@ -188,7 +190,8 @@ export default function MemoryMomentScreen({ navigation, route }) {
                 />
                 <VoiceStatus audioState={voice.audioState} error={voice.voiceError} transcript={voiceTranscript} />
 
-                <Text style={[s.helper, { marginTop: 12 }]}>Photo (optional)</Text>
+                <Text style={[s.helper, { marginTop: 12 }]}>Photo cue (optional)</Text>
+                <Text style={s.photoNote}>This picture is a cue on your device. It is not saved with the topic.</Text>
                 {!photoUri ? (
                   <View style={{ marginTop: 6 }}>
                     <Button label="Choose a Photo" onPress={choosePhoto} />
@@ -262,7 +265,7 @@ export default function MemoryMomentScreen({ navigation, route }) {
             </>
           ) : (
             <Card style={s.doneCard}>
-              <View style={s.check}><Text style={s.checkText}>OK</Text></View>
+              <View style={s.check}><Text style={s.checkText}>♡</Text></View>
               <Text style={s.doneTitle}>Thank you for sharing.</Text>
               <Text style={s.doneCopy}>{savedMessage}</Text>
               <Button label="Done" onPress={() => navigation.popToTop()} style={s.fullButton} />
@@ -275,16 +278,17 @@ export default function MemoryMomentScreen({ navigation, route }) {
 }
 
 const s = StyleSheet.create({
-  safe: { backgroundColor: '#FFF9F3', flex: 1 },
+  safe: { backgroundColor: colors.background, flex: 1 },
   flex: { flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
-  promptCard: { backgroundColor: '#FFF0E6', overflow: 'hidden' },
+  promptCard: { backgroundColor: '#FFF8F1', borderColor: '#E8DCCB', overflow: 'hidden' },
   promptTop: { alignItems: 'center', flexDirection: 'row' },
-  promptLabel: { ...type.meta, color: '#8A5D47', flex: 1, letterSpacing: 0.8, marginLeft: spacing.md },
+  promptLabel: { ...type.meta, color: '#6E5547', flex: 1, letterSpacing: 0.8, marginLeft: spacing.md },
   promptText: { ...type.question, color: colors.text, marginTop: spacing.xl },
-  answerCard: { marginTop: spacing.lg },
+  answerCard: { borderTopColor: '#98566C', borderTopWidth: 4, marginTop: spacing.lg },
   answerTitle: { ...type.card, color: colors.text },
-  input: { ...type.body, backgroundColor: colors.background, borderColor: colors.border, borderRadius: 18, borderWidth: 1, color: colors.text, marginTop: spacing.md, minHeight: 118, padding: spacing.lg, textAlignVertical: 'top' },
+  input: { ...type.body, backgroundColor: '#FBF8F3', borderColor: colors.border, borderRadius: 18, borderWidth: 1, color: colors.text, marginTop: spacing.md, minHeight: 118, padding: spacing.lg, textAlignVertical: 'top' },
+  photoNote: { ...type.meta, color: colors.secondary, marginTop: spacing.xs },
   actions: { marginTop: spacing.lg },
   actionsRow: { flexDirection: 'row', gap: spacing.md },
   actionButton: { flex: 1 },
@@ -294,10 +298,10 @@ const s = StyleSheet.create({
   consentActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   consentYes: { flex: 1 },
   consentNo: { flex: 1 },
-  doneCard: { alignItems: 'center', marginTop: spacing.md },
-  check: { alignItems: 'center', backgroundColor: colors.mint, borderRadius: 38, height: 76, justifyContent: 'center', width: 76 },
-  checkText: { color: colors.primary, fontSize: 15, fontWeight: '900' },
+  doneCard: { alignItems: 'center', backgroundColor: '#FFFEFC', borderColor: '#E9DCCB', marginTop: spacing.md },
+  check: { alignItems: 'center', backgroundColor: '#F8EDEF', borderRadius: 38, height: 76, justifyContent: 'center', width: 76 },
+  checkText: { color: '#98566C', fontSize: 32, fontWeight: '900' },
   doneTitle: { ...type.section, color: colors.text, marginTop: spacing.lg },
-  doneCopy: { ...type.body, color: colors.secondary, marginTop: spacing.sm, textAlign: 'center' },
+  doneCopy: { ...type.body, color: colors.primary, marginTop: spacing.sm, textAlign: 'center' },
   fullButton: { alignSelf: 'stretch', marginTop: spacing.xl },
 });

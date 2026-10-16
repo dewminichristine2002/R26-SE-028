@@ -82,7 +82,9 @@ async function analyzeNarrative(transcribedNarrative, options = {}) {
         baseRiskLevel: getBaseRiskLevel(prediction.emotion),
         detectionSource: prediction.detectionSource,
         modelVersion: prediction.modelVersion,
-        uncertainty: false,
+        uncertainty: Boolean(prediction.clarificationSuggested),
+        clarificationSuggested: Boolean(prediction.clarificationSuggested),
+        uncertaintyDetails: prediction.uncertainty || null,
         fallbackReason: null,
       };
     }

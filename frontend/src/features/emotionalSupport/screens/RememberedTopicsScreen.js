@@ -115,7 +115,7 @@ export default function RememberedTopicsScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  safe: { backgroundColor: '#FFF9F3', flex: 1 },
+  safe: { backgroundColor: colors.background, flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
   topicCard: { marginBottom: spacing.md },
   topicRow: { alignItems: 'center', flexDirection: 'row' },

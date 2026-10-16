@@ -2,8 +2,10 @@ import { NativeModules, Platform } from 'react-native';
 
 const normalizeApiUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 
-const lanApi = 'http://192.168.8.140:5000/api';
-const defaultApi = Platform.OS === 'android' ? lanApi : 'http://localhost:5000/api';
+// Android's emulator reaches the host machine through this standard bridge
+// address. Physical devices should set EXPO_PUBLIC_API_URL to the developer
+// machine's current LAN address rather than relying on a repository IP.
+const defaultApi = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 const configuredApi = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
 
 const derivedHost = (() => {
@@ -42,6 +44,6 @@ export const getBackendConnectionHelp = () =>
     `Could not connect to the ElderMeds backend at ${API_BASE_URL}.`,
     'Make sure the backend is running on port 5000.',
     Platform.OS === 'android'
-      ? 'For an Android emulator, use http://10.0.2.2:5000/api. For a physical phone, use your computer LAN IP, for example EXPO_PUBLIC_API_URL=http://192.168.8.140:5000/api.'
-      : 'For iOS simulator/web, use http://localhost:5000/api. For a physical device, use your computer LAN IP, for example EXPO_PUBLIC_API_URL=http://192.168.8.140:5000/api.',
+      ? 'For an Android emulator, use http://10.0.2.2:5000/api. For a physical phone, set EXPO_PUBLIC_API_URL to http://<computer-LAN-IP>:5000/api.'
+      : 'For iOS simulator/web, use http://localhost:5000/api. For a physical device, set EXPO_PUBLIC_API_URL to http://<computer-LAN-IP>:5000/api.',
   ].join('\n');

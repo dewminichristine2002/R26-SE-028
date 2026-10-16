@@ -305,8 +305,10 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.conversationIntro}>Let's talk for a moment.</Text>
+          <View style={styles.greetingBanner}>
+            <View style={styles.greetingIcon}><Text style={styles.greetingEmoji}>☀️</Text></View>
+            <View style={styles.greetingCopy}><Text style={styles.greeting}>{greeting}</Text><Text style={styles.conversationIntro}>Let's talk for a moment.</Text></View>
+          </View>
           <ConversationDots current={Math.min(questionIndex, TOTAL_QUESTIONS)} total={TOTAL_QUESTIONS} />
 
           {/* Collapsed previous conversation */}
@@ -460,11 +462,14 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+  safeArea: { flex: 1, backgroundColor: '#F7EFE4' },
   keyboardView: { flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
-  greeting: { ...type.section, color: colors.text },
-  conversationIntro: { ...type.body, color: colors.secondary, marginTop: spacing.xs },
+  greetingBanner: { alignItems: 'center', backgroundColor: '#2F6654', borderColor: '#E5C44F', borderRadius: 22, borderWidth: 2, flexDirection: 'row', marginBottom: spacing.md, minHeight: 104, padding: spacing.lg },
+  greetingIcon: { alignItems: 'center', backgroundColor: '#FFF4B8', borderRadius: 18, height: 56, justifyContent: 'center', marginRight: spacing.md, width: 56 },
+  greetingEmoji: { fontSize: 28 }, greetingCopy: { flex: 1 },
+  greeting: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', lineHeight: 28 },
+  conversationIntro: { ...type.meta, color: '#ECFFF6', marginTop: spacing.xs },
   dotsRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   dot: { backgroundColor: colors.border, borderRadius: 7, height: 14, width: 14 },
   dotFilled: { backgroundColor: colors.primary },
