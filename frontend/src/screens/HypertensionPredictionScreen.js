@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import hypertensionPredictionService from '../services/hypertensionPredictionService';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import healthAdviceService from '../services/healthAdviceService';
 
 const emptyForm = {
@@ -412,7 +413,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
           onChangeText={(value) => setForm((prev) => ({ ...prev, [key]: value }))}
           style={[styles.input, styles.inputShellInput]}
           placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#718079"
           keyboardType="numeric"
         />
         {unit ? <Text style={styles.unitText}>{unit}</Text> : null}
@@ -443,7 +444,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
           }}
           style={[styles.input, styles.inputShellInput]}
           placeholder="120/80"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#718079"
           keyboardType="numbers-and-punctuation"
         />
         <Text style={styles.unitText}>mmHg</Text>
@@ -453,13 +454,14 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
 
   const renderHealthForm = () => (
     <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <Pressable onPress={() => setScreenMode('chat')} style={styles.backButton}>
+          <Text style={styles.backText}>{'< Chat'}</Text>
+        </Pressable>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Update BP Values</Text>
+        <HeaderAccountActions />
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => setScreenMode('chat')} style={styles.backButton}>
-            <Text style={styles.backText}>{'< Chat'}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Update BP Values</Text>
-        </View>
 
         <View style={styles.formIntro}>
           <Text style={styles.formIntroTitle}>Easy blood pressure check</Text>
@@ -516,7 +518,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
               onChangeText={(value) => setForm((prev) => ({ ...prev, existingDiseaseHistory: value }))}
               style={[styles.input, styles.multilineInput]}
               placeholder="Example: diabetes, heart disease"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#718079"
               multiline
             />
           </View>
@@ -531,13 +533,14 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
 
   const renderChatScreen = () => (
     <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <Pressable onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backText}>{'< Back'}</Text>
+        </Pressable>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>BP Helper</Text>
+        <HeaderAccountActions />
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>{'< Back'}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>BP Helper</Text>
-        </View>
 
         <View style={[styles.riskPanel, { backgroundColor: riskTheme.soft, borderColor: riskTheme.border }]}>
           <Text style={styles.welcomeText}>Hi {displayName}</Text>
@@ -631,7 +634,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
               onChangeText={setChatInput}
               style={[styles.input, styles.chatInput]}
               placeholder="Type your message"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#718079"
             />
             <Pressable style={styles.sendButton} onPress={onSendChat} disabled={chatLoading}>
               <Text style={styles.sendButtonText}>{chatLoading ? '...' : 'Send'}</Text>
@@ -657,83 +660,83 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F8FB' },
-  scrollContent: { padding: 18, paddingBottom: 42 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F6F8FB' },
-  loadingText: { marginTop: 12, color: '#475569', fontSize: 17, fontWeight: '700' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 58, marginBottom: 18 },
+  container: { flex: 1, backgroundColor: '#F7F8F5' },
+  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 20, paddingBottom: 56 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F8F5' },
+  loadingText: { marginTop: 12, color: '#53645A', fontSize: 17, fontWeight: '700' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 70, marginTop: 18, marginHorizontal: 20, borderRadius: 22, borderWidth: 2, borderColor: '#F4CF75', backgroundColor: '#275C4B', paddingHorizontal: 9 },
   backButton: {
     minHeight: 48,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#EAF2FF',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
-    marginRight: 18,
+    marginRight: 8,
   },
-  backText: { color: '#2563EB', fontWeight: '900', fontSize: 18, lineHeight: 24 },
-  headerTitle: { flex: 1, flexShrink: 1, fontSize: 30, fontWeight: '900', color: '#0F172A', lineHeight: 36 },
-  riskPanel: { borderWidth: 1, borderRadius: 8, padding: 18, marginBottom: 14 },
-  welcomeText: { color: '#475569', fontSize: 18, fontWeight: '800', marginBottom: 8 },
-  riskLabel: { color: '#0F172A', fontSize: 17, fontWeight: '800', marginBottom: 10 },
-  riskBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 10, marginBottom: 10 },
+  backText: { color: '#275C4B', fontWeight: '900', fontSize: 18, lineHeight: 24 },
+  headerTitle: { flex: 1, flexShrink: 1, fontSize: 21, fontWeight: '900', color: '#FFFFFF', lineHeight: 27 },
+  riskPanel: { borderWidth: 1, borderRadius: 16, padding: 18, marginBottom: 14 },
+  welcomeText: { color: '#53645A', fontSize: 18, fontWeight: '800', marginBottom: 8 },
+  riskLabel: { color: '#193D31', fontSize: 17, fontWeight: '800', marginBottom: 10 },
+  riskBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 16, paddingHorizontal: 18, paddingVertical: 10, marginBottom: 10 },
   riskBadgeText: { fontSize: 30, fontWeight: '900' },
-  confidenceText: { color: '#475569', fontSize: 16, fontWeight: '700', marginBottom: 10 },
-  summaryText: { color: '#1E293B', fontSize: 17, lineHeight: 25 },
-  primaryButton: { backgroundColor: '#B91C1C', borderRadius: 8, minHeight: 58, alignItems: 'center', justifyContent: 'center', marginBottom: 14, paddingHorizontal: 16 },
+  confidenceText: { color: '#53645A', fontSize: 16, fontWeight: '700', marginBottom: 10 },
+  summaryText: { color: '#53645A', fontSize: 17, lineHeight: 25 },
+  primaryButton: { backgroundColor: '#B91C1C', borderRadius: 16, minHeight: 58, alignItems: 'center', justifyContent: 'center', marginBottom: 14, paddingHorizontal: 16 },
   primaryButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 18 },
   disabledButton: { opacity: 0.65 },
-  advicePanel: { backgroundColor: '#FFFFFF', borderColor: '#FECACA', borderWidth: 1, borderRadius: 8, padding: 14, marginBottom: 14 },
+  advicePanel: { backgroundColor: '#FFFFFF', borderColor: '#FECACA', borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 14 },
   adviceTitle: { color: '#991B1B', fontSize: 18, fontWeight: '900', marginBottom: 10 },
   adviceChipRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  adviceChip: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginRight: 8, marginBottom: 8 },
+  adviceChip: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10, marginRight: 8, marginBottom: 8 },
   adviceChipText: { color: '#B91C1C', fontSize: 15, fontWeight: '900' },
-  snapshotPanel: { backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', padding: 16, marginBottom: 14 },
+  snapshotPanel: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E1E7E0', padding: 16, marginBottom: 14 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 21, fontWeight: '900', color: '#0F172A' },
-  textButton: { color: '#2563EB', fontSize: 16, fontWeight: '900' },
+  sectionTitle: { fontSize: 21, fontWeight: '900', color: '#193D31' },
+  textButton: { color: '#275C4B', fontSize: 16, fontWeight: '900' },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  metricTile: { width: '48%', minHeight: 88, backgroundColor: '#F8FAFC', borderRadius: 8, padding: 12, marginBottom: 10 },
-  metricLabel: { color: '#64748B', fontSize: 15, fontWeight: '800', marginBottom: 8 },
-  metricValue: { color: '#0F172A', fontSize: 21, fontWeight: '900' },
+  metricTile: { width: '48%', minHeight: 88, backgroundColor: '#F7F8F5', borderRadius: 16, padding: 12, marginBottom: 10 },
+  metricLabel: { color: '#63736A', fontSize: 15, fontWeight: '800', marginBottom: 8 },
+  metricValue: { color: '#193D31', fontSize: 21, fontWeight: '900' },
   factorRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
-  factorChip: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginRight: 8, marginTop: 8 },
+  factorChip: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, marginRight: 8, marginTop: 8 },
   factorText: { color: '#B91C1C', fontSize: 14, fontWeight: '800' },
-  chatPanel: { backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', padding: 16, marginBottom: 12 },
-  chatBox: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, minHeight: 210, padding: 10, backgroundColor: '#F8FAFC', marginTop: 12, marginBottom: 10 },
-  chatBubble: { padding: 12, borderRadius: 8, marginBottom: 10, maxWidth: '94%' },
-  chatUser: { alignSelf: 'flex-end', backgroundColor: '#DBEAFE' },
+  chatPanel: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E1E7E0', padding: 16, marginBottom: 12 },
+  chatBox: { borderWidth: 1, borderColor: '#E1E7E0', borderRadius: 16, minHeight: 210, padding: 10, backgroundColor: '#F7F8F5', marginTop: 12, marginBottom: 10 },
+  chatBubble: { padding: 12, borderRadius: 16, marginBottom: 10, maxWidth: '94%' },
+  chatUser: { alignSelf: 'flex-end', backgroundColor: '#D4E6DA' },
   chatAssistant: { alignSelf: 'flex-start', backgroundColor: '#FEF2F2' },
-  chatText: { color: '#0F172A', fontSize: 16, lineHeight: 22 },
-  sourceBox: { marginTop: 10, backgroundColor: '#FFFFFF', borderColor: '#FECACA', borderWidth: 1, borderRadius: 8, padding: 10 },
+  chatText: { color: '#193D31', fontSize: 16, lineHeight: 22 },
+  sourceBox: { marginTop: 10, backgroundColor: '#FFFFFF', borderColor: '#FECACA', borderWidth: 1, borderRadius: 16, padding: 10 },
   sourceTitle: { color: '#991B1B', fontSize: 13, fontWeight: '900', marginBottom: 4 },
   sourceText: { color: '#B91C1C', fontSize: 13, fontWeight: '800', lineHeight: 18, marginTop: 2 },
-  safetyBox: { marginTop: 8, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, borderRadius: 8, padding: 9 },
+  safetyBox: { marginTop: 8, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, borderRadius: 16, padding: 9 },
   safetyText: { color: '#1E3A8A', fontSize: 13, fontWeight: '800', lineHeight: 18 },
   chatInputRow: { flexDirection: 'row', alignItems: 'center' },
   chatInput: { flex: 1, marginRight: 10, minHeight: 54 },
-  sendButton: { backgroundColor: '#2563EB', borderRadius: 8, minHeight: 54, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  sendButton: { backgroundColor: '#275C4B', borderRadius: 16, minHeight: 54, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
   sendButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
-  disclaimer: { color: '#475569', fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 2 },
-  formIntro: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 14 },
+  disclaimer: { color: '#53645A', fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 2 },
+  formIntro: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 14 },
   formIntroTitle: { color: '#991B1B', fontSize: 20, fontWeight: '900', marginBottom: 6 },
   formIntroText: { color: '#B91C1C', fontSize: 17, lineHeight: 24 },
-  formSection: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 14 },
-  formSectionTitle: { color: '#0F172A', fontSize: 22, fontWeight: '900', marginBottom: 12 },
+  formSection: { backgroundColor: '#FFFFFF', borderColor: '#E1E7E0', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 14 },
+  formSectionTitle: { color: '#193D31', fontSize: 22, fontWeight: '900', marginBottom: 12 },
   inputWrap: { marginBottom: 14 },
-  inputLabel: { color: '#334155', marginBottom: 8, fontWeight: '900', fontSize: 17 },
-  inputShell: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, backgroundColor: '#FFFFFF', minHeight: 58 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#FFFFFF', color: '#0F172A', fontSize: 17, minHeight: 54 },
+  inputLabel: { color: '#53645A', marginBottom: 8, fontWeight: '900', fontSize: 17 },
+  inputShell: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#AABCB0', borderRadius: 16, backgroundColor: '#FFFFFF', minHeight: 58 },
+  input: { flex: 1, borderWidth: 1, borderColor: '#AABCB0', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#FFFFFF', color: '#193D31', fontSize: 17, minHeight: 54 },
   inputShellInput: { borderWidth: 0 },
-  unitText: { color: '#64748B', fontSize: 16, fontWeight: '800', paddingRight: 14 },
+  unitText: { color: '#63736A', fontSize: 16, fontWeight: '800', paddingRight: 14 },
   multilineInput: { minHeight: 92, textAlignVertical: 'top', paddingTop: 14 },
   choiceRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  choiceButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 13, backgroundColor: '#FFFFFF', minHeight: 54, marginRight: 8, marginBottom: 8 },
+  choiceButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#AABCB0', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 13, backgroundColor: '#FFFFFF', minHeight: 54, marginRight: 8, marginBottom: 8 },
   choiceButtonActive: { borderColor: '#B91C1C', backgroundColor: '#FEF2F2' },
   radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#94A3B8', alignItems: 'center', justifyContent: 'center', marginRight: 9 },
   radioOuterActive: { borderColor: '#B91C1C' },
   radioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#B91C1C' },
-  choiceText: { color: '#334155', fontWeight: '900', fontSize: 16 },
+  choiceText: { color: '#53645A', fontWeight: '900', fontSize: 16 },
   choiceTextActive: { color: '#B91C1C' },
 });
 

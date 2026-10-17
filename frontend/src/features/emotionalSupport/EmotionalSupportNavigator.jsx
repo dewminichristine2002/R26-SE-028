@@ -37,8 +37,13 @@ const routes = {
   MemoryConversationScreen,
 };
 
-export default function EmotionalSupportNavigator({ user }) {
-  const [routeStack, setRouteStack] = useState([{ name: 'ElderHome', params: {} }]);
+export default function EmotionalSupportNavigator({ user, initialRoute = 'ElderHome', onExit }) {
+  const [routeStack, setRouteStack] = useState(() => {
+    const home = { name: 'ElderHome', params: {} };
+    return initialRoute !== 'ElderHome' && routes[initialRoute]
+      ? [home, { name: initialRoute, params: {} }]
+      : [home];
+  });
   const currentRoute = routeStack[routeStack.length - 1];
   const CurrentScreen = routes[currentRoute.name] || ElderHomeScreen;
 
@@ -62,7 +67,7 @@ export default function EmotionalSupportNavigator({ user }) {
 
   return (
     <EmotionalSupportProvider user={user}>
-      <CurrentScreen navigation={navigation} route={{ name: currentRoute.name, params: currentRoute.params }} />
+      <CurrentScreen navigation={navigation} route={{ name: currentRoute.name, params: currentRoute.params }} onExit={onExit} />
     </EmotionalSupportProvider>
   );
 }

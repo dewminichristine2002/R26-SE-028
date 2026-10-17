@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#F7F8F5",
       "resizeMode": "contain"
     },
     "assetBundlePatterns": [
@@ -57,10 +57,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "thyagaalwis",
+    "owner": "dewmini_expo",
     "extra": {
       "eas": {
-        "projectId": "a9753d49-2146-4910-b83b-b6b526fb2fdf"
+        "projectId": "24a21b0b-dd9d-4e1c-a8b2-92f84bbd7322"
       }
     }
   }

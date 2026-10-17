@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import AgenticGlowCard from '../components/AgenticGlowCard';
 import AgenticScreenFrame from '../components/AgenticScreenFrame';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { routineService } from '../services/routineService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
@@ -356,7 +357,7 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1, highlight = n
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#2f5d50" />
+        <ActivityIndicator size="large" color="#275C4B" />
         <Text style={[styles.loaderText, { fontSize: 15 * textScale }]}>Loading your routine...</Text>
         <AgenticScreenFrame active={hasAgenticFrame} pulseKey={highlight?.nonce} />
       </View>
@@ -369,8 +370,8 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1, highlight = n
         <TouchableOpacity onPress={onBackToMenu} style={styles.backIconButton}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={[styles.topTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>⏰ Routine Setup</Text>
-        <View style={styles.headerRightSpacer} />
+        <Text style={[styles.topTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>⏰ Routine Setup</Text>
+        <HeaderAccountActions />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -567,17 +568,17 @@ const RoutineSetupScreen = ({ onBackToMenu, reminderTextScale = 1, highlight = n
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   loaderText: {
     marginTop: 12,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 15,
   },
   topBar: {
@@ -589,7 +590,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#f4cf75',
@@ -603,7 +604,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -612,7 +613,7 @@ const styles = StyleSheet.create({
   backIcon: {
     fontSize: 32,
     lineHeight: 36,
-    color: '#2f5d50',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -637,7 +638,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#f4cf75',
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     padding: 16,
     marginBottom: 14,
     flexDirection: 'row',
@@ -682,8 +683,8 @@ const styles = StyleSheet.create({
     minHeight: 58,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -700,13 +701,13 @@ const styles = StyleSheet.create({
   voiceSetupText: {
     fontSize: 19,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   voiceResultCard: {
     borderWidth: 1,
     borderColor: '#a8dbc8',
     borderRadius: 16,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
@@ -763,13 +764,13 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     fontWeight: '900',
     letterSpacing: 0,
-    color: '#24352f',
+    color: '#193D31',
   },
   timeSubtitle: {
     marginTop: 2,
     fontSize: 14,
     lineHeight: 18,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '700',
   },
   timeValue: {
@@ -777,7 +778,7 @@ const styles = StyleSheet.create({
     fontSize: 31,
     lineHeight: 37,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   clockWrap: {
     width: 52,
@@ -795,8 +796,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -807,7 +808,7 @@ const styles = StyleSheet.create({
   },
   tipText: {
     flex: 1,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 15,
     fontWeight: '800',
     lineHeight: 20,
@@ -816,7 +817,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     minHeight: 58,
     borderRadius: 18,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#17382f',
@@ -856,7 +857,7 @@ const styles = StyleSheet.create({
   pickerHeader: {
     minHeight: 76,
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
     borderColor: '#f4cf75',
     paddingHorizontal: 14,
@@ -912,13 +913,13 @@ const styles = StyleSheet.create({
     fontSize: 40,
     lineHeight: 48,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
     textAlign: 'center',
   },
   pickerTimePreviewLabel: {
     marginBottom: 4,
     fontSize: 14,
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '900',
     textTransform: 'uppercase',
   },
@@ -931,9 +932,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 104,
     borderRadius: 22,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
@@ -945,7 +946,7 @@ const styles = StyleSheet.create({
   simplePickerLabel: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#5d5045',
+    color: '#53645A',
     textAlign: 'center',
   },
   simplePickerArrowStack: {
@@ -958,7 +959,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 32,
     borderRadius: 13,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -976,7 +977,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#f4cf75',
     backgroundColor: '#e9f7f1',
-    color: '#24352f',
+    color: '#193D31',
     fontSize: 29,
     lineHeight: 35,
     fontWeight: '900',
@@ -994,31 +995,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 17,
     fontWeight: '900',
-    color: '#5d5045',
+    color: '#53645A',
   },
   periodPickerButton: {
     flex: 1,
     minHeight: 60,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   periodPickerButtonActive: {
-    borderColor: '#2f5d50',
-    backgroundColor: '#2f5d50',
+    borderColor: '#275C4B',
+    backgroundColor: '#275C4B',
   },
   periodPickerText: {
     fontSize: 18,
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '900',
   },
   periodPickerSubText: {
     marginTop: 2,
     fontSize: 12,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '800',
   },
   periodPickerTextActive: {
@@ -1033,8 +1034,8 @@ const styles = StyleSheet.create({
     minHeight: 58,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -1042,13 +1043,13 @@ const styles = StyleSheet.create({
   pickerCancelText: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#5d5045',
+    color: '#53645A',
   },
   pickerConfirmButton: {
     flex: 1,
     minHeight: 58,
     borderRadius: 18,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,

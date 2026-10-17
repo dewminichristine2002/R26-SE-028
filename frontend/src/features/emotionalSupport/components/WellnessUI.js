@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, shadows, spacing, type } from '../theme';
+import HeaderAccountActions from '../../../components/HeaderAccountActions';
 
 export function WellnessBackdrop({ variant = 'mint' }) {
   const tint = variant === 'warm' ? colors.amber : variant === 'sky' ? colors.sky : colors.mint;
@@ -15,6 +16,7 @@ export function ScreenHeader({ title, subtitle, navigation, eyebrow }) {
   return <View style={s.header}>
     {navigation ? <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={({ pressed }) => [s.back, pressed && s.pressed]}><Text style={s.backText}>‹</Text></Pressable> : null}
     <View style={s.headerCopy}>{eyebrow ? <Text style={s.eyebrow}>{eyebrow}</Text> : null}<View style={s.titleRow}><View style={s.titleAccent} /><Text style={s.title}>{title}</Text></View>{subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}</View>
+    <HeaderAccountActions />
   </View>;
 }
 
@@ -55,9 +57,9 @@ export function InlineState({ loading, error, empty, emptyTitle, emptyText, erro
 
 const s = StyleSheet.create({
   orbLarge: { borderRadius: 150, height: 280, opacity: 0.24, position: 'absolute', right: -130, top: -100, width: 280 }, orbSmall: { backgroundColor: colors.mint, borderRadius: 70, height: 140, left: -75, opacity: 0.48, position: 'absolute', top: 330, width: 140 }, arc: { borderColor: colors.gold, borderRadius: 100, borderWidth: 18, bottom: 30, height: 150, opacity: 0.15, position: 'absolute', right: -95, width: 150 }, greeting: { alignItems: 'center', backgroundColor: colors.primary, borderColor: colors.gold, borderRadius: radius.hero, borderWidth: 2, flexDirection: 'row', marginBottom: spacing.lg, minHeight: 116, paddingHorizontal: 18, paddingVertical: 16, ...shadows.level2 }, greetingIcon: { alignItems: 'center', backgroundColor: '#FFF4B8', borderRadius: 20, height: 62, justifyContent: 'center', marginRight: 14, width: 62 }, greetingEmoji: { fontSize: 30 }, greetingCopy: { flex: 1 }, greetingText: { color: colors.white, fontSize: 25, fontWeight: '900', lineHeight: 32 }, greetingSubtitle: { ...type.body, color: '#ECFFF6', fontSize: 16, marginTop: spacing.xs },
-  header: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.card, borderWidth: 1, flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl, padding: spacing.lg, ...shadows.level1 }, headerCopy: { flex: 1 }, titleRow: { alignItems: 'flex-start', flexDirection: 'row' }, titleAccent: { backgroundColor: colors.primary, borderRadius: 3, height: 28, marginRight: spacing.sm, marginTop: 5, width: 4 },
+  header: { backgroundColor: '#275C4B', borderColor: '#F4CF75', borderRadius: 22, borderWidth: 2, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xl, padding: 10, minHeight: 72, ...shadows.level1 }, headerCopy: { flex: 1, minWidth: 0 }, titleRow: { alignItems: 'flex-start', flexDirection: 'row' }, titleAccent: { backgroundColor: '#F8D978', borderRadius: 3, height: 25, marginRight: spacing.sm, marginTop: 4, width: 4 },
   back: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.pill, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 }, backText: { color: colors.primary, fontSize: 36, lineHeight: 39 },
-  eyebrow: { ...type.meta, color: colors.primary, letterSpacing: 0.8, marginBottom: spacing.xs, textTransform: 'uppercase' }, title: { ...type.screen, color: colors.text, fontSize: 29, lineHeight: 36 }, subtitle: { ...type.body, color: colors.secondary, marginTop: spacing.sm },
+  eyebrow: { ...type.meta, color: '#D9F2E5', letterSpacing: 0.8, marginBottom: spacing.xs, textTransform: 'uppercase' }, title: { ...type.screen, color: '#FFFFFF', fontSize: 23, lineHeight: 30, flexShrink: 1 }, subtitle: { ...type.body, color: '#EAF7F0', marginTop: spacing.sm },
   card: { ...shadows.level2, backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.card, borderWidth: 1, padding: spacing.xl },
   button: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.button, justifyContent: 'center', minHeight: 58, paddingHorizontal: spacing.xl, paddingVertical: spacing.md }, buttonText: { ...type.button, color: colors.white, textAlign: 'center' }, secondaryButton: { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1.5 }, secondaryButtonText: { color: colors.primary }, disabled: { backgroundColor: colors.disabled, opacity: 0.75 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between' }, progressText: { ...type.body, color: colors.text, fontWeight: '900' }, progressMeta: { ...type.meta, color: colors.secondary }, segments: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }, segment: { backgroundColor: colors.border, borderRadius: radius.pill, flex: 1, height: 8 }, currentSegment: { opacity: 0.82, transform: [{ scaleY: 1.35 }] },

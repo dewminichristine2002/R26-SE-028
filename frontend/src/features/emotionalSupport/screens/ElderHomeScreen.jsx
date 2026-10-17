@@ -1,18 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import HeaderAccountActions from '../../../components/HeaderAccountActions';
 import { getWellnessTrends } from '../api/emotionalSupportApi';
-import { Card, Greeting, WellnessBackdrop } from '../components/WellnessUI';
+import { Card, WellnessBackdrop } from '../components/WellnessUI';
 import { useEmotionalSupportContext } from '../context/EmotionalSupportContext';
 import { colors, radius, screenInsets, spacing, type } from '../theme';
-import { getPersonalizedGreeting } from '../utils/personalization';
-
-const getGreetingIcon = () => {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return '\u{1F305}';
-  if (hour < 17) return '\u2600\uFE0F';
-  if (hour < 21) return '\u{1F307}';
-  return '\u{1F319}';
-};
 
 /**
  * "Today for You" home — four simple choices for the elder:
@@ -55,19 +48,13 @@ function HomeActionCard({ icon, iconColor, iconBackground, buttonColor, title, d
   );
 }
 
-export default function ElderHomeScreen({ navigation }) {
-  const { elderId, user } = useEmotionalSupportContext();
+export default function ElderHomeScreen({ navigation, onExit }) {
+  const { elderId } = useEmotionalSupportContext();
   const { width, fontScale } = useWindowDimensions();
   const stackWeekStats = width < 350 || fontScale > 1.25;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const greeting = useMemo(() => getPersonalizedGreeting(user), [user]);
-  const greetingIcon = useMemo(getGreetingIcon, []);
-  const isCaregiver = user?.role === 'caregiver';
-  const greetingSubtitle = isCaregiver
-    ? `Here is how ${user?.fullName?.split(' ')[0] || 'your elder'} is doing today.`
-    : 'Here is how you are doing today.';
 
   // Gentle engagement tracking uses only factual app activity counts.
   const load = useCallback(async () => {
@@ -93,8 +80,17 @@ export default function ElderHomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.safe}><WellnessBackdrop />
+      <View style={s.topBar}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to Home" onPress={onExit || navigation.goBack} style={({ pressed }) => [s.backButton, pressed && s.pressed]}>
+          <Ionicons name="arrow-back" size={25} color="#275C4B" />
+        </Pressable>
+        <View style={s.topTitleRow}>
+          <Ionicons name="leaf-outline" size={23} color="#F8D978" />
+          <Text style={s.topTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Wellness</Text>
+        </View>
+        <HeaderAccountActions />
+      </View>
       <ScrollView contentContainerStyle={s.container}>
-        <Greeting text={greeting} subtitle={greetingSubtitle} emoji={greetingIcon} />
         <View style={s.pageIntro}><Text accessibilityRole="header" style={s.pageTitle}>Today for You</Text><Text style={s.pageSubtitle}>Choose one small moment for yourself.</Text></View>
 
         <View style={s.actionCards}>
@@ -211,7 +207,12 @@ function WeekMetric({ value, label, wide }) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
+  topBar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#275C4B', borderColor: '#F4CF75', borderWidth: 2, borderRadius: 22, paddingHorizontal: 10, marginHorizontal: spacing.xl, marginTop: screenInsets.top, shadowColor: '#20382F', shadowOpacity: 0.17, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  backButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF', borderColor: '#FFF4C6', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  topTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  topTitle: { color: '#FFFFFF', fontSize: 23, lineHeight: 29, fontWeight: '900', marginLeft: 7, flexShrink: 1 },
+  topSpacer: { width: 50 },
+  container: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: screenInsets.bottom + spacing.xl },
   pageIntro: { marginBottom: spacing.md }, pageTitle: { ...type.section, color: colors.text }, pageSubtitle: { ...type.body, color: colors.secondary, marginTop: spacing.xs },
   actionCards: { gap: spacing.md, marginBottom: spacing.lg },
   actionCard: { borderRadius: radius.card, borderWidth: 1.5, marginBottom: 0, padding: spacing.lg },

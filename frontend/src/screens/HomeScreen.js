@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform } from 'react-native';
-import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, Platform, useWindowDimensions } from 'react-native';
+import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { useTranslation } from '../i18n/useTranslation';
 
-const elderMedsLogo = require('../../assets/logo.png');
 import RoutineSetupScreen from './RoutineSetupScreen';
 import ManualEntryScreen from './ManualEntryScreen';
 import MedicineListScreen from './MedicineListScreen';
@@ -13,20 +14,30 @@ import ScheduleBoardScreen from './ScheduleBoardScreen';
 import SafetyCenterScreen from './SafetyCenterScreen';
 import ReceiptScanScreen from './ReceiptScanScreen';
 import { caregiverAlertService } from '../services/caregiverAlertService';
+import { medicationService } from '../services/medicationService';
 
-const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenQuickCare, onOpenAssistant, onLogout, launchIntent, onLaunchIntentConsumed }) => {
-  const [showReminderMenu, setShowReminderMenu] = useState(false);
+const HomeScreen = ({ user, isLocalMode, initialSection = 'home', onOpenAllergies, onOpenMedicine, onOpenHistory, onOpenEmotionalSupport, onOpenDashboard, onOpenQuickCare, onOpenAssistant, launchIntent, onLaunchIntentConsumed, onSectionChange }) => {
+  const { width: screenWidth } = useWindowDimensions();
+  const [showReminderMenu, setShowReminderMenu] = useState(initialSection === 'medicines');
+  useEffect(() => {
+    onSectionChange?.(showReminderMenu ? 'medicines' : 'home');
+  }, [showReminderMenu, onSectionChange]);
   const [activeReminderView, setActiveReminderView] = useState('menu');
   const [largeTextMode, setLargeTextMode] = useState(false);
   const [caregiverAlerts, setCaregiverAlerts] = useState([]);
   const [caregiverUnreadCount, setCaregiverUnreadCount] = useState(0);
+  const [caregiverAlertStatus, setCaregiverAlertStatus] = useState('loading');
   const [caregiverTimeline, setCaregiverTimeline] = useState([]);
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
   const [medicineDraft, setMedicineDraft] = useState(null);
   const [medicineDraftQueue, setMedicineDraftQueue] = useState([]);
   const [medicineDraftIndex, setMedicineDraftIndex] = useState(0);
   const [capturedMedicines, setCapturedMedicines] = useState([]);
+  const [homeMedicines, setHomeMedicines] = useState({ status: 'loading', count: 0 });
+  const [isRefreshingHome, setIsRefreshingHome] = useState(false);
   const caregiverUnreadCountRef = useRef(0);
+  const caregiverAlertsLoadedRef = useRef(false);
+  const homeMedicinesRequestRef = useRef(0);
   const { t } = useTranslation();
 
   const toDraftKey = (item) => {
@@ -243,6 +254,27 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
 
   const textScale = largeTextMode ? 1.15 : 1;
   const isCaregiver = user?.role === 'caregiver';
+  const loadHomeMedicines = useCallback(async () => {
+    const requestId = ++homeMedicinesRequestRef.current;
+    setHomeMedicines((current) => ({ ...current, status: 'loading' }));
+    try {
+      const medicines = await medicationService.getMyMedications();
+      if (homeMedicinesRequestRef.current === requestId) {
+        setHomeMedicines({ status: 'ready', count: Array.isArray(medicines) ? medicines.length : 0 });
+      }
+    } catch (error) {
+      if (homeMedicinesRequestRef.current === requestId) {
+        setHomeMedicines({ status: 'error', count: 0 });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isCaregiver || showReminderMenu) return undefined;
+    loadHomeMedicines();
+    return () => { homeMedicinesRequestRef.current += 1; };
+  }, [isCaregiver, showReminderMenu, loadHomeMedicines]);
+
   const availableReminderMenuItems = isCaregiver
     ? reminderMenuItems.filter((item) => item.title !== 'Schedule Board' && item.title !== 'Safety Center')
     : reminderMenuItems;
@@ -468,6 +500,20 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
       return;
     }
 
+    if (launchIntent.type === 'home') {
+      setShowReminderMenu(false);
+      setActiveReminderView('menu');
+      onLaunchIntentConsumed?.();
+      return;
+    }
+
+    if (launchIntent.type === 'medicines') {
+      setShowReminderMenu(true);
+      setActiveReminderView('menu');
+      onLaunchIntentConsumed?.();
+      return;
+    }
+
     const viewByIntentType = {
       'routine-setup': 'routine-setup',
       'medicine-list': 'medicine-list',
@@ -516,8 +562,10 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
     if (!isCaregiver) {
       setCaregiverAlerts([]);
       setCaregiverUnreadCount(0);
+      setCaregiverAlertStatus('loading');
       setCaregiverTimeline([]);
       caregiverUnreadCountRef.current = 0;
+      caregiverAlertsLoadedRef.current = false;
       return undefined;
     }
 
@@ -540,16 +588,21 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
         setCaregiverAlerts(alerts);
         setCaregiverTimeline(timelineResponse || []);
         setCaregiverUnreadCount(unreadCount);
+        setCaregiverAlertStatus('ready');
         caregiverUnreadCountRef.current = unreadCount;
 
-        if (unreadCount > previousUnreadCount) {
+        if (caregiverAlertsLoadedRef.current && unreadCount > previousUnreadCount) {
           const newestUnread = alerts.find((item) => !item.is_read);
           if (newestUnread?.message) {
             Alert.alert(getCaregiverAlertTitle(newestUnread), newestUnread.message);
           }
         }
+        caregiverAlertsLoadedRef.current = true;
       } catch (error) {
         console.log('[HomeScreen] caregiver alerts load failed:', error?.message || error);
+        if (mounted) {
+          setCaregiverAlertStatus((current) => current === 'ready' || current === 'stale' ? 'stale' : 'error');
+        }
       }
     };
 
@@ -593,75 +646,37 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
   if (isCaregiver && !showReminderMenu) {
     return (
       <ScrollView style={styles.caregiverPage} contentContainerStyle={styles.caregiverContainer}>
-        <View style={styles.caregiverHeaderCard}>
-          <View style={styles.caregiverHeaderTextWrap}>
-            <Text style={styles.caregiverEyebrow}>Caregiver Home</Text>
-            <Text
-              style={styles.caregiverTitle}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.86}
-            >
-              Caregiver Alerts
-            </Text>
-            <Text style={styles.caregiverWelcome}>
-              Monitoring updates for {user?.fullName || 'your patient'}
-            </Text>
+        <Text style={caregiverStyles.eyebrow}>CAREGIVER SPACE</Text>
+        <Text style={caregiverStyles.heading}>Caregiver overview</Text>
+        <Text style={caregiverStyles.intro}>A clear view of the person you care for.</Text>
+
+        <View style={caregiverStyles.alertSummary}>
+          <View style={caregiverStyles.alertTop}>
+            <View style={caregiverStyles.alertIcon}><Ionicons name={caregiverAlertStatus === 'error' || caregiverAlertStatus === 'stale' ? 'cloud-offline-outline' : caregiverUnreadCount ? 'notifications-outline' : 'checkmark-circle-outline'} size={25} color="#FFFFFF" /></View>
+            <View style={caregiverStyles.alertCopy}>
+              <Text style={caregiverStyles.alertCount}>{caregiverAlertStatus === 'loading' ? 'Checking updates' : caregiverAlertStatus === 'error' ? 'Updates unavailable' : caregiverAlertStatus === 'stale' ? 'Showing last updates' : caregiverUnreadCount ? `${caregiverUnreadCount} new ${caregiverUnreadCount === 1 ? 'update' : 'updates'}` : 'All caught up'}</Text>
+              <Text style={caregiverStyles.alertDescription}>{caregiverAlertStatus === 'loading' ? 'Loading caregiver alerts' : caregiverAlertStatus === 'error' || caregiverAlertStatus === 'stale' ? 'Could not refresh alerts. Check your connection.' : caregiverUnreadCount ? 'Review what needs your attention' : 'There are no new alerts right now'}</Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.caregiverNotificationButton} onPress={handleCaregiverNotificationPress}>
-            <Text style={styles.caregiverNotificationIcon}>🔔</Text>
-            {caregiverUnreadCount > 0 && (
-              <View style={styles.caregiverNotificationBadge}>
-                <Text style={styles.caregiverNotificationBadgeText}>{caregiverUnreadCount > 99 ? '99+' : caregiverUnreadCount}</Text>
-              </View>
-            )}
+          {caregiverUnreadCount > 0 ? (
+            <TouchableOpacity style={caregiverStyles.markReadButton} onPress={handleCaregiverNotificationPress} accessibilityRole="button" accessibilityLabel="Mark alerts as read">
+              <Text style={caregiverStyles.markRead}>Mark read</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={caregiverStyles.quickLinks}>
+          <TouchableOpacity style={[caregiverStyles.quickLink, caregiverStyles.quickLinkBlue]} onPress={onOpenDashboard} accessibilityRole="button" accessibilityLabel="Open health overview">
+            <View style={caregiverStyles.quickLinkIcon}><Ionicons name="grid-outline" size={24} color="#2E6770" /></View>
+            <Text style={caregiverStyles.quickLinkTitle}>Health overview</Text>
+            <Text style={caregiverStyles.quickLinkSubtitle}>Summary and trends</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[caregiverStyles.quickLink, caregiverStyles.quickLinkRose]} onPress={onOpenQuickCare} accessibilityRole="button" accessibilityLabel="Open risk checks">
+            <View style={caregiverStyles.quickLinkIcon}><Ionicons name="pulse-outline" size={24} color="#984454" /></View>
+            <Text style={caregiverStyles.quickLinkTitle}>Risk checks</Text>
+            <Text style={caregiverStyles.quickLinkSubtitle}>Review health risks</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.caregiverInfoStrip}>
-          <Text style={styles.caregiverInfoTitle}>Today's Alerts</Text>
-          <Text style={styles.caregiverInfoBadge}>{caregiverUnreadCount} Active</Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.caregiverDashboardCard}
-          activeOpacity={0.88}
-          onPress={onOpenDashboard}
-          accessibilityRole="button"
-          accessibilityLabel="Open conversational dashboard"
-          accessibilityHint="Shows the elder's unified medication, mood, alert, stock, and routine summary"
-        >
-          <View style={styles.caregiverDashboardIconWrap}>
-            <Text style={styles.caregiverDashboardIcon}>{'\u{1F4CA}'}</Text>
-          </View>
-          <View style={styles.caregiverDashboardTextWrap}>
-            <Text style={styles.caregiverDashboardTitle}>Conversational Dashboard</Text>
-            <Text style={styles.caregiverDashboardSubtitle}>
-              Review the elder's health summary, risks, alerts, stock, mood, and routines.
-            </Text>
-          </View>
-          <Text style={styles.caregiverDashboardArrow}>{'\u203A'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.caregiverDashboardCard, styles.caregiverQuickCareCard]}
-          activeOpacity={0.88}
-          onPress={onOpenQuickCare}
-          accessibilityRole="button"
-          accessibilityLabel="Open Quick Care"
-          accessibilityHint="Shows risk prediction summary and checks"
-        >
-          <View style={[styles.caregiverDashboardIconWrap, styles.caregiverQuickCareIconWrap]}>
-            <Text style={styles.caregiverDashboardIcon}>{'\u{1F49A}'}</Text>
-          </View>
-          <View style={styles.caregiverDashboardTextWrap}>
-            <Text style={styles.caregiverDashboardTitle}>Quick Care</Text>
-            <Text style={styles.caregiverDashboardSubtitle}>
-              Open risk prediction summary and checks for the elder.
-            </Text>
-          </View>
-          <Text style={[styles.caregiverDashboardArrow, styles.caregiverQuickCareArrow]}>{'\u203A'}</Text>
-        </TouchableOpacity>
 
         {!!criticalAlerts.length && (
           <View style={styles.caregiverCriticalCard}>
@@ -810,21 +825,13 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
                 accessibilityLabel={item.title}
                 accessibilityHint={item.subtitle}
               >
-                <Text style={styles.caregiverToolIcon}>{item.icon}</Text>
+                <Ionicons name={{ 'Routine Setup': 'time-outline', 'Add Medicine': 'add-circle-outline', 'Medicine List': 'list-outline', 'Medicine Stock': 'cube-outline', 'Tablet Identifier': 'scan-outline', 'Scan Pharmacy Receipt': 'receipt-outline' }[item.title] || 'medkit-outline'} size={24} color="#275C4B" />
                 <Text style={styles.caregiverToolLabel}>{item.title}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        <View style={styles.quickActionRow}>
-          <TouchableOpacity style={styles.profileButton} onPress={onOpenProfile}>
-            <Text style={styles.profileButtonText}>View Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-            <Text style={styles.logoutButtonText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     );
   }
@@ -841,22 +848,31 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
 
     if (activeReminderView === 'add-medicine') {
       return (
-        <ScrollView contentContainerStyle={styles.addMedicineContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.addMedicineHeader}>
+        <View style={styles.addMedicinePage}>
+          <View style={styles.addMedicineHeaderOuter}>
+            <View style={styles.addMedicineHeader}>
             <TouchableOpacity
               style={styles.addMedicineBackButton}
               onPress={() => setActiveReminderView('menu')}
               accessibilityRole="button"
               accessibilityLabel="Back to reminder menu"
             >
-              <Text style={styles.addMedicineBackIcon}>‹</Text>
+              <Ionicons name="arrow-back" size={25} color="#275C4B" />
             </TouchableOpacity>
-            <Text style={styles.addMedicineTitle}>Add Medicine</Text>
-            <View style={styles.addMedicineHeaderSpacer} />
+            <View style={styles.addMedicineHeaderTitleRow}>
+              <Ionicons name="medkit-outline" size={23} color="#F8D978" />
+              <Text style={styles.addMedicineTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Add Medicine</Text>
+            </View>
+              <HeaderAccountActions />
+            </View>
           </View>
-
+          <ScrollView contentContainerStyle={styles.addMedicineContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.addMedicineHintCard}>
-            <Text style={styles.addMedicineHintTitle}>How would you like to add your medicine today?</Text>
+            <View style={styles.addMedicineHintIcon}><Ionicons name="add-circle-outline" size={32} color="#275C4B" /></View>
+            <View style={styles.addMedicineHintCopy}>
+              <Text style={styles.addMedicineHintTitle}>Add your medicine</Text>
+              <Text style={styles.addMedicineHintSubtitle}>Choose the easiest way for you.</Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -867,16 +883,17 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
             accessibilityHint="Scan your pharmacy receipt to add medicines"
           >
             <View style={[styles.addMedicineOptionIconWrap, styles.addMedicineOptionIconWrapPrimary]}>
-              <Text style={styles.addMedicineOptionIcon}>📷</Text>
+              <Ionicons name="receipt-outline" size={29} color="#FFFFFF" />
             </View>
             <View style={styles.addMedicineOptionTextWrap}>
               <Text style={styles.addMedicineOptionTitle}>Scan Pharmacy Receipt</Text>
               <Text style={styles.addMedicineOptionSubtitle}>Capture your pharmacy receipt details</Text>
             </View>
+            <View style={[styles.addMedicineOptionArrow, styles.addMedicineOptionArrowPrimary]}><Ionicons name="chevron-forward" size={21} color="#287CB4" /></View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.addMedicineOptionCard}
+            style={[styles.addMedicineOptionCard, styles.addMedicineOptionCardManual]}
             onPress={() => {
               setMedicineDraft(null);
               setMedicineDraftQueue([]);
@@ -888,15 +905,17 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
             accessibilityLabel="Manual Entry"
             accessibilityHint="Type medicine details manually"
           >
-            <View style={styles.addMedicineOptionIconWrap}>
-              <Text style={styles.addMedicineOptionIcon}>⌨️</Text>
+            <View style={[styles.addMedicineOptionIconWrap, styles.addMedicineOptionIconWrapManual]}>
+              <Ionicons name="create-outline" size={29} color="#FFFFFF" />
             </View>
             <View style={styles.addMedicineOptionTextWrap}>
               <Text style={styles.addMedicineOptionTitle}>Manual Entry</Text>
               <Text style={styles.addMedicineOptionSubtitle}>Type in the details yourself</Text>
             </View>
+            <View style={[styles.addMedicineOptionArrow, styles.addMedicineOptionArrowManual]}><Ionicons name="chevron-forward" size={21} color="#218265" /></View>
           </TouchableOpacity>
-        </ScrollView>
+          </ScrollView>
+        </View>
       );
     }
 
@@ -1012,274 +1031,166 @@ const HomeScreen = ({ user, isLocalMode, onOpenProfile, onOpenAllergies, onOpenM
       return <SafetyCenterScreen onBack={leaveReminderSubView} />;
     }
 
+    const medicineIcons = {
+      'Schedule Board': 'calendar-outline',
+      'Routine Setup': 'time-outline',
+      'Add Medicine': 'add-circle-outline',
+      'Medicine List': 'list-outline',
+      'Medicine Stock': 'cube-outline',
+      'Tablet Identifier': 'scan-outline',
+      'Safety Center': 'shield-checkmark-outline',
+    };
+    const medicineMenuColors = {
+      'Schedule Board': { background: '#EDF7F0', border: '#D3E9DA', accent: '#168565', iconBackground: '#DFF1E5' },
+      'Routine Setup': { background: '#FFF8EA', border: '#F1DFC1', accent: '#A56325', iconBackground: '#FCEBD2' },
+      'Add Medicine': { background: '#EAF5FD', border: '#CBE4F5', accent: '#287CB4', iconBackground: '#D9EDFB' },
+      'Medicine List': { background: '#F3F0FC', border: '#E1D9F5', accent: '#6D56A9', iconBackground: '#E8E1F8' },
+      'Medicine Stock': { background: '#EAF7F7', border: '#CBE6E5', accent: '#168282', iconBackground: '#D8F0EF' },
+      'Tablet Identifier': { background: '#EAF5FD', border: '#CBE4F5', accent: '#287CB4', iconBackground: '#D9EDFB' },
+      'Safety Center': { background: '#FFF1EE', border: '#F1D7D0', accent: '#B75D54', iconBackground: '#FBE2DC' },
+    };
     return (
-      <ScrollView
-        style={styles.reminderScroll}
-        contentContainerStyle={styles.reminderContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.reminderTopBar}>
-          <View style={styles.reminderLogoPill}>
-            <Image source={elderMedsLogo} style={styles.reminderLogo} resizeMode="contain" />
+      <View style={medicineStyles.page}>
+        <View style={medicineStyles.headerBar}>
+          <TouchableOpacity style={medicineStyles.navIconButton} onPress={() => { setShowReminderMenu(false); setActiveReminderView('menu'); }} accessibilityRole="button" accessibilityLabel="Back to home">
+            <Ionicons name="arrow-back" size={25} color="#275C4B" />
+          </TouchableOpacity>
+          <View style={medicineStyles.headerTitleRow}>
+            <Ionicons name="medkit-outline" size={22} color="#F8D978" />
+            <Text style={medicineStyles.topBarTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Medicines</Text>
           </View>
-
-          <View style={styles.reminderTopActions}>
-            <TouchableOpacity
-              style={[styles.reminderTopIconButton, styles.reminderProfileButton]}
-              onPress={() => onOpenProfile?.()}
-              activeOpacity={0.86}
-              accessibilityRole="button"
-              accessibilityLabel="Open profile"
-              accessibilityHint="Opens your ElderMeds profile"
-            >
-              <Text style={styles.reminderTopIcon}>{'\u{1F464}'}</Text>
+          <HeaderAccountActions />
+        </View>
+        <ScrollView contentContainerStyle={homeStyles.content} showsVerticalScrollIndicator={false}>
+        <View style={medicineStyles.intro}>
+          <View pointerEvents="none" style={medicineStyles.introHalo} />
+          <Image source={require('../../assets/home-medicine-illustration.png')} resizeMode="contain" style={[medicineStyles.introArt, screenWidth < 360 && medicineStyles.introArtNarrow]} accessible={false} />
+          <Text style={medicineStyles.eyebrow}>DAILY MEDICATION CARE</Text>
+          <Text style={medicineStyles.title}>Medicines</Text>
+          <Text style={medicineStyles.description}>Your medicines and daily schedule in one place.</Text>
+        </View>
+        <View style={medicineStyles.sectionRow}>
+          <Text style={medicineStyles.sectionTitle}>Manage medicines</Text>
+          <View style={medicineStyles.textSizeControl}>
+            <TouchableOpacity onPress={() => setLargeTextMode(false)} accessibilityRole="button" accessibilityLabel="Normal text size" style={[medicineStyles.textSizeButton, !largeTextMode && medicineStyles.textSizeActive]}>
+              <Text style={[medicineStyles.textSizeText, !largeTextMode && medicineStyles.textSizeTextActive]}>A</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.reminderTopIconButton, styles.reminderHomeButton]}
-              onPress={() => {
-                setShowReminderMenu(false);
-                setActiveReminderView('menu');
-              }}
-              activeOpacity={0.86}
-              accessibilityRole="button"
-              accessibilityLabel="Back to home"
-              accessibilityHint="Returns to the main home menu"
-            >
-              <Text style={styles.reminderTopIcon}>{'\u{1F3E0}'}</Text>
+            <TouchableOpacity onPress={() => setLargeTextMode(true)} accessibilityRole="button" accessibilityLabel="Large text size" style={[medicineStyles.textSizeButton, largeTextMode && medicineStyles.textSizeActive]}>
+              <Text style={[medicineStyles.textSizeText, largeTextMode && medicineStyles.textSizeTextActive]}>A+</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        <Text style={styles.reminderMenuHeading}>Reminder Menu</Text>
-
-        <View style={styles.reminderHeroBanner}>
-          <View style={styles.reminderHeroIconTile}>
-            <Text style={styles.reminderHeroIcon}>{'\u{1F514}'}</Text>
-          </View>
-          <Text
-            style={[styles.reminderTitle, { fontSize: 34 * textScale, lineHeight: 42 * textScale }]}
-            numberOfLines={2}
-            adjustsFontSizeToFit
-            minimumFontScale={0.82}
-          >
-            Medicine{`\n`}Reminder
-          </Text>
-        </View>
-
-        <View style={styles.reminderActionHeader}>
-          <Text style={styles.reminderInfoText}>Choose Action</Text>
-          <View style={styles.textModeRow}>
-            <Text style={styles.textModeLabel}>Text</Text>
-            <TouchableOpacity
-              style={[styles.textModeButton, !largeTextMode && styles.textModeButtonActive]}
-              onPress={() => setLargeTextMode(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Normal text size"
-              accessibilityHint="Sets regular text size for this page"
-            >
-              <Text style={[styles.textModeButtonText, !largeTextMode && styles.textModeButtonTextActive]}>A</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.textModeButton, largeTextMode && styles.textModeButtonActive]}
-              onPress={() => setLargeTextMode(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Large text size"
-              accessibilityHint="Makes menu text larger and easier to read"
-            >
-              <Text style={[styles.textModeButtonText, largeTextMode && styles.textModeButtonTextActive]}>A+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.reminderButtonList}>
-          {availableReminderMenuItems.map((item) => (
-            <TouchableOpacity
-              key={item.title}
-              style={[
-                styles.reminderButton,
-                {
-                  backgroundColor: item.cardColor,
-                  borderColor: item.borderColor,
-                },
-              ]}
-              activeOpacity={0.86}
-              onPress={() => handleReminderMenuPress(item.title)}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-              accessibilityHint={item.subtitle}
-            >
-              <View style={[styles.reminderButtonIconWrap, { backgroundColor: item.iconBg }]}>
-                <Text style={[styles.reminderButtonIcon, item.isTextIcon && styles.reminderButtonTextIcon]}>
-                  {item.icon}
-                </Text>
+        {availableReminderMenuItems.map((item) => {
+          const colors = medicineMenuColors[item.title] || medicineMenuColors['Schedule Board'];
+          return (
+            <TouchableOpacity key={item.title} style={[medicineStyles.row, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={() => handleReminderMenuPress(item.title)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={item.title} accessibilityHint={item.subtitle}>
+              <View style={[medicineStyles.rowIcon, { backgroundColor: colors.iconBackground }]}><Ionicons name={medicineIcons[item.title] || 'medkit-outline'} size={26} color={colors.accent} /></View>
+              <View style={medicineStyles.rowCopy}>
+                <Text style={[medicineStyles.rowTitle, { fontSize: 18 * textScale }]}>{item.title}</Text>
+                <Text style={[medicineStyles.rowSubtitle, { fontSize: 16 * textScale }]}>{item.subtitle}</Text>
               </View>
-              <View style={styles.reminderButtonTextWrap}>
-                <Text
-                  style={[styles.reminderButtonText, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.72}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  style={[styles.reminderButtonSubText, { fontSize: 16 * textScale, lineHeight: 22 * textScale }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.78}
-                >
-                  {item.subtitle}
-                </Text>
-              </View>
-              <View style={[styles.reminderButtonArrowWrap, { borderColor: item.borderColor }]}>
-                <Text style={[styles.reminderButtonArrow, { color: item.arrowColor }]}>{'\u203A'}</Text>
-              </View>
+              <View style={[medicineStyles.rowArrow, { backgroundColor: colors.iconBackground }]}><Ionicons name="chevron-forward" size={21} color={colors.accent} /></View>
             </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+          );
+        })}
+        </ScrollView>
+      </View>
     );
   }
 
-  const todayLabel = new Date().toLocaleDateString([], {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
+  const now = new Date();
+  const todayLabel = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = String(user?.fullName || '').trim().split(/\s+/)[0] || 'there';
+  const careActions = [
+    { key: 'medication', title: 'Medication', detail: 'Manage your medicines', icon: 'medkit-outline', color: '#168966', tint: '#E6F5EE', border: '#CBE9DB', onPress: () => { setShowReminderMenu(true); setActiveReminderView('menu'); } },
+    { key: 'medicine-safety', title: 'Safety', detail: 'Allergies & reactions', icon: 'shield-checkmark-outline', color: '#C46057', tint: '#FFF0EC', border: '#F4D9D2', onPress: onOpenAllergies },
+    { key: 'emotions', title: 'Emotions', detail: 'How you feel today', icon: 'happy-outline', color: '#3486BD', tint: '#E8F4FD', border: '#D2EAF9', onPress: () => onOpenEmotionalSupport?.('SupportMoodCheckInScreen') },
+    { key: 'cognitive', title: 'Cognitive care', detail: 'Games & activities', icon: 'extension-puzzle-outline', color: '#7757B7', tint: '#F2EDFC', border: '#E2D8F6', onPress: () => onOpenEmotionalSupport?.('CognitiveActivityLibraryScreen') },
+    { key: 'dashboard', title: 'Care overview', detail: 'Health summary', icon: 'clipboard-outline', color: '#B88624', tint: '#FFF6DF', border: '#F3E6BF', onPress: onOpenDashboard },
+    { key: 'wellness', title: 'Wellness', detail: 'Daily support', icon: 'leaf-outline', color: '#C56E72', tint: '#FFF0F0', border: '#F5DDDE', onPress: () => onOpenEmotionalSupport?.('ElderHome') },
+  ];
+  const homeHero = homeMedicines.status === 'error'
+    ? { status: 'Unavailable', title: 'Medicines unavailable', detail: 'Check your connection and try again.', action: 'Try again', icon: 'refresh-outline' }
+    : homeMedicines.status === 'loading'
+      ? { status: 'Loading', title: 'Your medicine plan', detail: 'Checking your saved medicines.', action: 'Open Medicines', icon: 'medkit-outline' }
+      : homeMedicines.count === 0
+        ? { status: 'Getting started', title: 'Start your medicine plan', detail: 'Add your first medicine to keep your care organized.', action: 'Add a medicine', icon: 'add-circle-outline' }
+        : { status: `${homeMedicines.count} ${homeMedicines.count === 1 ? 'medicine' : 'medicines'} saved`, title: 'Your medicines', detail: 'Review your daily schedule and medicine details.', action: "View today's schedule", icon: 'calendar-outline' };
+  const openHomeHero = () => {
+    if (homeMedicines.status === 'error') {
+      loadHomeMedicines();
+      return;
+    }
+    setShowReminderMenu(true);
+    setActiveReminderView(homeMedicines.status === 'loading' ? 'menu' : homeMedicines.status === 'ready' && homeMedicines.count === 0 ? 'add-medicine' : 'schedule-board');
+  };
+  const refreshHome = async () => {
+    setIsRefreshingHome(true);
+    try {
+      await loadHomeMedicines();
+    } finally {
+      setIsRefreshingHome(false);
+    }
+  };
 
   return (
-    <ScrollView style={styles.homeScroll} contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.homeTopBar}>
-        <View style={styles.homeLogoPill}>
-          <Image source={elderMedsLogo} style={styles.homeBrandLogo} resizeMode="contain" />
-        </View>
-        <View style={styles.homeTopActions}>
-          <TouchableOpacity
-            style={styles.homeTopProfileButton}
-            onPress={onOpenProfile}
-            accessibilityRole="button"
-            accessibilityLabel="Open profile"
-            accessibilityHint="Opens your ElderMeds profile"
-          >
-            <Text style={styles.homeTopProfileIcon}>👤</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.homeTopLogoutButton}
-            onPress={onLogout}
-            accessibilityRole="button"
-            accessibilityLabel="Logout"
-            accessibilityHint="Signs out from ElderMeds"
-          >
-            <View style={styles.homeTopLogoutIconFrame}>
-              <View style={styles.homeTopLogoutDoor} />
-              <Text style={styles.homeTopLogoutArrow}>→</Text>
-            </View>
-            <Text style={styles.homeTopLogoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    <ScrollView style={homeStyles.page} contentContainerStyle={homeStyles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshingHome} onRefresh={refreshHome} colors={['#168966']} tintColor="#168966" />}>
 
-      <View style={styles.homeHeroCard}>
-        <View style={styles.homeHeroTextWrap}>
-          <Text style={styles.homeDateText}>{todayLabel}</Text>
-          <Text
-            style={styles.homeHeroTitle}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-          >
-            Good day, {firstName}
-          </Text>
-          <Text style={styles.homeHeroSubtitle}>Your medicine care is ready when you are.</Text>
+      <View style={homeStyles.greeting}>
+        <View pointerEvents="none" style={homeStyles.greetingHalo} />
+        <View pointerEvents="none" style={homeStyles.greetingLeaf} />
+        <Image source={require('../../assets/home-elder-illustration.png')} resizeMode="contain" style={homeStyles.greetingIllustration} accessible={false} />
+        <View style={homeStyles.dateRow}>
+          <Ionicons name="calendar-outline" size={19} color="#2576A6" />
+          <Text style={homeStyles.date}>{todayLabel}</Text>
         </View>
-        <View style={styles.homeHeroBadge}>
-          <Text style={styles.homeHeroBadgeIcon}>❤</Text>
-          <Text style={styles.homeHeroBadgeText}>Care</Text>
-        </View>
+        <Text style={[homeStyles.greetingTitle, screenWidth < 360 && homeStyles.greetingTitleNarrow]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{greeting},</Text>
+        <Text style={homeStyles.greetingName}>{firstName}</Text>
+        <Text style={homeStyles.subtitle}>We're here to support your health and wellbeing.</Text>
       </View>
 
       {isLocalMode ? (
-        <View style={styles.localModeBanner}>
-          <Text style={styles.localModeTitle}>Saved On This Device</Text>
-          <Text style={styles.localModeText}>
-            The shared database is unavailable right now, so this account and its new changes are being stored on this phone.
-          </Text>
+        <View style={homeStyles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={20} color="#795522" />
+          <Text style={homeStyles.offlineText}>Changes are saved on this device while the shared database is unavailable.</Text>
         </View>
       ) : null}
 
-      <TouchableOpacity
-        style={styles.homePrimaryAction}
-        activeOpacity={0.88}
-        onPress={() => handleButtonPress(menuItems[0])}
-        accessibilityRole="button"
-        accessibilityLabel="Open medicine reminder"
-        accessibilityHint="Shows schedule, routine, medicine list, stock and safety options"
-      >
-        <View style={styles.homePrimaryIconWrap}>
-          <Text style={styles.homePrimaryIcon}>🔔</Text>
+      <TouchableOpacity style={homeStyles.featuredCard} onPress={openHomeHero} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={homeHero.action} accessibilityHint={homeHero.detail}>
+        <View pointerEvents="none" style={homeStyles.featuredGreenPanel} />
+        <View style={homeStyles.featuredIcon}>
+          <Ionicons name="medkit-outline" size={29} color="#FFFFFF" />
         </View>
-        <View style={styles.homePrimaryTextWrap}>
-          <Text style={styles.homePrimaryEyebrow}>Main action</Text>
-          <Text
-            style={styles.homePrimaryTitle}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-          >
-            Medicine Reminder
-          </Text>
-          <Text style={styles.homePrimarySubtitle} numberOfLines={2}>Open today schedule and medicine tools.</Text>
+        <View style={homeStyles.featuredCopy}>
+          <Text style={homeStyles.featuredTitle}>{homeHero.title}</Text>
+          <Text style={homeStyles.featuredDescription}>{homeMedicines.status === 'ready' && homeMedicines.count > 0 ? homeHero.status : homeHero.detail}</Text>
+          <Text style={homeStyles.featuredAction}>{homeHero.action}</Text>
         </View>
-        <View style={styles.homePrimaryArrowWrap}>
-          <Text style={styles.homePrimaryArrow}>›</Text>
-        </View>
+        <View style={homeStyles.featuredArrow}><Ionicons name="chevron-forward" size={23} color="#218265" /></View>
       </TouchableOpacity>
 
-      <View style={styles.homeSectionHeader}>
-        <View>
-          <Text style={styles.homeSectionTitle}>More Care Tools</Text>
-          <Text style={styles.homeSectionSubtitle}>Large buttons for easy tapping</Text>
-        </View>
+      <View style={homeStyles.sectionHeading}>
+        <Text style={homeStyles.sectionTitle}>Explore your care</Text>
+        <Text style={homeStyles.sectionSubtitle}>Choose what you need today</Text>
       </View>
-
-      <View style={styles.homeActionList}>
-        {menuItems.slice(1).map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={[
-              styles.homeActionCard,
-              {
-                backgroundColor: item.cardColor,
-                borderColor: item.borderColor,
-              },
-            ]}
-            activeOpacity={0.88}
-            onPress={() => handleButtonPress(item)}
-            accessibilityRole="button"
-            accessibilityLabel={item.label}
-            accessibilityHint="Medicine care option"
-          >
-            <View style={[styles.homeActionIconWrap, { backgroundColor: item.iconBg }]}>
-              <Text style={styles.homeActionIcon}>{item.icon}</Text>
+      <View style={homeStyles.actionGrid}>
+        {careActions.map((item) => (
+          <TouchableOpacity key={item.key} style={[homeStyles.actionCard, { backgroundColor: item.tint, borderColor: item.border }]} onPress={item.onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={item.title} accessibilityHint={item.detail}>
+            <View style={homeStyles.actionTopRow}>
+              <View style={[homeStyles.actionIcon, { borderColor: item.border }]}>
+                <Ionicons name={item.icon} size={27} color={item.color} />
+              </View>
+              <View style={[homeStyles.actionArrow, { backgroundColor: item.border }]}><Ionicons name="chevron-forward" size={19} color={item.color} /></View>
             </View>
-            <View style={styles.homeActionTextWrap}>
-              <Text
-                style={styles.homeActionTitle}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {item.label}
-              </Text>
-              <Text style={styles.homeActionSubtitle} numberOfLines={1}>Care option</Text>
-            </View>
-            <View style={[styles.homeActionArrowWrap, { borderColor: item.borderColor }]}>
-              <Text style={[styles.homeActionHelper, { color: item.arrowColor }]}>{'\u203A'}</Text>
+            <View style={homeStyles.actionCopy}>
+              <Text style={homeStyles.actionTitle}>{item.title}</Text>
+              <Text style={homeStyles.actionDetail}>{item.detail}</Text>
             </View>
           </TouchableOpacity>
         ))}
       </View>
+
     </ScrollView>
   );
 };
@@ -1292,7 +1203,7 @@ const styles = StyleSheet.create({
   },
   homeScroll: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   homeContent: {
     flexGrow: 1,
@@ -1313,9 +1224,9 @@ const styles = StyleSheet.create({
     maxWidth: 172,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#fffdf7',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#8d7355',
@@ -1339,7 +1250,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#ace1ce',
     alignItems: 'center',
@@ -1359,7 +1270,7 @@ const styles = StyleSheet.create({
     minWidth: 104,
     minHeight: 50,
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#f2d47a',
     flexDirection: 'row',
@@ -1387,19 +1298,19 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 3,
     borderWidth: 2,
-    borderColor: '#2f6654',
+    borderColor: '#275C4B',
     borderRightWidth: 0,
   },
   homeTopLogoutArrow: {
     position: 'absolute',
     right: 0,
-    color: '#2f6654',
+    color: '#275C4B',
     fontSize: 19,
     lineHeight: 23,
     fontWeight: '900',
   },
   homeTopLogoutText: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '900',
@@ -1407,7 +1318,7 @@ const styles = StyleSheet.create({
   homeHeroCard: {
     minHeight: 154,
     borderRadius: 24,
-    backgroundColor: '#2f6654',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
     borderColor: '#e5c44f',
     paddingHorizontal: 18,
@@ -1456,13 +1367,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   homeHeroBadgeIcon: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontSize: 28,
     lineHeight: 32,
     fontWeight: '900',
   },
   homeHeroBadgeText: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontSize: 13,
     fontWeight: '900',
     marginTop: 4,
@@ -1503,14 +1414,14 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   homePrimaryEyebrow: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   homePrimaryTitle: {
-    color: '#18352f',
+    color: '#193D31',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
@@ -1542,13 +1453,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   homeSectionTitle: {
-    color: '#27231f',
+    color: '#193D31',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   homeSectionSubtitle: {
-    color: '#5e5143',
+    color: '#53645A',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -1591,7 +1502,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   homeActionTitle: {
-    color: '#18352f',
+    color: '#193D31',
     fontSize: 20,
     lineHeight: 26,
     fontWeight: '900',
@@ -1650,7 +1561,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 14,
-    color: '#1f6894',
+    color: '#275C4B',
     fontWeight: '600',
     marginBottom: 12,
   },
@@ -1661,7 +1572,7 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     flex: 1,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     borderRadius: 10,
     paddingVertical: 10,
     marginRight: 8,
@@ -1714,35 +1625,38 @@ const styles = StyleSheet.create({
   },
   reminderContainer: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingTop: Platform.OS === 'android' ? 28 : 22,
     paddingBottom: 118,
     paddingHorizontal: 22,
   },
   caregiverPage: {
     flex: 1,
-    backgroundColor: '#EEF7F8',
+    backgroundColor: '#F7F8F5',
   },
   caregiverContainer: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 38 : 24,
-    paddingBottom: 132,
-    backgroundColor: '#EEF7F8',
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 110,
+    backgroundColor: '#F7F8F5',
   },
   caregiverHeaderCard: {
     minHeight: 118,
     backgroundColor: '#FFFFFF',
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#D6EEF3',
+    borderColor: '#E1E7E0',
     paddingHorizontal: 16,
     paddingVertical: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#0F5E73',
+    shadowColor: '#193D31',
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 7 },
@@ -1815,9 +1729,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E3EDF1',
-    shadowColor: '#0F5E73',
-    shadowOpacity: 0.07,
+    borderColor: '#E1E7E0',
+    shadowColor: '#1C3E31',
+    shadowOpacity: 0.04,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 5 },
     elevation: 2,
@@ -1825,10 +1739,10 @@ const styles = StyleSheet.create({
   caregiverToolsSubtitle: {
     marginTop: -4,
     marginBottom: 12,
-    fontSize: 12,
-    color: '#5e7183',
+    fontSize: 14,
+    color: '#63736A',
     fontWeight: '600',
-    lineHeight: 17,
+    lineHeight: 20,
   },
   caregiverToolsGrid: {
     flexDirection: 'row',
@@ -1837,7 +1751,7 @@ const styles = StyleSheet.create({
   },
   caregiverAssistantCard: {
     minHeight: 88,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     borderWidth: 1,
     borderColor: '#bfd8ef',
     borderRadius: 14,
@@ -1855,7 +1769,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 16,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1873,7 +1787,7 @@ const styles = StyleSheet.create({
   caregiverAssistantTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#21455f',
+    color: '#193D31',
     lineHeight: 22,
   },
   caregiverAssistantSubtitle: {
@@ -1886,15 +1800,15 @@ const styles = StyleSheet.create({
   caregiverAssistantArrow: {
     fontSize: 28,
     lineHeight: 32,
-    color: '#1f6894',
+    color: '#275C4B',
     fontWeight: '900',
   },
   caregiverToolButton: {
     width: '48%',
     minHeight: 92,
-    backgroundColor: '#f4f9ff',
+    backgroundColor: '#F7F8F5',
     borderWidth: 1,
-    borderColor: '#bfd8ef',
+    borderColor: '#E1E7E0',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 10,
@@ -1907,19 +1821,20 @@ const styles = StyleSheet.create({
   },
   caregiverToolLabel: {
     textAlign: 'center',
-    color: '#21455f',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: '#193D31',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 9,
   },
   caregiverCardTitle: {
-    color: '#4c6d82',
+    color: '#53645A',
     fontSize: 13,
     marginBottom: 6,
   },
   caregiverCardValue: {
     fontSize: 20,
-    color: '#0a4b70',
+    color: '#193D31',
     fontWeight: '700',
   },
   caregiverCardSubValue: {
@@ -2017,12 +1932,11 @@ const styles = StyleSheet.create({
     color: '#A93447',
   },
   caregiverSectionTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    color: '#243848',
-    fontWeight: '900',
+    fontSize: 18,
+    lineHeight: 24,
+    color: '#193D31',
+    fontWeight: '800',
     marginBottom: 12,
-    textTransform: 'uppercase',
   },
   caregiverCriticalCard: {
     backgroundColor: '#fff4f5',
@@ -2196,7 +2110,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: '#edf4fb',
+    backgroundColor: '#F7F8F5',
   },
   caregiverTimelineExpandButtonText: {
     color: '#2b72b8',
@@ -2205,7 +2119,7 @@ const styles = StyleSheet.create({
   },
   reminderScroll: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   reminderTopBar: {
     minHeight: 62,
@@ -2220,9 +2134,9 @@ const styles = StyleSheet.create({
     maxWidth: 172,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#fffdf7',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#8d7355',
@@ -2245,7 +2159,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2267,7 +2181,7 @@ const styles = StyleSheet.create({
     lineHeight: 31,
   },
   reminderMenuHeading: {
-    color: '#27231f',
+    color: '#193D31',
     fontSize: 27,
     lineHeight: 33,
     fontWeight: '900',
@@ -2276,7 +2190,7 @@ const styles = StyleSheet.create({
   reminderHeroBanner: {
     minHeight: 156,
     borderRadius: 24,
-    backgroundColor: '#2f6654',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
     borderColor: '#e5c44f',
     paddingHorizontal: 22,
@@ -2343,7 +2257,7 @@ const styles = StyleSheet.create({
     height: 50,
     paddingHorizontal: 11,
     borderRadius: 13,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 7,
@@ -2351,8 +2265,8 @@ const styles = StyleSheet.create({
     borderColor: '#e3d6c3',
   },
   textModeButtonActive: {
-    backgroundColor: '#2f6654',
-    borderColor: '#2f6654',
+    backgroundColor: '#275C4B',
+    borderColor: '#275C4B',
   },
   textModeButtonText: {
     color: '#42372e',
@@ -2406,7 +2320,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   reminderButtonText: {
-    color: '#18352f',
+    color: '#193D31',
     fontWeight: '900',
     letterSpacing: 0,
   },
@@ -2430,106 +2344,117 @@ const styles = StyleSheet.create({
     lineHeight: 42,
     fontWeight: '900',
   },
-  addMedicineContainer: {
-    flexGrow: 1,
-    backgroundColor: '#f4f6f8',
-    paddingTop: 14,
-    paddingHorizontal: 14,
-    paddingBottom: 24,
-  },
-  addMedicineHeader: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#e7ebef',
-    marginBottom: 12,
-  },
-  addMedicineBackButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#f0f5fa',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addMedicineBackIcon: {
-    fontSize: 24,
-    color: '#4c6175',
-    marginTop: -2,
-  },
-  addMedicineTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1e2a35',
-  },
-  addMedicineHeaderSpacer: {
-    width: 34,
-    height: 34,
-  },
-  addMedicineHintCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e6eaef',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  addMedicineHintTitle: {
-    fontSize: 20,
-    lineHeight: 24,
-    color: '#2a3c4c',
-    fontWeight: '600',
-  },
-  addMedicineOptionCard: {
-    minHeight: 90,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e0e5ea',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addMedicineOptionCardPrimary: {
-    borderColor: '#3c98d6',
-    backgroundColor: '#f4fbff',
-  },
-  addMedicineOptionIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 10,
-    backgroundColor: '#f2f4f7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  addMedicineOptionIconWrapPrimary: {
-    backgroundColor: '#2f8fd0',
-  },
-  addMedicineOptionIcon: {
-    fontSize: 22,
-  },
-  addMedicineOptionTextWrap: {
-    flex: 1,
-  },
-  addMedicineOptionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1c2b36',
-  },
-  addMedicineOptionSubtitle: {
-    marginTop: 2,
-    fontSize: 16,
-    color: '#556472',
-  },
+  addMedicinePage: { flex: 1, backgroundColor: '#F7F8F5' },
+  addMedicineHeaderOuter: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingTop: 22, paddingHorizontal: 18 },
+  addMedicineContainer: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingTop: 16, paddingHorizontal: 18, paddingBottom: 110 },
+  addMedicineHeader: { minHeight: 72, borderRadius: 22, backgroundColor: '#275C4B', borderWidth: 2, borderColor: '#F4CF75', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#20382F', shadowOpacity: 0.17, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  addMedicineBackButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFF4C6', alignItems: 'center', justifyContent: 'center' },
+  addMedicineHeaderTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  addMedicineTitle: { color: '#FFFFFF', fontSize: 22, lineHeight: 28, fontWeight: '900', marginLeft: 7, flexShrink: 1 },
+  addMedicineHeaderSpacer: { width: 50 },
+  addMedicineHintCard: { minHeight: 138, flexDirection: 'row', alignItems: 'center', backgroundColor: '#275C4B', borderRadius: 22, borderWidth: 2, borderColor: '#F4CF75', padding: 17, marginBottom: 17, shadowColor: '#315A4F', shadowOpacity: 0.14, shadowRadius: 11, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  addMedicineHintIcon: { width: 62, height: 62, borderRadius: 20, backgroundColor: '#F8D978', borderWidth: 2, borderColor: '#FFF4C6', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  addMedicineHintCopy: { flex: 1, minWidth: 0 },
+  addMedicineHintTitle: { color: '#FFFFFF', fontSize: 24, lineHeight: 30, fontWeight: '900' },
+  addMedicineHintSubtitle: { color: '#E9F7F1', fontSize: 16, lineHeight: 22, fontWeight: '600', marginTop: 6 },
+  addMedicineOptionCard: { minHeight: 112, borderRadius: 20, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 15, marginBottom: 13, flexDirection: 'row', alignItems: 'center', shadowColor: '#6B5D4B', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  addMedicineOptionCardPrimary: { borderColor: '#C9E2F1', backgroundColor: '#EAF5FD' },
+  addMedicineOptionCardManual: { borderColor: '#CAE4D6', backgroundColor: '#EAF7F0' },
+  addMedicineOptionIconWrap: { width: 60, height: 60, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  addMedicineOptionIconWrapPrimary: { backgroundColor: '#287CB4' },
+  addMedicineOptionIconWrapManual: { backgroundColor: '#218265' },
+  addMedicineOptionTextWrap: { flex: 1, minWidth: 0, paddingRight: 7 },
+  addMedicineOptionTitle: { color: '#193D31', fontSize: 19, lineHeight: 25, fontWeight: '900' },
+  addMedicineOptionSubtitle: { color: '#53645A', fontSize: 15, lineHeight: 21, marginTop: 3 },
+  addMedicineOptionArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  addMedicineOptionArrowPrimary: { backgroundColor: '#D9ECF8' },
+  addMedicineOptionArrowManual: { backgroundColor: '#D9F0E4' },
+});
+
+const homeStyles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#F4FAF6' },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 0, paddingBottom: 110 },
+  greeting: { minHeight: 282, marginHorizontal: -20, marginTop: 0, paddingTop: 34, paddingHorizontal: 24, paddingBottom: 28, backgroundColor: '#ECF8F1', overflow: 'hidden' },
+  greetingHalo: { position: 'absolute', width: 280, height: 280, borderRadius: 140, backgroundColor: '#D5F0E3', right: -80, top: -72, opacity: 0.9 },
+  greetingLeaf: { position: 'absolute', width: 105, height: 180, borderTopLeftRadius: 105, borderBottomRightRadius: 105, backgroundColor: '#BDE8D1', opacity: 0.6, right: -23, bottom: -53, transform: [{ rotate: '-25deg' }] },
+  greetingIllustration: { position: 'absolute', width: 295, height: 246, right: -54, bottom: -9 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', zIndex: 1 },
+  date: { color: '#37665B', fontSize: 15, lineHeight: 21, fontWeight: '800', marginLeft: 9 },
+  greetingTitle: { color: '#174C3D', fontSize: 31, lineHeight: 39, fontWeight: '900', marginTop: 24, maxWidth: '75%', zIndex: 1 },
+  greetingTitleNarrow: { fontSize: 27, lineHeight: 35 },
+  greetingName: { color: '#18845F', fontSize: 34, lineHeight: 41, fontWeight: '900', maxWidth: '62%', zIndex: 1 },
+  subtitle: { color: '#546F69', fontSize: 16, lineHeight: 23, fontWeight: '500', marginTop: 13, maxWidth: '57%', zIndex: 1 },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF5E6', borderColor: '#EAD9B9', borderWidth: 1, borderRadius: 14, padding: 13, marginBottom: 16 },
+  offlineText: { flex: 1, marginLeft: 10, color: '#795522', fontSize: 16, lineHeight: 23 },
+  featuredCard: { minHeight: 126, flexDirection: 'row', alignItems: 'center', backgroundColor: '#EAF5FD', borderRadius: 21, padding: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#B6DCCF', marginTop: -7, shadowColor: '#315A4F', shadowOpacity: 0.1, shadowRadius: 9, shadowOffset: { width: 0, height: 4 }, elevation: 3, zIndex: 1 },
+  featuredGreenPanel: { position: 'absolute', top: 0, right: 0, bottom: 0, width: '42%', backgroundColor: '#E0F1E7' },
+  featuredIcon: { width: 54, height: 54, borderRadius: 17, backgroundColor: '#287CB4', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  featuredCopy: { flex: 1, minWidth: 0 },
+  featuredTitle: { color: '#174C3D', fontSize: 21, lineHeight: 27, fontWeight: '900' },
+  featuredDescription: { color: '#536B61', fontSize: 15, lineHeight: 21, marginTop: 3 },
+  featuredAction: { color: '#2576A6', fontSize: 15, lineHeight: 21, fontWeight: '800', marginTop: 7 },
+  featuredArrow: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#CDE9DA', alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  sectionHeading: { marginTop: 29, marginBottom: 16, paddingHorizontal: 3 },
+  sectionTitle: { color: '#174C3D', fontSize: 24, lineHeight: 31, fontWeight: '900' },
+  sectionSubtitle: { color: '#607671', fontSize: 16, lineHeight: 23, marginTop: 3 },
+  actionGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  actionCard: { width: '48.5%', minHeight: 145, borderWidth: 1, borderRadius: 21, padding: 12, marginBottom: 11, justifyContent: 'space-between' },
+  actionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  actionIcon: { width: 46, height: 46, borderWidth: 1, borderRadius: 23, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  actionCopy: { marginTop: 10 },
+  actionTitle: { color: '#173D37', fontSize: 17, lineHeight: 21, fontWeight: '900' },
+  actionDetail: { color: '#5B706D', fontSize: 14, lineHeight: 18, marginTop: 3 },
+  actionArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+});
+
+const caregiverStyles = StyleSheet.create({
+  eyebrow: { color: '#62736B', fontSize: 12, lineHeight: 18, fontWeight: '900', letterSpacing: 1 },
+  heading: { color: '#193D31', fontSize: 29, lineHeight: 36, fontWeight: '800', marginTop: 5 },
+  intro: { color: '#53645A', fontSize: 16, lineHeight: 23, marginTop: 5, marginBottom: 21 },
+  alertSummary: { backgroundColor: '#1C5849', borderColor: '#2C745D', borderWidth: 1, borderRadius: 20, padding: 17, marginBottom: 15, minHeight: 108, shadowColor: '#153E31', shadowOpacity: 0.13, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  alertTop: { flexDirection: 'row', alignItems: 'center' },
+  alertIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: '#397A65', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  alertCopy: { flex: 1 },
+  alertCount: { color: '#FFFFFF', fontSize: 19, fontWeight: '800' },
+  alertDescription: { color: '#E3F1E8', fontSize: 15, lineHeight: 21, marginTop: 4 },
+  markReadButton: { minHeight: 48, alignSelf: 'flex-start', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 17, marginTop: 14 },
+  markRead: { color: '#275C4B', fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  quickLinks: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
+  quickLink: { width: '48%', minHeight: 150, borderWidth: 1, borderRadius: 19, padding: 15 },
+  quickLinkBlue: { backgroundColor: '#EFF7F8', borderColor: '#D6E9EC' },
+  quickLinkRose: { backgroundColor: '#FDF2F4', borderColor: '#EFDCE0' },
+  quickLinkIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  quickLinkTitle: { color: '#193D31', fontSize: 18, lineHeight: 23, fontWeight: '800', marginTop: 11 },
+  quickLinkSubtitle: { color: '#53645A', fontSize: 15, lineHeight: 21, marginTop: 2 },
+});
+
+const medicineStyles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#F0F5EF' },
+  headerBar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#275C4B', borderColor: '#F4CF75', borderWidth: 2, borderRadius: 22, paddingHorizontal: 10, marginHorizontal: 20, marginTop: 14, marginBottom: 0, shadowColor: '#20382F', shadowOpacity: 0.17, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  navIconButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFF4C6', alignItems: 'center', justifyContent: 'center' },
+  headerTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  headerSpacer: { width: 50 },
+  topBarTitle: { color: '#FFFFFF', fontSize: 22, lineHeight: 28, fontWeight: '900', marginLeft: 7, flexShrink: 1 },
+  intro: { minHeight: 190, marginTop: 17, marginBottom: 25, borderRadius: 24, borderWidth: 1, borderColor: '#D5E8DA', backgroundColor: '#E8F3EB', paddingHorizontal: 19, paddingVertical: 25, justifyContent: 'center', overflow: 'hidden' },
+  introHalo: { position: 'absolute', width: 175, height: 175, borderRadius: 88, right: -43, top: -40, backgroundColor: '#DBECF4', opacity: 0.8 },
+  introArt: { position: 'absolute', width: 156, height: 156, right: -20, bottom: -5 },
+  introArtNarrow: { width: 132, height: 132, right: -18 },
+  eyebrow: { color: '#357966', fontSize: 12, lineHeight: 17, fontWeight: '900', letterSpacing: 0.8, maxWidth: '60%', zIndex: 1 },
+  title: { color: '#174C3D', fontSize: 31, lineHeight: 39, fontWeight: '900', marginTop: 7, maxWidth: '65%', zIndex: 1 },
+  description: { color: '#45675C', fontSize: 15, lineHeight: 22, fontWeight: '500', marginTop: 6, maxWidth: '60%', zIndex: 1 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingHorizontal: 2 },
+  sectionTitle: { color: '#193D31', fontSize: 22, fontWeight: '800', flexShrink: 1, marginRight: 8 },
+  textSizeControl: { flexDirection: 'row', backgroundColor: '#E3F1E9', borderRadius: 12, padding: 3 },
+  textSizeButton: { minWidth: 44, minHeight: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  textSizeActive: { backgroundColor: '#FFFFFF' },
+  textSizeText: { color: '#53645A', fontSize: 16, fontWeight: '800' },
+  textSizeTextActive: { color: '#275C4B' },
+  row: { minHeight: 91, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 20, paddingHorizontal: 13, paddingVertical: 13, marginBottom: 11 },
+  rowIcon: { width: 55, height: 55, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginRight: 13 },
+  rowCopy: { flex: 1, paddingRight: 8 },
+  rowTitle: { color: '#193D31', fontWeight: '800', lineHeight: 26 },
+  rowSubtitle: { color: '#53645A', lineHeight: 23, marginTop: 2 },
+  rowArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
 });
 
 export default HomeScreen;

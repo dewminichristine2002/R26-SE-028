@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { medicationService } from '../services/medicationService';
 import { routineService } from '../services/routineService';
 
@@ -383,8 +384,8 @@ const TabletIdentifierScreen = ({ onBack, reminderTextScale = 1 }) => {
           >
             <Text style={styles.backIcon}>{'<'}</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Tablet Identifier</Text>
-          <View style={styles.headerRightSpacer} />
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Tablet Identifier</Text>
+          <HeaderAccountActions />
         </View>
       </View>
 
@@ -425,7 +426,7 @@ const TabletIdentifierScreen = ({ onBack, reminderTextScale = 1 }) => {
 
         {!!message && (
           <View style={[styles.messageCard, isMatched ? styles.messageCardGood : styles.messageCardWarn]}>
-            {isAnalyzing ? <ActivityIndicator size="small" color="#2f5d50" /> : null}
+            {isAnalyzing ? <ActivityIndicator size="small" color="#275C4B" /> : null}
             <Text style={[styles.messageText, { fontSize: 15 * textScale, lineHeight: 21 * textScale }]}>{message}</Text>
           </View>
         )}
@@ -515,17 +516,17 @@ const TabletIdentifierScreen = ({ onBack, reminderTextScale = 1 }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   staticHeaderWrap: {
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 26,
   },
   headerRow: {
     minHeight: 58,
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -543,7 +544,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -552,7 +553,7 @@ const styles = StyleSheet.create({
   backIcon: {
     fontSize: 32,
     lineHeight: 36,
-    color: '#2f5d50',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -575,10 +576,10 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   introCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     padding: 14,
     marginBottom: 14,
     flexDirection: 'row',
@@ -594,7 +595,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   introIcon: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -602,19 +603,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   introTitle: {
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   introText: {
     marginTop: 4,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '700',
   },
   photoPanel: {
     borderRadius: 24,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     padding: 14,
     marginBottom: 14,
   },
@@ -638,13 +639,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   photoPlaceholderText: {
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '900',
   },
   cameraButton: {
     minHeight: 56,
     borderRadius: 18,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -676,7 +677,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     flex: 1,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '800',
   },
   resultCard: {
@@ -688,7 +689,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   resultLabel: {
-    color: '#2f5d50',
+    color: '#275C4B',
     textTransform: 'uppercase',
     fontWeight: '900',
     marginBottom: 10,
@@ -702,7 +703,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   resultName: {
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '900',
   },
   resultMeta: {
@@ -712,14 +713,14 @@ const styles = StyleSheet.create({
   },
   scheduleCard: {
     borderRadius: 22,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     padding: 14,
     marginBottom: 14,
   },
   scheduleTitle: {
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
     marginBottom: 8,
   },
@@ -741,7 +742,7 @@ const styles = StyleSheet.create({
     minWidth: 86,
     minHeight: 42,
     borderRadius: 14,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
@@ -756,23 +757,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scheduleSlotText: {
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '900',
   },
   scheduleRuleText: {
     marginTop: 3,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '800',
   },
   scheduleHint: {
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '800',
   },
   alternativesCard: {
     borderRadius: 22,
     backgroundColor: '#ffffff',
     borderWidth: 2,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     padding: 14,
   },
   detectedCard: {
@@ -784,12 +785,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   detectedTitle: {
-    color: '#12354d',
+    color: '#193D31',
     fontWeight: '900',
     marginBottom: 6,
   },
   detectedText: {
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '900',
   },
   detectedHint: {
@@ -798,7 +799,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   alternativesTitle: {
-    color: '#12354d',
+    color: '#193D31',
     fontWeight: '900',
     marginBottom: 10,
   },
@@ -815,7 +816,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   alternativeName: {
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '900',
   },
   alternativeMeta: {
@@ -827,9 +828,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { startAdaptiveActivity, submitAdaptiveActivity } from '../api/emotionalSupportApi';
 import { ListenControl, VoiceAnswerControl, VoiceStatus } from '../components/VoiceControls';
+import HeaderAccountActions from '../../../components/HeaderAccountActions';
 import useEnglishVoice from '../voice/useEnglishVoice';
 import { mapTranscriptToVisibleOption } from '../voice/voiceUtils';
 import { resolveItemIllustration } from '../utils/cognitiveItemIllustrations';
@@ -191,6 +192,7 @@ function IntroNav({ navigation }) {
   return <View style={s.introNav}>
     <Pressable accessibilityRole="button" accessibilityLabel="Go back" style={({ pressed }) => [s.introBack, pressed && s.pressed]} onPress={() => navigation.goBack()}><Text style={s.introBackText}>{'\u2039'}</Text></Pressable>
     <Text style={s.introNavLabel}>COGNITIVE ACTIVITIES</Text>
+    <HeaderAccountActions />
   </View>;
 }
 
@@ -202,6 +204,7 @@ function Header({ navigation, title, icon, difficulty }) {
       <View style={s.headerOverline}><Text style={s.headerEyebrow}>COGNITIVE ACTIVITY</Text><View style={s.headerDifficulty}><Text style={s.headerDifficultyText}>{difficultyName(difficulty)}</Text></View></View>
       <Text accessibilityRole="header" style={s.headerTitle}>{title || 'Cognitive Activity'}</Text>
     </View>
+    <HeaderAccountActions />
   </View>;
 }
 
@@ -374,7 +377,7 @@ const s = StyleSheet.create({
   safe: { backgroundColor: palette.background, flex: 1 },
   introNav: { alignItems: 'center', backgroundColor: palette.background, flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
   introBack: { alignItems: 'center', backgroundColor: palette.surface, borderColor: palette.border, borderRadius: radius.pill, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
-  introBackText: { color: palette.primary, fontSize: 34, lineHeight: 38 }, introNavLabel: { color: palette.primary, fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+  introBackText: { color: palette.primary, fontSize: 34, lineHeight: 38 }, introNavLabel: { color: palette.primary, fontSize: 13, fontWeight: '900', letterSpacing: 1, flex: 1, minWidth: 0 },
   header: { alignItems: 'center', backgroundColor: palette.primary, borderBottomColor: palette.gold, borderBottomWidth: 3, flexDirection: 'row', gap: 11, paddingHorizontal: 18, paddingVertical: 15 },
   back: { alignItems: 'center', backgroundColor: '#FFFFFF20', borderColor: '#FFFFFF75', borderRadius: 16, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
   backText: { color: palette.white, fontSize: 34, lineHeight: 38 },
@@ -393,7 +396,7 @@ const s = StyleSheet.create({
   description: { color: palette.muted, fontSize: 17, lineHeight: 25, marginTop: 17 },
   difficultyPanel: { alignItems: 'center', backgroundColor: '#fff4b8', borderColor: '#e5c44f', borderRadius: 17, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, minHeight: 82, paddingHorizontal: 15, paddingVertical: 11 },
   difficultyPanelCopy: { flex: 1 }, difficultyName: { color: palette.primary, fontSize: 20, fontWeight: '900', lineHeight: 26, marginTop: 2 },
-  difficultyDescription: { color: '#5e5143', fontSize: 14, lineHeight: 20, marginTop: 1 },
+  difficultyDescription: { color: '#53645A', fontSize: 14, lineHeight: 20, marginTop: 1 },
   difficultyMark: { alignItems: 'center', backgroundColor: palette.primary, borderRadius: 15, height: 38, justifyContent: 'center', marginLeft: 9, width: 38 },
   difficultyMarkText: { color: palette.white, fontSize: 20, fontWeight: '900' },
   metaRow: { flexDirection: 'row', gap: 10, marginTop: 12 }, metaRowStacked: { flexDirection: 'column' },
@@ -407,7 +410,7 @@ const s = StyleSheet.create({
   progressTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, progressEyebrow: { color: palette.muted, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   progressTitle: { color: palette.dark, fontSize: 19, fontWeight: '900', marginTop: 3 }, progressTotal: { color: palette.muted, fontSize: 16, fontWeight: '700' },
   percentPill: { alignItems: 'center', backgroundColor: '#fff4b8', borderColor: '#e5c44f', borderRadius: radius.pill, borderWidth: 1, justifyContent: 'center', minHeight: 38, minWidth: 58, paddingHorizontal: 10 },
-  percentText: { color: palette.primary, fontSize: 15, fontWeight: '900' }, track: { backgroundColor: '#eadfcd', borderRadius: 9, height: 11, marginTop: 13, overflow: 'hidden' },
+  percentText: { color: palette.primary, fontSize: 15, fontWeight: '900' }, track: { backgroundColor: '#E1E7E0', borderRadius: 9, height: 11, marginTop: 13, overflow: 'hidden' },
   fill: { backgroundColor: palette.gold, borderRadius: 9, height: 11 },
   gameCard: { backgroundColor: palette.surface, borderColor: palette.border, borderRadius: 23, borderTopColor: palette.gold, borderTopWidth: 4, borderWidth: 1, padding: 18, ...shadows.level2 },
   gameCardTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -471,7 +474,7 @@ const s = StyleSheet.create({
   phaseDot: { alignSelf: 'center', backgroundColor: palette.primary, borderRadius: 5, height: 9, width: 9 }, phaseText: { color: palette.primary, fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   helper: { color: palette.muted, fontSize: 17, lineHeight: 25, marginTop: 8 },
   studyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginTop: 18 }, studyGridStacked: { flexDirection: 'column' },
-  studyItem: { alignItems: 'center', backgroundColor: '#fffdf8', borderColor: palette.border, borderRadius: 17, borderWidth: 1, flexDirection: 'column', gap: 8, justifyContent: 'center', minHeight: 144, padding: 12, width: '48%' },
+  studyItem: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: palette.border, borderRadius: 17, borderWidth: 1, flexDirection: 'column', gap: 8, justifyContent: 'center', minHeight: 144, padding: 12, width: '48%' },
   studyItemStacked: { width: '100%' }, studyIllustration: { alignItems: 'center', backgroundColor: '#fff4b8', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
   studyIllustrationText: { fontSize: 24 }, studyCopy: { alignItems: 'center', minWidth: 0 }, studyNumberText: { color: palette.primary, fontSize: 10, fontWeight: '900', letterSpacing: 0.7 }, studyWord: { color: palette.dark, flexShrink: 1, fontSize: 16, fontWeight: '900', marginTop: 2, textAlign: 'center' },
   ordered: { alignItems: 'center', backgroundColor: '#e3f8ee', borderColor: '#b8ead6', borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginTop: 9, minHeight: 62, padding: 12 },

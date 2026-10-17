@@ -1,129 +1,38 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-const severityStyles = {
-  good: {
-    border: '#10B981',
-    badge: '#D1FAE5',
-    badgeText: '#065F46',
-    label: 'Good news',
-    icon: '\u2705',
-    cardBg: '#F0FDF4',
-  },
-  warning: {
-    border: '#F59E0B',
-    badge: '#FEF3C7',
-    badgeText: '#92400E',
-    label: 'Heads up',
-    icon: '\u26A0\uFE0F',
-    cardBg: '#FFFBEB',
-  },
-  critical: {
-    border: '#EF4444',
-    badge: '#FEE2E2',
-    badgeText: '#991B1B',
-    label: 'Important',
-    icon: '\u{1F6A8}',
-    cardBg: '#FEF2F2',
-  },
-  default: {
-    border: '#2f6654',
-    badge: '#e3f8ee',
-    badgeText: '#2f6654',
-    label: 'Update',
-    icon: '\u{1F4AC}',
-    cardBg: '#fffdf8',
-  },
+const severity = {
+  good: { color: '#247453', tint: '#DCF1E4', surface: '#F0F8F3', border: '#D3EBDD', label: 'On track', icon: 'checkmark-circle-outline' },
+  warning: { color: '#91601E', tint: '#FBEBCF', surface: '#FFFAF0', border: '#F0DEC0', label: 'Needs attention', icon: 'alert-circle-outline' },
+  critical: { color: '#9C4250', tint: '#F8E2E5', surface: '#FFF7F7', border: '#EED8DC', label: 'Important', icon: 'warning-outline' },
+  default: { color: '#286F9E', tint: '#DEEEF9', surface: '#F1F8FC', border: '#D3E7F2', label: 'Update', icon: 'information-circle-outline' },
 };
 
-const SummaryCard = ({ card }) => {
-  if (!card) {
-    return null;
-  }
-  const palette = severityStyles[card.severity] || severityStyles.default;
-
+export default function SummaryCard({ card }) {
+  if (!card) return null;
+  const tone = severity[card.severity] || severity.default;
   return (
-    <View
-      style={[
-        styles.card,
-        { borderLeftColor: palette.border, backgroundColor: palette.cardBg },
-      ]}
-    >
-      <View style={styles.headerRow}>
-        <Text style={styles.cardIcon}>{palette.icon}</Text>
+    <View style={[styles.card, { backgroundColor: tone.surface, borderColor: tone.border, borderLeftColor: tone.color }]}>
+      <View style={styles.topRow}>
+        <View style={[styles.icon, { backgroundColor: tone.tint }]}>
+          <Ionicons name={tone.icon} size={22} color={tone.color} />
+        </View>
         <Text style={styles.title} numberOfLines={2}>{card.title}</Text>
+        <Text style={[styles.status, { color: tone.color, backgroundColor: tone.tint }]}>{tone.label}</Text>
       </View>
-
-      <View style={[styles.badge, { backgroundColor: palette.badge }]}>
-        <Text style={[styles.badgeText, { color: palette.badgeText }]}>
-          {palette.label}
-        </Text>
-      </View>
-
       <Text style={styles.headline}>{card.headline}</Text>
       {card.detail ? <Text style={styles.detail}>{card.detail}</Text> : null}
-
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    borderLeftWidth: 6,
-    borderTopWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderTopColor: '#eadfcd',
-    borderRightColor: '#eadfcd',
-    borderBottomColor: '#eadfcd',
-    shadowColor: '#7a674f',
-    shadowOpacity: 0.1,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardIcon: { fontSize: 28, marginRight: 12 },
-  title: {
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: '900',
-    color: '#18352f',
-    flex: 1,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 8,
-  },
-  badgeText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  headline: {
-    fontSize: 25,
-    fontWeight: '900',
-    color: '#27231f',
-    marginTop: 4,
-    lineHeight: 31,
-  },
-  detail: {
-    fontSize: 18,
-    color: '#5e5143',
-    marginTop: 8,
-    lineHeight: 27,
-  },
+  card: { borderRadius: 19, padding: 17, marginBottom: 12, borderWidth: 1, borderLeftWidth: 4 },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 13 },
+  icon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  title: { flex: 1, color: '#193D31', fontSize: 16, lineHeight: 21, fontWeight: '800', paddingRight: 6 },
+  status: { maxWidth: 106, overflow: 'hidden', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: '900' },
+  headline: { color: '#193D31', fontSize: 20, lineHeight: 27, fontWeight: '800' },
+  detail: { color: '#53645A', fontSize: 16, lineHeight: 24, marginTop: 5 },
 });
-
-export default SummaryCard;

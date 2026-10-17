@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { intakeMonitoringService } from '../services/intakeMonitoringService';
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
@@ -2169,8 +2171,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <TouchableOpacity style={styles.backButton} onPress={resetIntakeVerification}>
               <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>Intake Check</Text>
-            <View style={styles.headerRightSpacer} />
+            <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Intake Check</Text>
+            <HeaderAccountActions />
           </View>
         </View>
 
@@ -2249,7 +2251,7 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <View style={styles.verificationAnalysisBox}>
               {isAnalyzingTabletCount ? (
                 <View style={styles.verificationAnalysisRow}>
-                  <ActivityIndicator color="#2f5d50" size="small" />
+                  <ActivityIndicator color="#275C4B" size="small" />
                   <Text style={styles.verificationAnalysisText}>Analyzing palm photo...</Text>
                 </View>
               ) : (
@@ -2384,8 +2386,8 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backIcon}>‹</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>💊 My Medicines</Text>
-          <View style={styles.headerRightSpacer} />
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>My Medicines</Text>
+          <HeaderAccountActions />
         </View>
       </View>
 
@@ -2400,33 +2402,6 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
             <Text style={[styles.dateTimeValue, styles.dateTimeValueStrong, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>
               {currentTimeLabel}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.scheduleControlPanel}>
-          <View style={styles.scheduleControlGroup}>
-            <View style={styles.scheduleControlTitleRow}>
-              <Text style={styles.scheduleControlIcon}>👁</Text>
-              <Text style={[styles.scheduleControlLabel, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>List</Text>
-            </View>
-            <View style={styles.scheduleToggleRow}>
-              <TouchableOpacity
-                style={[styles.scheduleToggleButton, showFullDay && styles.scheduleToggleButtonActive]}
-                onPress={() => setShowFullDay(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Show full day medicine list"
-              >
-                <Text style={[styles.scheduleToggleButtonText, showFullDay && styles.scheduleToggleButtonTextActive, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>Show</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.scheduleToggleButton, !showFullDay && styles.scheduleToggleButtonActive]}
-                onPress={() => setShowFullDay(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Hide full day medicine list"
-              >
-                <Text style={[styles.scheduleToggleButtonText, !showFullDay && styles.scheduleToggleButtonTextActive, { fontSize: 16 * textScale, lineHeight: 21 * textScale }]}>Hide</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 
@@ -2565,33 +2540,30 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
           )}
         </View>
 
-        {!showFullDay && (
-          <TouchableOpacity
-            style={styles.fullDayPrompt}
-            onPress={() => setShowFullDay(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Show all medicines today"
-          >
-            <Text style={styles.fullDayPromptIcon}>📋</Text>
-            <View style={styles.fullDayPromptTextWrap}>
-              <Text style={[styles.fullDayPromptTitle, { fontSize: 18 * textScale, lineHeight: 23 * textScale }]}>See all medicines</Text>
-              <Text style={[styles.fullDayPromptText, { fontSize: 15 * textScale, lineHeight: 20 * textScale }]}>Tap for full day list</Text>
+        <View style={styles.sectionRow}>
+          <View style={styles.sectionHeading}>
+            <Text style={[styles.sectionTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit>All Today</Text>
+            <View style={styles.totalBadge}>
+              <Text style={styles.totalBadgeText}>{upcomingTodaySchedule.length}</Text>
             </View>
+          </View>
+          <TouchableOpacity
+            style={styles.listVisibilityButton}
+            onPress={() => setShowFullDay((visible) => !visible)}
+            accessibilityRole="button"
+            accessibilityLabel={showFullDay ? 'Hide today’s medicine list' : 'Show today’s medicine list'}
+            accessibilityState={{ expanded: showFullDay }}
+          >
+            <Text style={[styles.listVisibilityText, { fontSize: 15 * textScale }]}>{showFullDay ? 'Hide list' : 'Show list'}</Text>
+            <Ionicons name={showFullDay ? 'chevron-up' : 'chevron-down'} size={18} color="#275C4B" />
           </TouchableOpacity>
-        )}
+        </View>
 
         {showFullDay && (
           <View style={styles.allTodayPanel}>
-            <View style={styles.sectionRow}>
-              <Text style={[styles.sectionTitle, { fontSize: 24 * textScale, lineHeight: 29 * textScale }]}>📋 All Today</Text>
-              <View style={styles.totalBadge}>
-                <Text style={styles.totalBadgeText}>{upcomingTodaySchedule.length}</Text>
-              </View>
-            </View>
-
             {isLoading ? (
               <View style={styles.loaderWrap}>
-                <ActivityIndicator size="large" color="#2f5d50" />
+                <ActivityIndicator size="large" color="#275C4B" />
                 <Text style={[styles.loaderText, { fontSize: 14 * textScale }]}>Loading schedule...</Text>
               </View>
             ) : null}
@@ -2733,18 +2705,18 @@ const ScheduleBoardScreen = ({ onBack, user, reminderTextScale = 1 }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   verificationContainer: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 0,
     paddingBottom: 28,
   },
   verificationHeroCard: {
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
     borderColor: '#f4cf75',
     padding: 16,
@@ -2761,9 +2733,9 @@ const styles = StyleSheet.create({
   },
   verificationMedicineCard: {
     borderRadius: 20,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     padding: 14,
     marginBottom: 14,
     flexDirection: 'row',
@@ -2776,11 +2748,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   verificationMedicineName: {
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   verificationMedicineMeta: {
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '800',
     marginTop: 3,
   },
@@ -2789,36 +2761,36 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#f8f2e9',
     borderWidth: 1,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   verificationMedicineListText: {
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '800',
   },
   verificationStepCard: {
     borderRadius: 20,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     padding: 14,
     marginBottom: 14,
   },
   verificationStepTitle: {
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
     marginBottom: 8,
   },
   verificationStepText: {
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '700',
     marginBottom: 12,
   },
   verificationAnalysisBox: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     backgroundColor: '#ffffff',
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -2829,7 +2801,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   verificationAnalysisText: {
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '800',
@@ -2845,7 +2817,7 @@ const styles = StyleSheet.create({
   verificationAvailabilityList: {
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#eadcca',
+    borderTopColor: '#E1E7E0',
     paddingTop: 8,
   },
   verificationAvailabilitySection: {
@@ -2936,7 +2908,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   verificationAvailabilityName: {
-    color: '#2d241d',
+    color: '#193D31',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
@@ -2962,14 +2934,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#9b3d47',
   },
   verificationAvailabilityAppearanceText: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '900',
     marginTop: 1,
   },
   verificationAvailabilityMeta: {
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '800',
@@ -2987,20 +2959,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#f2e8dc',
     borderWidth: 1,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   verificationPhotoPlaceholderText: {
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 14,
     fontWeight: '900',
   },
   verificationCameraButton: {
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3033,12 +3005,12 @@ const styles = StyleSheet.create({
     borderColor: '#edbdc4',
   },
   verificationCountValueText: {
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   verificationReadOnlyCountText: {
     marginTop: 8,
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '800',
@@ -3061,7 +3033,7 @@ const styles = StyleSheet.create({
     minHeight: 58,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     backgroundColor: '#ffffff',
     flexDirection: 'row',
     alignItems: 'center',
@@ -3080,7 +3052,7 @@ const styles = StyleSheet.create({
   },
   verificationCheckText: {
     flex: 1,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   verificationCompleteButton: {
@@ -3105,26 +3077,26 @@ const styles = StyleSheet.create({
   verificationCancelButton: {
     minHeight: 50,
     borderRadius: 16,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   verificationCancelButtonText: {
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 16,
     fontWeight: '900',
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 0,
     paddingBottom: 28,
   },
   staticHeaderWrap: {
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 26,
   },
@@ -3134,7 +3106,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 58,
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
     marginBottom: 14,
     borderWidth: 2,
@@ -3149,7 +3121,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -3158,7 +3130,7 @@ const styles = StyleSheet.create({
   backIcon: {
     fontSize: 32,
     lineHeight: 36,
-    color: '#2f5d50',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -3178,8 +3150,8 @@ const styles = StyleSheet.create({
   dateTimeCard: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
@@ -3198,7 +3170,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 0,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '900',
   },
   dateTimeValue: {
@@ -3206,86 +3178,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '900',
-    color: '#2d241d',
+    color: '#193D31',
   },
   dateTimeValueStrong: {
-    color: '#2f5d50',
-  },
-  scheduleControlPanel: {
-    borderRadius: 20,
-    backgroundColor: '#fffdf8',
-    borderWidth: 1,
-    borderColor: '#eadcca',
-    padding: 12,
-    marginBottom: 14,
-    flexDirection: 'row',
-    columnGap: 10,
-    shadowColor: '#6b4b2d',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  scheduleControlGroup: {
-    flex: 1,
-  },
-  scheduleControlTitleRow: {
-    minHeight: 28,
-    marginBottom: 7,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scheduleControlIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f7efe4',
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontSize: 15,
-    marginRight: 7,
-  },
-  scheduleControlLabel: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 20,
-    color: '#5d5045',
-    fontWeight: '900',
-  },
-  scheduleToggleRow: {
-    flexDirection: 'row',
-    columnGap: 8,
-  },
-  scheduleToggleButton: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: 14,
-    backgroundColor: '#f8f2e9',
-    borderWidth: 1,
-    borderColor: '#eadcca',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  scheduleToggleButtonActive: {
-    backgroundColor: '#e9f7f1',
-    borderColor: '#a8dbc8',
-  },
-  scheduleToggleButtonText: {
-    fontSize: 16,
-    lineHeight: 21,
-    color: '#5d5045',
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  scheduleToggleButtonTextActive: {
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   nextDoseCard: {
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#f4cf75',
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     padding: 16,
     marginBottom: 16,
     shadowColor: '#315a4f',
@@ -3331,14 +3233,14 @@ const styles = StyleSheet.create({
   },
   nextIntakeSummaryCard: {
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#f4cf75',
     padding: 12,
     marginBottom: 12,
   },
   nextIntakeSummaryTitle: {
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '900',
     marginBottom: 8,
   },
@@ -3350,7 +3252,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 44,
     borderRadius: 14,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     borderWidth: 1,
     borderColor: '#b9d4f2',
     alignItems: 'center',
@@ -3362,7 +3264,7 @@ const styles = StyleSheet.create({
     borderColor: '#f4cf75',
   },
   nextIntakeSummaryValue: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     textAlign: 'center',
   },
@@ -3374,7 +3276,7 @@ const styles = StyleSheet.create({
   highlightMedicineRow: {
     flexDirection: 'column',
     alignItems: 'flex-start',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 14,
     marginBottom: 10,
@@ -3399,14 +3301,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
   },
   appearanceIconFrame: {
     width: 38,
     height: 38,
     borderRadius: 14,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     borderWidth: 1,
     borderColor: '#d8c9b7',
     alignItems: 'center',
@@ -3478,14 +3380,14 @@ const styles = StyleSheet.create({
   highlightMedicineName: {
     fontSize: 25,
     fontWeight: '900',
-    color: '#24352f',
+    color: '#193D31',
     lineHeight: 30,
   },
   highlightMedicineMeta: {
     marginTop: 3,
     fontSize: 18,
     lineHeight: 23,
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '800',
   },
   highlightMedicineSubMeta: {
@@ -3499,7 +3401,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontSize: 15,
     lineHeight: 20,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
   },
   highlightTextLocked: {
@@ -3565,7 +3467,7 @@ const styles = StyleSheet.create({
     borderColor: '#d4dce3',
   },
   entryActionButtonText: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontSize: 17,
     fontWeight: '900',
   },
@@ -3576,7 +3478,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     lineHeight: 19,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '800',
   },
   entryVoiceText: {
@@ -3594,7 +3496,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 64,
     borderRadius: 16,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#f4cf75',
     alignItems: 'center',
@@ -3606,7 +3508,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     lineHeight: 30,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
     textAlign: 'center',
   },
   nextDoseGlobalActionLabel: {
@@ -3614,7 +3516,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 17,
     fontWeight: '900',
-    color: '#5d5045',
+    color: '#53645A',
     textAlign: 'center',
   },
   noNextDoseWrap: {
@@ -3628,50 +3530,12 @@ const styles = StyleSheet.create({
   noNextDoseText: {
     fontSize: 16,
     lineHeight: 22,
-    color: '#5d5045',
-    fontWeight: '700',
-  },
-  fullDayPrompt: {
-    minHeight: 78,
-    borderRadius: 18,
-    backgroundColor: '#fffdf8',
-    borderWidth: 1,
-    borderColor: '#eadcca',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  fullDayPromptIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#f8d978',
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontSize: 24,
-    marginRight: 12,
-  },
-  fullDayPromptTextWrap: {
-    flex: 1,
-  },
-  fullDayPromptTitle: {
-    fontSize: 18,
-    lineHeight: 23,
-    color: '#2d241d',
-    fontWeight: '900',
-  },
-  fullDayPromptText: {
-    marginTop: 3,
-    fontSize: 15,
-    lineHeight: 20,
-    color: '#74665b',
+    color: '#53645A',
     fontWeight: '700',
   },
   allTodayPanel: {
     borderRadius: 24,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     borderWidth: 2,
     borderColor: '#b9d4f2',
     padding: 12,
@@ -3687,20 +3551,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    columnGap: 8,
+  },
+  sectionHeading: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 8,
   },
   sectionTitle: {
+    flexShrink: 1,
     fontSize: 24,
     fontWeight: '900',
-    color: '#2d241d',
+    color: '#193D31',
     lineHeight: 29,
   },
   totalBadge: {
     minWidth: 40,
     borderRadius: 14,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
     paddingVertical: 7,
+  },
+  listVisibilityButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#B8DCC8',
+    backgroundColor: '#EAF5EE',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 4,
+  },
+  listVisibilityText: {
+    color: '#275C4B',
+    fontSize: 15,
+    fontWeight: '800',
   },
   totalBadgeText: {
     fontSize: 13,
@@ -3712,11 +3601,11 @@ const styles = StyleSheet.create({
   scheduleItemCard: {
     minHeight: 104,
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     borderLeftWidth: 5,
-    borderLeftColor: '#2f5d50',
+    borderLeftColor: '#275C4B',
     paddingVertical: 13,
     paddingHorizontal: 12,
     flexDirection: 'row',
@@ -3734,21 +3623,21 @@ const styles = StyleSheet.create({
   scheduleMedicineName: {
     fontSize: 21,
     fontWeight: '900',
-    color: '#24352f',
+    color: '#193D31',
     lineHeight: 26,
   },
   scheduleMetaText: {
     marginTop: 3,
     fontSize: 15,
     lineHeight: 20,
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '800',
   },
   scheduleSubMetaText: {
     marginTop: 2,
     fontSize: 13,
     lineHeight: 18,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '700',
   },
   scheduleRuleText: {
@@ -3767,7 +3656,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     fontSize: 13,
     lineHeight: 17,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
   },
   scheduleAppearanceDot: {
@@ -3778,8 +3667,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 6,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
   },
   scheduleArrow: {
     marginLeft: 9,
@@ -3826,7 +3715,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#edf4fb',
+    backgroundColor: '#F7F8F5',
     borderWidth: 1,
     borderColor: '#d3e2f0',
     alignItems: 'center',

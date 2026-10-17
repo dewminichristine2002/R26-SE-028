@@ -131,7 +131,7 @@ export default function SupportMoodCheckInScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f7efe4' },
+  safeArea: { flex: 1, backgroundColor: '#F7F8F5' },
   keyboardView: { flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
   header: { marginBottom: 24 },
@@ -146,11 +146,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  moodButtonSelected: { backgroundColor: '#E3F8EE', borderColor: '#2F6654' },
+  moodButtonSelected: { backgroundColor: '#E3F8EE', borderColor: '#275C4B' },
   moodLabel: { color: '#27231F', fontSize: 21, fontWeight: '900' },
-  moodLabelSelected: { color: '#2F6654' },
+  moodLabelSelected: { color: '#275C4B' },
   reflectionCard: {
-    backgroundColor: '#FFFDF8',
+    backgroundColor: '#FFFFFF',
     borderColor: colors.border,
     borderRadius: 20,
     borderWidth: 1,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: { ...type.card, color: '#27231F', fontSize: 20, marginBottom: spacing.md },
   reflectionInput: {
-    backgroundColor: '#F7EFE4',
+    backgroundColor: '#F7F8F5',
     borderColor: colors.border,
     borderRadius: 16,
     borderWidth: 1,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   successText: { color: '#166534', fontSize: 17, fontWeight: '800', lineHeight: 23 },
   submitButton: {
     alignItems: 'center',
-    backgroundColor: '#2F6654',
+    backgroundColor: '#275C4B',
     borderRadius: 18,
     justifyContent: 'center',
     marginTop: 22,

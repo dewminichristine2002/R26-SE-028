@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, PanResponder, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const DEFAULT_RIGHT = 16;
 const DEFAULT_BOTTOM = 20;
@@ -8,17 +9,17 @@ const DRAG_THRESHOLD = 6;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-const AssistantFAB = ({ onPress, label = 'Ask me', visible = true }) => {
+const AssistantFAB = ({ onPress, label = 'Ask assistant', visible = true, bottomOffset = DEFAULT_BOTTOM }) => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const position = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const offsetRef = useRef({ x: 0, y: 0 });
-  const [buttonSize, setButtonSize] = useState({ width: 176, height: 68 });
+  const [buttonSize, setButtonSize] = useState({ width: 60, height: 60 });
 
   const getBounds = useCallback(() => {
-    const buttonWidth = buttonSize.width || 176;
-    const buttonHeight = buttonSize.height || 68;
+    const buttonWidth = buttonSize.width || 60;
+    const buttonHeight = buttonSize.height || 60;
     const baseLeft = screenWidth - buttonWidth - DEFAULT_RIGHT;
-    const baseTop = screenHeight - buttonHeight - DEFAULT_BOTTOM;
+    const baseTop = screenHeight - buttonHeight - bottomOffset;
 
     const minX = SCREEN_MARGIN - baseLeft;
     const maxX = screenWidth - SCREEN_MARGIN - buttonWidth - baseLeft;
@@ -31,7 +32,7 @@ const AssistantFAB = ({ onPress, label = 'Ask me', visible = true }) => {
       minY: Math.min(minY, maxY),
       maxY: Math.max(minY, maxY),
     };
-  }, [buttonSize.height, buttonSize.width, screenHeight, screenWidth]);
+  }, [bottomOffset, buttonSize.height, buttonSize.width, screenHeight, screenWidth]);
 
   const moveTo = useCallback((nextPosition, animated = true) => {
     offsetRef.current = nextPosition;
@@ -104,22 +105,16 @@ const AssistantFAB = ({ onPress, label = 'Ask me', visible = true }) => {
           setButtonSize({ width, height });
         }
       }}
-      style={[styles.wrapper, { transform: position.getTranslateTransform() }]}
+      style={[styles.wrapper, { bottom: bottomOffset, transform: position.getTranslateTransform() }]}
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open your health helper"
+        accessibilityLabel={label}
         accessibilityHint="Double tap to open. Drag to move this helper bubble."
         onPress={onPress}
         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
       >
-        <View style={styles.iconBubble}>
-          <Text style={styles.icon}>{'\u{1F49A}'}</Text>
-        </View>
-        <View style={styles.textBox}>
-          <Text style={styles.title}>{label}</Text>
-          <Text style={styles.subtitle}>Health Helper</Text>
-        </View>
+        <Ionicons name="chatbubble-ellipses" size={27} color="#FFFFFF" />
       </Pressable>
     </Animated.View>
   );
@@ -132,52 +127,29 @@ const styles = StyleSheet.create({
     bottom: DEFAULT_BOTTOM,
     zIndex: 999,
     elevation: 14,
+    padding: 4,
+    borderRadius: 25,
+    backgroundColor: '#E5F8ED',
+    borderWidth: 2,
+    borderColor: '#A8E3C2',
   },
   button: {
-    backgroundColor: '#2563EB',
-    minHeight: 68,
-    paddingLeft: 8,
-    paddingRight: 18,
-    paddingVertical: 8,
-    borderRadius: 999,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#1D4ED8',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
-    borderWidth: 2,
-    borderColor: '#1D4ED8',
-  },
-  buttonPressed: {
-    backgroundColor: '#1D4ED8',
-  },
-  iconBubble: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F885E',
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    shadowColor: '#075C42',
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#08724F',
   },
-  icon: {
-    fontSize: 26,
-  },
-  textBox: {
-    paddingRight: 4,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 18,
-  },
-  subtitle: {
-    color: '#DBEAFE',
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 1,
+  buttonPressed: {
+    backgroundColor: '#086C4D',
   },
 });
 

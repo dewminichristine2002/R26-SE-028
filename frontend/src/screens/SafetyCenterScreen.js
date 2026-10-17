@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { medicationService } from '../services/medicationService';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 
 const formatEventTime = (value) => {
   if (!value) {
@@ -161,14 +162,15 @@ const SafetyCenterScreen = ({ onBack, reminderTextScale = 1 }) => {
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backText}>‹</Text>
           </TouchableOpacity>
-          <Text style={[styles.title, { fontSize: 24 * textScale, lineHeight: 30 * textScale }]}>🛡 Safety Center</Text>
-          <TouchableOpacity style={styles.refreshButton} onPress={loadTodayIssues}>
-            <Text style={styles.refreshText}>↻</Text>
-          </TouchableOpacity>
+          <Text style={[styles.title, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Safety Center</Text>
+          <HeaderAccountActions />
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <TouchableOpacity style={styles.refreshInlineButton} onPress={loadTodayIssues} accessibilityRole="button" accessibilityLabel="Refresh safety status">
+        <Text style={styles.refreshInlineText}>↻  Refresh status</Text>
+      </TouchableOpacity>
       <View style={styles.summaryGrid}>
         <View style={[styles.summaryCard, styles.summaryCardGood]}>
           <Text style={styles.summaryIcon}>✓</Text>
@@ -243,17 +245,17 @@ const SafetyCenterScreen = ({ onBack, reminderTextScale = 1 }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   container: {
     paddingHorizontal: 14,
     paddingTop: 0,
     paddingBottom: 28,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     flexGrow: 1,
   },
   staticHeaderWrap: {
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 26,
   },
@@ -263,7 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 58,
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
     marginBottom: 14,
     borderWidth: 2,
@@ -278,7 +280,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 32,
     lineHeight: 36,
-    color: '#2f5d50',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -300,22 +302,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     paddingHorizontal: 8,
   },
-  refreshButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#fffdf8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#fff4c6',
-  },
-  refreshText: {
-    color: '#2f5d50',
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '900',
-  },
+  refreshInlineButton: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#EAF4EE', marginBottom: 12 },
+  refreshInlineText: { color: '#275C4B', fontSize: 15, fontWeight: '800' },
   summaryGrid: {
     flexDirection: 'row',
     columnGap: 8,
@@ -351,18 +339,18 @@ const styles = StyleSheet.create({
     fontSize: 23,
     lineHeight: 27,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   summaryNumber: {
     marginTop: 3,
-    color: '#24352f',
+    color: '#193D31',
     fontSize: 30,
     lineHeight: 36,
     fontWeight: '900',
   },
   summaryLabel: {
     marginTop: 2,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
@@ -373,7 +361,7 @@ const styles = StyleSheet.create({
   },
   loaderText: {
     marginTop: 10,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -386,48 +374,48 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 21,
     lineHeight: 27,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   clearButton: {
     minHeight: 42,
     borderRadius: 16,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clearText: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 14,
   },
   emptyCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
   },
   emptyTitle: {
-    color: '#24352f',
+    color: '#193D31',
     fontSize: 18,
     fontWeight: '900',
     marginBottom: 4,
   },
   emptyText: {
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 14,
     fontWeight: '700',
   },
   issueCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     padding: 14,
     marginBottom: 12,
     flexDirection: 'row',
@@ -485,7 +473,7 @@ const styles = StyleSheet.create({
   },
   issueHeadline: {
     flex: 1,
-    color: '#24352f',
+    color: '#193D31',
     fontSize: 18,
     lineHeight: 23,
     fontWeight: '800',
@@ -513,20 +501,20 @@ const styles = StyleSheet.create({
   },
   issueMedicine: {
     marginTop: 4,
-    color: '#2d241d',
+    color: '#193D31',
     fontSize: 21,
     lineHeight: 27,
     fontWeight: '900',
   },
   issueTime: {
     marginTop: 4,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontSize: 14,
     fontWeight: '900',
   },
   issueDetail: {
     marginTop: 6,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -550,20 +538,20 @@ const styles = StyleSheet.create({
     borderColor: '#dfe6ed',
   },
   monitorTitle: {
-    color: '#24352f',
+    color: '#193D31',
     fontSize: 18,
     fontWeight: '900',
   },
   monitorText: {
     marginTop: 6,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 15,
     lineHeight: 22,
     fontWeight: '700',
   },
   monitorMeta: {
     marginTop: 8,
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 12,
     fontWeight: '800',
   },

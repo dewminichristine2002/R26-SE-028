@@ -49,8 +49,10 @@ describe('Today for You home experience', () => {
     });
   });
 
-  test('personalized time-aware greeting is shown safely', () => {
-    expect(source).toContain('getPersonalizedGreeting(user)');
+  test('Wellness has a clear page header and a simple introduction', () => {
+    expect(source).toContain('Back to Home');
+    expect(source).toContain('>Wellness</Text>');
+    expect(source).not.toContain('<Greeting');
     expect(source).toContain('Choose one small moment for yourself.');
   });
 

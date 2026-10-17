@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { BackHandler, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, BackHandler, Platform, StatusBar, View } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './src/i18n/config';
 import { languageService } from './src/services/languageService';
@@ -17,6 +17,9 @@ import DiabetesPredictionScreen from './src/screens/DiabetesPredictionScreen';
 import StrokePredictionScreen from './src/screens/StrokePredictionScreen';
 import HypertensionPredictionScreen from './src/screens/HypertensionPredictionScreen';
 import AssistantFAB from './src/components/AssistantFAB';
+import AppHeader from './src/components/AppHeader';
+import { HeaderAccountContext } from './src/components/HeaderAccountActions';
+import AppTabBar from './src/components/AppTabBar';
 import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
 import { authService } from './src/services/authService';
 import { userService } from './src/services/userService';
@@ -48,11 +51,44 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState('home');
+  const [profileReturnScreen, setProfileReturnScreen] = useState('home');
   const [currentUser, setCurrentUser] = useState(null);
   const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
+  const [medicineSafetyReturn, setMedicineSafetyReturn] = useState('home');
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState('');
   const [assistantReturnScreen, setAssistantReturnScreen] = useState('home');
   const [predictionReturnScreen, setPredictionReturnScreen] = useState('quick-care');
+  const [homeSection, setHomeSection] = useState('home');
+  const [tabNavigationKey, setTabNavigationKey] = useState(0);
+  const [emotionalSupportLaunch, setEmotionalSupportLaunch] = useState({ route: 'ElderHome', nonce: 0 });
+
+  const handleHomeSectionChange = useCallback((section) => {
+    setHomeSection(section);
+    if (section === 'home') {
+      setActiveScreen((screen) => screen === 'medicines' ? 'home' : screen);
+    }
+  }, []);
+
+  const selectTab = (tab) => {
+    if (tab === 'safety') {
+      if (activeScreen === 'allergies') return;
+      setMedicineSafetyReturn(activeScreen === 'medicines' || (activeScreen === 'home' && homeSection === 'medicines') ? 'medicines' : 'home');
+      setActiveScreen('allergies');
+      return;
+    }
+    if (tab === 'home' || tab === 'medicines') {
+      setHomeLaunchIntent(null);
+      setHomeSection(tab);
+      setTabNavigationKey((key) => key + 1);
+      setActiveScreen(tab);
+      return;
+    }
+    if (tab === 'wellness') {
+      openEmotionalSupport();
+      return;
+    }
+    setActiveScreen({ overview: 'unified-dashboard', care: 'quick-care' }[tab]);
+  };
 
   const handleAssistantNavigation = (navigation = {}) => {
     const launchIntent = navigation.launchIntent
@@ -109,11 +145,16 @@ export default function App() {
         return true;
       }
       if (activeScreen === 'profile') {
-        setActiveScreen('home');
+        setActiveScreen(profileReturnScreen);
         return true;
       }
       if (activeScreen === 'settings') {
         setActiveScreen('profile');
+        return true;
+      }
+      if (activeScreen === 'allergies') {
+        setHomeLaunchIntent(null);
+        setActiveScreen(medicineSafetyReturn === 'medicines' ? 'medicines' : 'home');
         return true;
       }
       if (activeScreen !== 'home') {
@@ -124,13 +165,23 @@ export default function App() {
     };
     BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-  }, [isAuthenticated, activeScreen, assistantReturnScreen, predictionReturnScreen]);
+  }, [isAuthenticated, activeScreen, assistantReturnScreen, predictionReturnScreen, medicineSafetyReturn, profileReturnScreen]);
 
   const openAssistant = (options = {}) => {
     const fromScreen = activeScreen === 'assistant-chat' ? assistantReturnScreen : activeScreen;
     setAssistantReturnScreen(fromScreen && fromScreen !== 'assistant-chat' ? fromScreen : 'unified-dashboard');
     setAssistantInitialPrompt(options.initialPrompt || '');
     setActiveScreen('assistant-chat');
+  };
+
+  const openMedicineSafety = (returnTo = 'home') => {
+    setMedicineSafetyReturn(returnTo);
+    setActiveScreen('allergies');
+  };
+
+  const openEmotionalSupport = (route = 'ElderHome') => {
+    setEmotionalSupportLaunch({ route, nonce: Date.now() });
+    setActiveScreen('emotional-support');
   };
 
   const closeAssistant = () => {
@@ -259,12 +310,25 @@ export default function App() {
     setActiveScreen('home');
   };
 
-  const handleLogout = async () => {
-    await authService.logout();
-    setCurrentUser(null);
-    setIsAuthenticated(false);
-    setAuthMode('login');
-    setActiveScreen('home');
+  const handleLogout = () => {
+    Alert.alert('Log out of ElderMeds?', 'You can sign in again to access your care information.', [
+      { text: 'Stay signed in', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await authService.logout();
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+            setAuthMode('login');
+            setActiveScreen('home');
+          } catch (error) {
+            Alert.alert('Could not log out', 'Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleProfileUpdated = (updatedUser) => {
@@ -298,10 +362,8 @@ export default function App() {
       return (
         <ProfileScreen
           user={currentUser}
-          onBack={() => setActiveScreen('home')}
           onOpenSettings={() => setActiveScreen('settings')}
           onProfileUpdated={handleProfileUpdated}
-          onLogout={handleLogout}
         />
       );
     }
@@ -310,7 +372,6 @@ export default function App() {
       return (
         <SettingsScreen
           onBack={() => setActiveScreen('profile')}
-          onLogout={handleLogout}
         />
       );
     }
@@ -318,7 +379,10 @@ export default function App() {
     if (activeScreen === 'allergies') {
       return (
         <MedicineSafetyScreen
-          onBack={() => setActiveScreen('home')}
+          onBack={() => {
+            setHomeLaunchIntent(null);
+            setActiveScreen(medicineSafetyReturn === 'medicines' ? 'medicines' : 'home');
+          }}
           onLogout={handleLogout}
           initialRoute="home"
         />
@@ -329,13 +393,12 @@ export default function App() {
       return (
         <SettingsScreen
           onBack={() => setActiveScreen('profile')}
-          onLogout={handleLogout}
         />
       );
     }
 
     if (activeScreen === 'emotional-support') {
-      return <EmotionalSupportNavigator user={currentUser} />;
+      return <EmotionalSupportNavigator key={emotionalSupportLaunch.nonce} user={currentUser} initialRoute={emotionalSupportLaunch.route} onExit={() => setActiveScreen('home')} />;
     }
 
     if (activeScreen === 'unified-dashboard') {
@@ -403,18 +466,19 @@ export default function App() {
 
     return (
       <HomeScreen
+        key={`${activeScreen}-${tabNavigationKey}`}
         user={currentUser}
-        onOpenProfile={() => setActiveScreen('profile')}
-        onOpenAllergies={() => setActiveScreen('allergies')}
-        onOpenMedicine={() => setActiveScreen('allergies')}
+        initialSection={activeScreen === 'medicines' ? 'medicines' : 'home'}
+        onOpenAllergies={(options) => openMedicineSafety(options?.returnTo === 'medicines' ? 'medicines' : 'home')}
+        onOpenMedicine={() => openMedicineSafety()}
         onOpenHistory={() => setActiveScreen('history')}
         launchIntent={homeLaunchIntent}
         onLaunchIntentConsumed={() => setHomeLaunchIntent(null)}
-        onOpenEmotionalSupport={() => setActiveScreen('emotional-support')}
+        onSectionChange={handleHomeSectionChange}
+        onOpenEmotionalSupport={openEmotionalSupport}
         onOpenDashboard={() => setActiveScreen('unified-dashboard')}
         onOpenQuickCare={() => setActiveScreen('quick-care')}
         onOpenAssistant={openAssistant}
-        onLogout={handleLogout}
       />
     );
   };
@@ -422,12 +486,46 @@ export default function App() {
   const showFab =
     isAuthenticated &&
     !isBooting &&
-    (activeScreen === 'home' || activeScreen === 'unified-dashboard');
+    (activeScreen === 'unified-dashboard' || (activeScreen === 'home' && homeSection === 'home'));
+  const showTabs = isAuthenticated && !isBooting && [
+    'home', 'medicines', 'allergies', 'unified-dashboard', 'quick-care', 'emotional-support', 'profile',
+  ].includes(activeScreen);
+  const tabScreen = activeScreen === 'profile' ? profileReturnScreen : activeScreen;
+  const activeTab = tabScreen === 'medicines' ? 'medicines' : tabScreen === 'home'
+    ? homeSection
+    : { allergies: 'safety', 'unified-dashboard': 'overview', 'quick-care': 'care', 'emotional-support': 'wellness' }[tabScreen];
+  const headerBackground = activeScreen === 'home' && homeSection === 'home'
+    ? '#ECF8F1'
+    : activeScreen === 'medicines' || (activeScreen === 'home' && homeSection === 'medicines')
+      ? '#F0F5EF'
+      : activeScreen === 'unified-dashboard'
+        ? '#F2F7F3'
+        : '#F7F8F5';
+  const openProfile = () => {
+    if (activeScreen === 'profile') return;
+    if (activeScreen !== 'settings') {
+      setProfileReturnScreen(activeScreen === 'home' && homeSection === 'medicines' ? 'medicines' : activeScreen);
+    }
+    setActiveScreen('profile');
+  };
 
   return (
     <I18nextProvider i18n={i18n}>
-      {renderContent()}
-      <AssistantFAB visible={showFab} onPress={openAssistantFromFab} />
+      <StatusBar barStyle="dark-content" backgroundColor={isAuthenticated && !isBooting ? headerBackground : '#F7F8F5'} />
+      <HeaderAccountContext.Provider value={{ onOpenProfile: openProfile, onLogout: handleLogout, isProfileActive: activeScreen === 'profile' }}>
+        <View style={{ flex: 1, backgroundColor: '#F7F8F5' }}>
+        {isAuthenticated && !isBooting && activeScreen === 'home' && homeSection === 'home' && (
+          <AppHeader
+            onOpenProfile={openProfile}
+            onLogout={handleLogout}
+            backgroundColor={headerBackground}
+          />
+        )}
+        <View style={{ flex: 1 }}>{renderContent()}</View>
+        {showTabs && <AppTabBar activeTab={activeTab} onSelect={selectTab} />}
+        <AssistantFAB visible={showFab} bottomOffset={showTabs ? 85 : 20} onPress={openAssistantFromFab} />
+        </View>
+      </HeaderAccountContext.Provider>
     </I18nextProvider>
   );
 }

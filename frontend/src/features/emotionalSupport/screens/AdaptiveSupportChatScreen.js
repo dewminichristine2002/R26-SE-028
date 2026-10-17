@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import HeaderAccountActions from '../../../components/HeaderAccountActions';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -304,6 +305,13 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <View style={styles.accountTopBar}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.accountBack}>
+            <Text style={styles.accountBackText}>‹</Text>
+          </Pressable>
+          <Text style={styles.accountTitle} numberOfLines={1}>Let's talk</Text>
+          <HeaderAccountActions />
+        </View>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.greetingBanner}>
             <View style={styles.greetingIcon}><Text style={styles.greetingEmoji}>☀️</Text></View>
@@ -462,10 +470,14 @@ export default function AdaptiveSupportChatScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F7EFE4' },
+  safeArea: { flex: 1, backgroundColor: '#F7F8F5' },
   keyboardView: { flex: 1 },
+  accountTopBar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.xl, marginTop: screenInsets.top, paddingHorizontal: 10, borderRadius: 22, borderWidth: 2, borderColor: '#F4CF75', backgroundColor: '#275C4B' },
+  accountBack: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  accountBackText: { color: '#275C4B', fontSize: 34, lineHeight: 38 },
+  accountTitle: { flex: 1, minWidth: 0, color: '#FFFFFF', fontSize: 22, fontWeight: '900', marginLeft: 9 },
   container: { paddingHorizontal: spacing.xl, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.xl },
-  greetingBanner: { alignItems: 'center', backgroundColor: '#2F6654', borderColor: '#E5C44F', borderRadius: 22, borderWidth: 2, flexDirection: 'row', marginBottom: spacing.md, minHeight: 104, padding: spacing.lg },
+  greetingBanner: { alignItems: 'center', backgroundColor: '#275C4B', borderColor: '#E5C44F', borderRadius: 22, borderWidth: 2, flexDirection: 'row', marginBottom: spacing.md, minHeight: 104, padding: spacing.lg },
   greetingIcon: { alignItems: 'center', backgroundColor: '#FFF4B8', borderRadius: 18, height: 56, justifyContent: 'center', marginRight: spacing.md, width: 56 },
   greetingEmoji: { fontSize: 28 }, greetingCopy: { flex: 1 },
   greeting: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', lineHeight: 28 },

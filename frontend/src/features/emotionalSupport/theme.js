@@ -1,10 +1,10 @@
 import { Platform, StatusBar } from 'react-native';
 
 export const colors = {
-  primary: '#2f6654', primaryDark: '#2f6654', forest: '#2f6654', gold: '#e5c44f',
-  text: '#18352f', secondary: '#5e5143', background: '#f7efe4', surface: '#fffdf8',
+  primary: '#275C4B', primaryDark: '#193D31', forest: '#275C4B', gold: '#D0B86B',
+  text: '#193D31', secondary: '#53645A', background: '#F7F8F5', surface: '#FFFFFF',
   mint: '#e3f8ee', sky: '#eaf7ff', lavender: '#f3edff', peach: '#fff7ed',
-  amber: '#fff4b8', coral: '#fff1f4', violet: '#f3edff', border: '#eadfcd',
+  amber: '#FFF4DF', coral: '#fff1f4', violet: '#f3edff', border: '#E1E7E0',
   disabled: '#b8ad9d', info: '#2576a6', error: '#a93447', errorBg: '#fff1f4', white: '#FFFFFF',
 };
 

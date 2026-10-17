@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AgenticGlowCard from '../components/AgenticGlowCard';
 import AgenticScreenFrame from '../components/AgenticScreenFrame';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { medicationService } from '../services/medicationService';
 
 const formatShortDate = (value) => {
@@ -175,14 +176,15 @@ const MedicineStockScreen = ({ onBack, reminderTextScale = 1, highlight = null }
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backIcon}>‹</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>📦 Medicine Stock</Text>
-          <TouchableOpacity style={styles.refreshButton} onPress={loadStock}>
-            <Text style={styles.refreshIcon}>↻</Text>
-          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Medicine Stock</Text>
+          <HeaderAccountActions />
         </View>
       </View>
 
       <ScrollView style={styles.scrollArea} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <TouchableOpacity style={styles.refreshInlineButton} onPress={loadStock} accessibilityRole="button" accessibilityLabel="Refresh medicine stock">
+        <Text style={styles.refreshInlineText}>↻  Refresh stock</Text>
+      </TouchableOpacity>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryBlock}>
@@ -342,10 +344,10 @@ const MedicineStockScreen = ({ onBack, reminderTextScale = 1, highlight = null }
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   staticHeaderWrap: {
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 26,
     zIndex: 10,
@@ -356,7 +358,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 0,
     paddingBottom: 28,
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 58,
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
     marginBottom: 14,
     borderWidth: 2,
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -391,7 +393,7 @@ const styles = StyleSheet.create({
   backIcon: {
     fontSize: 32,
     lineHeight: 36,
-    color: '#2f5d50',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -404,30 +406,17 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     paddingHorizontal: 8,
   },
-  refreshButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#f8d978',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#fff4c6',
-  },
-  refreshIcon: {
-    fontSize: 24,
-    color: '#2f5d50',
-    fontWeight: '900',
-  },
+  refreshInlineButton: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#EAF4EE', marginBottom: 12 },
+  refreshInlineText: { color: '#275C4B', fontSize: 15, fontWeight: '800' },
   summaryCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 22,
     paddingVertical: 14,
     paddingHorizontal: 14,
     flexDirection: 'row',
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
   },
   summaryBlock: {
     flex: 1,
@@ -439,14 +428,14 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '900',
   },
   summaryValue: {
     marginTop: 2,
     fontSize: 28,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   summaryDanger: {
     marginTop: 4,
@@ -465,16 +454,16 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   stockCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 22,
     padding: 14,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     shadowColor: '#6b4b2d',
     shadowOpacity: 0.08,
     shadowRadius: 10,
@@ -496,7 +485,7 @@ const styles = StyleSheet.create({
   medName: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#24352f',
+    color: '#193D31',
   },
   medSub: {
     marginTop: 2,
@@ -531,7 +520,7 @@ const styles = StyleSheet.create({
   pillsLeftText: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   percentText: {
     fontSize: 13,
@@ -562,7 +551,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#b9d4f2',
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
   },
   refillInfoText: {
     color: '#5f7588',
@@ -577,7 +566,7 @@ const styles = StyleSheet.create({
   refillButton: {
     flex: 1,
     marginRight: 8,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -592,15 +581,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     borderWidth: 2,
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
   },
   refillRequestButtonText: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 12,
   },
@@ -649,7 +638,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#f4cf75',
@@ -658,7 +647,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#2d241d',
+    color: '#193D31',
   },
   modalSubtitle: {
     marginTop: 2,
@@ -678,14 +667,14 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#e9f7f1',
   },
   stepperButtonText: {
     fontSize: 22,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     marginTop: -2,
   },
@@ -696,7 +685,7 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButton: {
     borderRadius: 18,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
@@ -709,22 +698,22 @@ const styles = StyleSheet.create({
   modalSecondaryButton: {
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#2f5d50',
-    backgroundColor: '#fffdf8',
+    borderColor: '#275C4B',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
   },
   modalSecondaryButtonText: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 14,
   },
   modalCancelButton: {
     borderRadius: 18,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     paddingVertical: 14,
     alignItems: 'center',
   },

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,16 +9,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import SummaryCard from '../components/SummaryCard';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { assistantService } from '../services/assistantService';
-
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return { text: 'Good morning', emoji: '\u{1F305}' };
-  if (hour < 17) return { text: 'Good afternoon', emoji: '\u2600\uFE0F' };
-  if (hour < 21) return { text: 'Good evening', emoji: '\u{1F307}' };
-  return { text: 'Good night', emoji: '\u{1F319}' };
-};
 
 const UnifiedDashboardScreen = ({
   user,
@@ -31,7 +25,6 @@ const UnifiedDashboardScreen = ({
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
 
-  const greeting = useMemo(getGreeting, []);
   const firstName = user?.fullName?.split(' ')[0] || '';
 
   const load = useCallback(async () => {
@@ -91,36 +84,36 @@ const UnifiedDashboardScreen = ({
       ];
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        {onBack ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={onBack}
-            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-          >
-            <Text style={styles.backButtonText}>{'\u2190'}  Back</Text>
-          </Pressable>
-        ) : null}
-
-        <View style={styles.greetingRow}>
-          <Text style={styles.greetingEmoji}>{greeting.emoji}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>
-              {greeting.text}{firstName ? `, ${firstName}` : ''}
-            </Text>
-            <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
+      <View style={styles.headerArea}>
+        <View style={styles.header}>
+          {onBack ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={onBack}
+              style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            >
+              <Ionicons name="arrow-back" size={22} color="#275C4B" />
+            </Pressable>
+          ) : null}
+          <View style={styles.headerCopy}>
+            <View style={styles.headerTitleRow}>
+              <Ionicons name="pulse-outline" size={21} color="#F8D978" style={styles.headerPulse} />
+              <Text style={styles.greeting} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Health overview</Text>
+            </View>
           </View>
+          <HeaderAccountActions />
         </View>
+        <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2f6654" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168565" colors={['#168565']} />}
       >
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#2f6654" />
+            <ActivityIndicator size="large" color="#275C4B" />
             <Text style={styles.loadingText}>Getting your health summary\u2026</Text>
           </View>
         ) : null}
@@ -154,7 +147,7 @@ const UnifiedDashboardScreen = ({
 
         {!loading && !error && cardCount === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyEmoji}>{'\u{1F33F}'}</Text>
+            <Ionicons name="document-text-outline" size={30} color="#275C4B" style={styles.emptyEmoji} />
             <Text style={styles.emptyTitle}>Nothing to show yet</Text>
             <Text style={styles.emptyText}>
               {emptyText}
@@ -171,7 +164,7 @@ const UnifiedDashboardScreen = ({
             style={({ pressed }) => [styles.quickCareCard, pressed && { opacity: 0.86 }]}
           >
             <View style={styles.quickCareIconWrap}>
-              <Text style={styles.quickCareIcon}>{'\u{1F49A}'}</Text>
+              <Ionicons name="pulse-outline" size={25} color="#287CB4" />
             </View>
             <View style={styles.quickCareTextWrap}>
               <Text style={styles.quickCareTitle}>Quick Care</Text>
@@ -220,72 +213,57 @@ const UnifiedDashboardScreen = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7efe4' },
+  container: { flex: 1, backgroundColor: '#F2F7F3' },
+  headerArea: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12 },
   header: {
-    paddingTop: 30,
-    paddingHorizontal: 18,
-    paddingBottom: 16,
-    backgroundColor: '#f7efe4',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eadfcd',
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    marginBottom: 12,
-    borderRadius: 999,
-    backgroundColor: '#fffdf8',
-    borderWidth: 1,
-    borderColor: '#eadfcd',
-  },
-  backButtonPressed: { opacity: 0.6 },
-  backButtonText: { color: '#2f6654', fontWeight: '900', fontSize: 17 },
-  greetingRow: {
+    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 128,
+    backgroundColor: '#275C4B',
     borderRadius: 22,
-    backgroundColor: '#2f6654',
     borderWidth: 2,
-    borderColor: '#e5c44f',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    shadowColor: '#725e25',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 5,
+    borderColor: '#F4CF75',
+    paddingHorizontal: 10,
+    shadowColor: '#20382F',
+    shadowOpacity: 0.17,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
   },
-  greetingEmoji: {
-    width: 66,
-    height: 66,
-    borderRadius: 20,
-    backgroundColor: '#fff4b8',
-    fontSize: 32,
-    lineHeight: 66,
-    marginRight: 14,
-    textAlign: 'center',
-    overflow: 'hidden',
+  backButton: {
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FFF4C6',
   },
+  backButtonPressed: { opacity: 0.6 },
+  headerCopy: { flex: 1, minWidth: 0, justifyContent: 'center' },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  headerPulse: { marginRight: 7 },
   greeting: {
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '900',
     color: '#FFFFFF',
+    flexShrink: 1,
   },
   subtitle: {
-    fontSize: 17,
-    color: '#ecfff6',
-    marginTop: 4,
-    lineHeight: 24,
-    fontWeight: '700',
+    fontSize: 16,
+    color: '#53645A',
+    marginTop: 14,
+    paddingHorizontal: 2,
+    lineHeight: 23,
   },
-  scroll: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 148 },
+  scroll: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 },
   sectionHeading: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#27231f',
+    color: '#193D31',
     marginBottom: 12,
     marginTop: 4,
     letterSpacing: 0,
@@ -293,7 +271,7 @@ const styles = StyleSheet.create({
   loadingBox: { paddingVertical: 80, alignItems: 'center' },
   loadingText: {
     marginTop: 14,
-    color: '#5e5143',
+    color: '#53645A',
     fontSize: 18,
     fontWeight: '800',
   },
@@ -311,7 +289,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 999,
     borderWidth: 1.5,
     borderColor: '#a93447',
@@ -322,46 +300,46 @@ const styles = StyleSheet.create({
     paddingVertical: 44,
     paddingHorizontal: 24,
     alignItems: 'center',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#F1F8FC',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#D3E7F2',
   },
   emptyEmoji: { fontSize: 56, marginBottom: 10 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#27231f',
+    color: '#193D31',
     marginBottom: 8,
   },
   emptyText: {
-    color: '#5e5143',
+    color: '#53645A',
     fontSize: 18,
     textAlign: 'center',
     lineHeight: 27,
   },
   quickCareCard: {
-    minHeight: 106,
+    minHeight: 92,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 18,
-    backgroundColor: '#eaf7ff',
+    backgroundColor: '#EBF5FB',
     borderWidth: 1,
-    borderColor: '#cae3f2',
+    borderColor: '#CFE5F2',
     marginTop: 12,
-    shadowColor: '#7a674f',
-    shadowOpacity: 0.09,
+    shadowColor: '#4D7995',
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
   quickCareIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: '#a93447',
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#D9ECF8',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 13,
@@ -376,20 +354,19 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   quickCareTitle: {
-    color: '#174862',
-    fontSize: 21,
-    lineHeight: 27,
-    fontWeight: '900',
+    color: '#193D31',
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '800',
   },
   quickCareSubtitle: {
-    color: '#2576a6',
+    color: '#63736A',
     marginTop: 3,
-    fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 20,
   },
   quickCareArrow: {
-    color: '#a93447',
+    color: '#287CB4',
     fontSize: 34,
     lineHeight: 36,
     fontWeight: '900',
@@ -397,23 +374,23 @@ const styles = StyleSheet.create({
   healthAdviceCard: {
     padding: 16,
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#EDF7F0',
     borderWidth: 1,
-    borderColor: '#b8ead6',
+    borderColor: '#D3E9DA',
     marginTop: 12,
-    shadowColor: '#7a674f',
-    shadowOpacity: 0.09,
+    shadowColor: '#598570',
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
   healthAdviceTitle: {
-    color: '#18352f',
-    fontWeight: '900',
-    fontSize: 20,
+    color: '#193D31',
+    fontWeight: '800',
+    fontSize: 18,
   },
   healthAdviceSubtitle: {
-    color: '#2f6654',
+    color: '#53645A',
     marginTop: 4,
     fontSize: 16,
     lineHeight: 23,
@@ -424,9 +401,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   healthAdviceChip: {
-    minHeight: 52,
-    backgroundColor: '#e3f8ee',
-    borderColor: '#b8ead6',
+    minHeight: 44,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D4E6DA',
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -435,9 +412,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   healthAdviceChipText: {
-    color: '#2f6654',
-    fontWeight: '900',
-    fontSize: 16,
+    color: '#275C4B',
+    fontWeight: '800',
+    fontSize: 14,
   },
 
   disclaimerBox: {

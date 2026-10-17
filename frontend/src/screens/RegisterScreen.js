@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { authService } from '../services/authService';
+import BrandLockup from '../components/BrandLockup';
 
 const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
   const [fullName, setFullName] = useState('');
@@ -32,15 +33,16 @@ const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <BrandLockup />
         <View style={styles.card}>
-          <Text style={styles.title}>Create ElderMeds Account</Text>
-          <Text style={styles.subtitle}>Your profile and reminders stay synced</Text>
+          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.subtitle}>Keep your medicines and reminders together.</Text>
 
           <Text style={styles.label}>Full Name</Text>
           <TextInput
             style={styles.input}
             placeholder="Full Name"
-            placeholderTextColor="#8a97a4"
+            placeholderTextColor="#718079"
             value={fullName}
             onChangeText={setFullName}
           />
@@ -49,7 +51,7 @@ const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#8a97a4"
+            placeholderTextColor="#718079"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -64,18 +66,18 @@ const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
           <TextInput
             style={styles.input}
             placeholder="Password (min 6 characters)"
-            placeholderTextColor="#8a97a4"
+            placeholderTextColor="#718079"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
 
           <TouchableOpacity style={styles.primaryButton} onPress={handleRegister} disabled={loading}>
-            <Text style={styles.primaryButtonText}>{loading ? 'Creating...' : 'Register'}</Text>
+            <Text style={styles.primaryButtonText}>{loading ? 'Creating...' : 'Create account'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={onBackToLogin} disabled={loading}>
-            <Text style={styles.secondaryButtonText}>Back to Login</Text>
+            <Text style={styles.secondaryButtonText}>Back to sign in</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -86,71 +88,75 @@ const RegisterScreen = ({ onRegisterSuccess, onBackToLogin }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#edf4fb',
+    backgroundColor: '#F7F8F5',
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#edf4fb',
+    backgroundColor: '#F7F8F5',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 34,
   },
   card: {
     width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
+    maxWidth: 430,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E1E7E0',
     padding: 22,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.14,
+    shadowColor: '#1C3E31',
+    shadowOpacity: 0.06,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
+    elevation: 2,
   },
   title: {
     fontSize: 30,
     lineHeight: 36,
     fontWeight: '900',
-    color: '#0a4b70',
+    color: '#193D31',
   },
   subtitle: {
     marginTop: 8,
     marginBottom: 18,
-    color: '#4c6d82',
+    color: '#53645A',
     fontSize: 17,
     lineHeight: 24,
     fontWeight: '700',
   },
   label: {
-    color: '#12354d',
-    fontSize: 17,
-    lineHeight: 23,
+    color: '#193D31',
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '900',
     marginBottom: 7,
   },
   input: {
-    minHeight: 60,
-    borderWidth: 2,
-    borderColor: '#d4e1ec',
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: '#E1E7E0',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12,
-    fontSize: 18,
-    color: '#12354d',
-    backgroundColor: '#f9fcff',
+    fontSize: 16,
+    color: '#193D31',
+    backgroundColor: '#FFFFFF',
     fontWeight: '700',
   },
   primaryButton: {
     minHeight: 62,
     marginTop: 6,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     borderRadius: 18,
     paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 18,
   },
@@ -158,14 +164,14 @@ const styles = StyleSheet.create({
     minHeight: 60,
     marginTop: 10,
     borderWidth: 2,
-    borderColor: '#1f6894',
+    borderColor: '#275C4B',
     borderRadius: 18,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: '#1f6894',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 17,
   },

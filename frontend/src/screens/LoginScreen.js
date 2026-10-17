@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { authService } from '../services/authService';
-
-const elderMedsLogo = require('../../assets/logo.png');
+import BrandLockup from '../components/BrandLockup';
 
 const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
   const [email, setEmail] = useState('');
@@ -34,19 +33,17 @@ const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.logoWrap}>
-          <Image source={elderMedsLogo} style={styles.logo} resizeMode="contain" />
-        </View>
+        <BrandLockup />
 
         <View style={styles.card}>
-          <Text style={styles.title}>Sign in</Text>
+          <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Use your account details to continue medicine care.</Text>
 
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
             placeholder="you@example.com"
-            placeholderTextColor="#8a97a4"
+            placeholderTextColor="#718079"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -62,7 +59,7 @@ const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
             <TextInput
               style={[styles.input, styles.passwordInput]}
               placeholder="Enter password"
-              placeholderTextColor="#8a97a4"
+              placeholderTextColor="#718079"
               secureTextEntry={!showPassword}
               value={password}
               onChangeText={setPassword}
@@ -86,11 +83,11 @@ const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
           </View>
 
           <TouchableOpacity style={[styles.primaryButton, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
-            <Text style={styles.primaryButtonText}>{loading ? 'Signing in...' : 'Login'}</Text>
+            <Text style={styles.primaryButtonText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={onNavigateRegister} disabled={loading}>
-            <Text style={styles.secondaryButtonText}>Create Account</Text>
+            <Text style={styles.secondaryButtonText}>Create an account</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -101,7 +98,7 @@ const LoginScreen = ({ onLoginSuccess, onNavigateRegister }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
   },
   container: {
     flexGrow: 1,
@@ -123,33 +120,33 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 430,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderWidth: 1,
+    borderColor: '#E1E7E0',
     padding: 22,
-    shadowColor: '#0f4f7a',
-    shadowOpacity: 0.14,
+    shadowColor: '#1C3E31',
+    shadowOpacity: 0.06,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
+    elevation: 2,
   },
   title: {
     fontSize: 30,
     lineHeight: 36,
     fontWeight: '900',
-    color: '#12354d',
+    color: '#193D31',
   },
   subtitle: {
     marginTop: 8,
     marginBottom: 20,
-    color: '#4c6d82',
+    color: '#53645A',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
   },
   label: {
-    color: '#12354d',
+    color: '#193D31',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '900',
@@ -158,14 +155,14 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 54,
     borderWidth: 2,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 0,
     marginBottom: 14,
     fontSize: 16,
-    color: '#12354d',
-    backgroundColor: '#f9fcff',
+    color: '#193D31',
+    backgroundColor: '#FFFFFF',
     fontWeight: '700',
   },
   passwordInputWrap: {
@@ -183,7 +180,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -199,7 +196,7 @@ const styles = StyleSheet.create({
     height: 15,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#1f6894',
+    borderColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -207,24 +204,24 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
   },
   passwordEyeSlash: {
     position: 'absolute',
     width: 28,
     height: 2,
     borderRadius: 1,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     transform: [{ rotate: '45deg' }],
   },
   primaryButton: {
     minHeight: 56,
     marginTop: 4,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0f4f7a',
+    shadowColor: '#1C3E31',
     shadowOpacity: 0.18,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
@@ -234,7 +231,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 16,
   },
@@ -242,13 +239,13 @@ const styles = StyleSheet.create({
     minHeight: 54,
     marginTop: 12,
     borderWidth: 2,
-    borderColor: '#1f6894',
+    borderColor: '#275C4B',
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: '#1f6894',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 15,
   },

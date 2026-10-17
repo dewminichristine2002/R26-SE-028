@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
 
@@ -249,13 +251,18 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backIcon}>‹</Text>
+        <TouchableOpacity style={styles.backButton} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to add medicine options">
+          <Ionicons name="arrow-back" size={25} color="#275C4B" />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>💊 Add Medicine</Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerTitleRow}>
+          <Ionicons name="medkit-outline" size={23} color="#F8D978" />
+          <Text style={[styles.headerTitle, { fontSize: Math.min(22 * textScale, 25), lineHeight: 30 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>Add Medicine</Text>
+        </View>
+        <View style={styles.accountActionsWrap}>
+          <HeaderAccountActions />
+        </View>
       </View>
 
       <View style={styles.helperCard}>
@@ -478,63 +485,69 @@ const ManualEntryScreen = ({ onBack, initialData, onSaved, reminderTextScale = 1
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
-    paddingHorizontal: 14,
-    paddingTop: 26,
-    paddingBottom: 28,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    backgroundColor: '#F7F8F5',
+    paddingHorizontal: 18,
+    paddingTop: 22,
+    paddingBottom: 110,
   },
+  // Compact, single-row header matching the ElderMeds Add Medicine reference.
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 58,
-    borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    minHeight: 76,
+    borderRadius: 26,
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
-    marginBottom: 14,
+    paddingVertical: 10,
+    marginBottom: 22,
     borderWidth: 2,
-    borderColor: '#f4cf75',
-    shadowColor: '#20382f',
+    borderColor: '#F4CF75',
+    shadowColor: '#20382F',
     shadowOpacity: 0.2,
     shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
+    shadowOffset: { width: 0, height: 6 },
     elevation: 5,
   },
   backButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#fff4c6',
+    flexShrink: 0,
   },
-  backIcon: {
-    fontSize: 32,
-    lineHeight: 36,
-    color: '#2f5d50',
-    marginTop: -3,
-    fontWeight: '900',
+  headerTitleRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
   },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 22,
-    lineHeight: 28,
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: '900',
-    paddingHorizontal: 8,
+    marginLeft: 5,
+    flexShrink: 1,
+    textAlign: 'center',
+  },
+  accountActionsWrap: {
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerSpacer: {
-    width: 46,
-    height: 46,
+    width: 50,
   },
   helperCard: {
     borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderWidth: 1,
+    borderColor: '#CAE4D6',
+    backgroundColor: '#EAF7F0',
     padding: 16,
     marginBottom: 16,
     flexDirection: 'row',
@@ -545,7 +558,7 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 20,
     backgroundColor: '#f8d978',
-    color: '#2d241d',
+    color: '#193D31',
     fontSize: 28,
     fontWeight: '900',
     textAlign: 'center',
@@ -558,31 +571,31 @@ const styles = StyleSheet.create({
   helperTitle: {
     fontSize: 22,
     lineHeight: 28,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   helperText: {
     marginTop: 4,
     fontSize: 16,
     lineHeight: 22,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '700',
   },
   fieldLabel: {
     fontSize: 17,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
     marginBottom: 8,
   },
   input: {
     minHeight: 56,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#CAE4D6',
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
     fontSize: 15,
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '800',
   },
   loadingBox: {
@@ -600,7 +613,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 2,
     borderColor: '#a8dbc8',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
   suggestionItem: {
@@ -647,8 +660,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
@@ -677,7 +690,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   colorChipActive: {
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
     backgroundColor: '#e9f7f1',
   },
   colorDot: {
@@ -700,8 +713,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     padding: 14,
   },
   stepHeaderRow: {
@@ -714,7 +727,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 14,
     backgroundColor: '#f8d978',
-    color: '#2d241d',
+    color: '#193D31',
     fontSize: 18,
     lineHeight: 40,
     fontWeight: '900',
@@ -725,15 +738,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     lineHeight: 25,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   miniField: {
     width: '100%',
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#f7efe4',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginBottom: 10,
@@ -769,7 +782,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#f4cf75',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     padding: 14,
   },
   scheduleTitle: {
@@ -819,16 +832,16 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginRight: 8,
     alignItems: 'center',
   },
   chipButtonActive: {
-    backgroundColor: '#2f5d50',
-    borderColor: '#2f5d50',
+    backgroundColor: '#275C4B',
+    borderColor: '#275C4B',
   },
   chipButtonText: {
     color: '#728495',
@@ -850,15 +863,15 @@ const styles = StyleSheet.create({
     width: '48.5%',
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
   },
   mealButtonActive: {
     backgroundColor: '#e9f7f1',
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
   },
   mealButtonText: {
     fontSize: 11,
@@ -866,14 +879,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mealButtonTextActive: {
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   howSection: {
     marginTop: 14,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     padding: 14,
   },
   howSectionTitle: {
@@ -891,14 +904,14 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   howButtonActive: {
-    borderColor: '#2f5d50',
-    backgroundColor: '#2f5d50',
+    borderColor: '#275C4B',
+    backgroundColor: '#275C4B',
   },
   howButtonText: {
     color: '#697988',
@@ -913,7 +926,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 2,
     borderColor: '#b9d4f2',
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -939,8 +952,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   finishButtonEnabled: {
-    backgroundColor: '#2f5d50',
-    borderColor: '#2f5d50',
+    backgroundColor: '#275C4B',
+    borderColor: '#275C4B',
   },
   finishButtonText: {
     color: '#9ba7b4',

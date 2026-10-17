@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import {
   ActivityIndicator,
   Alert,
@@ -172,7 +173,7 @@ const AssistantProgressCard = ({ progressIndex }) => {
       </View>
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
-          <ActivityIndicator size="small" color="#2f6654" />
+          <ActivityIndicator size="small" color="#275C4B" />
           <Text style={styles.progressTitle}>{activeStage}</Text>
         </View>
         <View style={styles.progressTrack}>
@@ -777,6 +778,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
               {isCaregiver ? "Ask me anything about the elder's care." : 'Ask me anything about your health.'}
             </Text>
           </View>
+          <HeaderAccountActions />
         </View>
       </View>
 
@@ -954,7 +956,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
 
             {loadingHistory ? (
               <View style={styles.historyLoading}>
-                <ActivityIndicator size="small" color="#2f6654" />
+                <ActivityIndicator size="small" color="#275C4B" />
                 <Text style={styles.historyLoadingText}>Loading your chats\u2026</Text>
               </View>
             ) : null}
@@ -1016,7 +1018,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
                         </Text>
                       </View>
                       {isLoading ? (
-                        <ActivityIndicator size="small" color="#2f6654" />
+                        <ActivityIndicator size="small" color="#275C4B" />
                       ) : null}
                     </Pressable>
 
@@ -1122,14 +1124,14 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7efe4' },
+  container: { flex: 1, backgroundColor: '#F7F8F5' },
   header: {
     paddingTop: 34,
     paddingHorizontal: 18,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eadfcd',
-    backgroundColor: '#f7efe4',
+    borderBottomColor: '#E1E7E0',
+    backgroundColor: '#F7F8F5',
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -1148,7 +1150,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     marginLeft: 8,
     borderWidth: 1,
     borderColor: '#c6ddce',
@@ -1160,7 +1162,7 @@ const styles = StyleSheet.create({
   },
   headerPillIcon: { fontSize: 16, marginRight: 6 },
   headerPillText: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 16,
   },
@@ -1170,18 +1172,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#E1E7E0',
   },
-  backButtonText: { color: '#2f6654', fontWeight: '900', fontSize: 18 },
+  backButtonText: { color: '#275C4B', fontWeight: '900', fontSize: 18 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
     minHeight: 94,
     borderRadius: 18,
-    backgroundColor: '#2f6654',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
     borderColor: '#e5c44f',
     paddingHorizontal: 14,
@@ -1206,20 +1208,20 @@ const styles = StyleSheet.create({
   title: { fontSize: 23, lineHeight: 28, fontWeight: '900', color: '#FFFFFF' },
   subtitle: { fontSize: 15, color: '#ecfff6', marginTop: 2, lineHeight: 21, fontWeight: '700' },
 
-  scroll: { flex: 1, backgroundColor: '#f7efe4' },
+  scroll: { flex: 1, backgroundColor: '#F7F8F5' },
   scrollContent: { paddingVertical: 16, paddingBottom: 26 },
   emptyState: { padding: 20 },
   emptyEmoji: { fontSize: 48, textAlign: 'center', marginBottom: 6 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#27231f',
+    color: '#193D31',
     textAlign: 'center',
     marginBottom: 8,
   },
   emptyHint: {
     fontSize: 18,
-    color: '#5e5143',
+    color: '#53645A',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 27,
@@ -1230,7 +1232,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 64,
     paddingVertical: 16,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     marginBottom: 12,
     borderWidth: 1,
@@ -1245,7 +1247,7 @@ const styles = StyleSheet.create({
   suggestionEmoji: { fontSize: 22, marginRight: 12 },
   suggestionText: {
     flex: 1,
-    color: '#18352f',
+    color: '#193D31',
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '800',
@@ -1288,7 +1290,7 @@ const styles = StyleSheet.create({
   progressCard: {
     flex: 1,
     maxWidth: '84%',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#b8ead6',
     borderRadius: 18,
@@ -1303,7 +1305,7 @@ const styles = StyleSheet.create({
   progressTitle: {
     flex: 1,
     marginLeft: 10,
-    color: '#18352f',
+    color: '#193D31',
     fontSize: 17,
     lineHeight: 23,
     fontWeight: '900',
@@ -1311,14 +1313,14 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 7,
     borderRadius: 999,
-    backgroundColor: '#eadfcd',
+    backgroundColor: '#E1E7E0',
     marginTop: 12,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#2f6654',
+    backgroundColor: '#275C4B',
   },
   progressStepList: {
     marginTop: 12,
@@ -1337,12 +1339,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#fff8eb',
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#E1E7E0',
     marginRight: 9,
   },
   progressStepDotActive: {
-    backgroundColor: '#2f6654',
-    borderColor: '#2f6654',
+    backgroundColor: '#275C4B',
+    borderColor: '#275C4B',
   },
   progressStepDotDone: {
     backgroundColor: '#168464',
@@ -1365,7 +1367,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressStepTextActive: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontWeight: '900',
   },
   progressStepTextDone: {
@@ -1374,9 +1376,9 @@ const styles = StyleSheet.create({
   },
 
   followUpPanel: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#eadfcd',
+    borderTopColor: '#E1E7E0',
   },
   followUpHeader: {
     minHeight: 48,
@@ -1388,7 +1390,7 @@ const styles = StyleSheet.create({
   followUpHeaderPressed: { backgroundColor: '#f0e4d4' },
   followUpHeaderText: {
     flex: 1,
-    color: '#18352f',
+    color: '#193D31',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1398,7 +1400,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginRight: 10,
     backgroundColor: '#e3f8ee',
-    color: '#2f6654',
+    color: '#275C4B',
     textAlign: 'center',
     textAlignVertical: 'center',
     fontSize: 15,
@@ -1406,7 +1408,7 @@ const styles = StyleSheet.create({
     paddingTop: 3,
   },
   followUpHeaderArrow: {
-    color: '#2f6654',
+    color: '#275C4B',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1420,16 +1422,16 @@ const styles = StyleSheet.create({
   followUpChip: {
     flexShrink: 1,
     maxWidth: '48%',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#2f6654',
+    borderColor: '#275C4B',
     paddingHorizontal: 14,
     minHeight: 52,
     paddingVertical: 12,
     borderRadius: 22,
   },
   followUpChipPressed: { backgroundColor: '#e3f8ee' },
-  followUpText: { color: '#2f6654', fontWeight: '900', fontSize: 16, lineHeight: 21 },
+  followUpText: { color: '#275C4B', fontWeight: '900', fontSize: 16, lineHeight: 21 },
 
   errorBar: {
     backgroundColor: '#FEE2E2',
@@ -1446,9 +1448,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 14,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#eadfcd',
+    borderTopColor: '#E1E7E0',
   },
   micButton: {
     width: 64,
@@ -1459,7 +1461,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
     borderWidth: 2,
-    borderColor: '#2f6654',
+    borderColor: '#275C4B',
   },
   micButtonActive: {
     backgroundColor: '#FEE2E2',
@@ -1469,7 +1471,7 @@ const styles = StyleSheet.create({
   micLabel: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#2f6654',
+    color: '#275C4B',
     marginTop: 2,
     letterSpacing: 0,
   },
@@ -1482,17 +1484,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: '#fff8eb',
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#E1E7E0',
     borderRadius: 28,
     fontSize: 18,
-    color: '#27231f',
+    color: '#193D31',
     lineHeight: 25,
   },
   sendButton: {
     marginLeft: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#2f6654',
+    backgroundColor: '#275C4B',
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1510,7 +1512,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
@@ -1524,7 +1526,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  modalTitle: { fontSize: 24, fontWeight: '900', color: '#27231f' },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: '#193D31' },
   modalSubtitle: { fontSize: 16, lineHeight: 22, color: '#6b5a49', marginTop: 2 },
   modalCloseButton: {
     paddingHorizontal: 16,
@@ -1532,7 +1534,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0e4d4',
     borderRadius: 999,
   },
-  modalCloseText: { color: '#2f6654', fontWeight: '900', fontSize: 16 },
+  modalCloseText: { color: '#275C4B', fontWeight: '900', fontSize: 16 },
 
   newChatRow: {
     flexDirection: 'row',
@@ -1544,8 +1546,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#b8ead6',
   },
-  newChatIcon: { fontSize: 20, color: '#2f6654', marginRight: 12 },
-  newChatText: { color: '#2f6654', fontWeight: '800', fontSize: 17 },
+  newChatIcon: { fontSize: 20, color: '#275C4B', marginRight: 12 },
+  newChatText: { color: '#275C4B', fontWeight: '800', fontSize: 17 },
 
   historyLoading: {
     flexDirection: 'row',
@@ -1553,7 +1555,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
   },
-  historyLoadingText: { marginLeft: 10, color: '#5e5143', fontSize: 16, fontWeight: '700' },
+  historyLoadingText: { marginLeft: 10, color: '#53645A', fontSize: 16, fontWeight: '700' },
   historyErrorText: {
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -1571,7 +1573,7 @@ const styles = StyleSheet.create({
   historyEmptyTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#27231f',
+    color: '#193D31',
     marginBottom: 4,
   },
   historyEmptyText: {
@@ -1587,12 +1589,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff8eb',
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#eadfcd',
+    borderColor: '#E1E7E0',
     overflow: 'hidden',
   },
   historyRowCurrent: {
     backgroundColor: '#e3f8ee',
-    borderColor: '#2f6654',
+    borderColor: '#275C4B',
     borderWidth: 2,
   },
   historyRowTop: {
@@ -1607,11 +1609,11 @@ const styles = StyleSheet.create({
   historyRowTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#27231f',
+    color: '#193D31',
   },
   historyRowSnippet: {
     fontSize: 16,
-    color: '#5e5143',
+    color: '#53645A',
     marginTop: 4,
     lineHeight: 23,
   },
@@ -1624,8 +1626,8 @@ const styles = StyleSheet.create({
   historyActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#eadfcd',
-    backgroundColor: '#fffdf8',
+    borderTopColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
   },
   historyActionBtn: {
     flex: 1,
@@ -1636,14 +1638,14 @@ const styles = StyleSheet.create({
   },
   historyRenameBtn: {
     borderRightWidth: 1,
-    borderRightColor: '#eadfcd',
+    borderRightColor: '#E1E7E0',
   },
   historyDeleteBtn: {},
   historyActionIcon: { fontSize: 16, marginRight: 6 },
   historyActionText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#2f6654',
+    color: '#275C4B',
   },
   historyDeleteText: { color: '#B91C1C' },
 
@@ -1657,7 +1659,7 @@ const styles = StyleSheet.create({
   renameDialog: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 22,
     shadowColor: '#4e3f31',
@@ -1670,7 +1672,7 @@ const styles = StyleSheet.create({
   renameTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#27231f',
+    color: '#193D31',
     textAlign: 'center',
   },
   renameSubtitle: {
@@ -1688,7 +1690,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 17,
-    color: '#27231f',
+    color: '#193D31',
     backgroundColor: '#fff8eb',
   },
   renameButtonRow: {
@@ -1709,9 +1711,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0e4d4',
     marginRight: 8,
   },
-  renameCancelText: { color: '#5e5143', fontWeight: '700', fontSize: 16 },
+  renameCancelText: { color: '#53645A', fontWeight: '700', fontSize: 16 },
   renameSaveButton: {
-    backgroundColor: '#2f6654',
+    backgroundColor: '#275C4B',
     marginLeft: 8,
   },
   renameSaveButtonDisabled: { backgroundColor: '#a5aa9c' },

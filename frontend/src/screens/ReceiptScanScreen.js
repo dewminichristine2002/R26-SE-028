@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { receiptOcrService } from '../services/receiptOcrService';
 import { medicationService } from '../services/medicationService';
 
@@ -273,11 +274,25 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>📷 Scan Receipt</Text>
-        <View style={styles.headerSpacer} />
+        <Text
+          style={[styles.headerTitle, { fontSize: 19 * textScale }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          🧾 Scan Receipt
+        </Text>
+        <View style={styles.accountActionsWrap}>
+          <HeaderAccountActions />
+        </View>
       </View>
 
       <View style={styles.scanHelpCard}>
@@ -424,63 +439,61 @@ const ReceiptScanScreen = ({ onBack, onDetected, onDetectedMany, initialDetected
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
-    paddingHorizontal: 14,
-    paddingTop: 26,
-    paddingBottom: 28,
+    backgroundColor: '#F5FAF8',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 58,
-    borderRadius: 22,
-    backgroundColor: '#2f5d50',
-    paddingHorizontal: 10,
-    marginBottom: 14,
+    backgroundColor: '#275C4B',
+    borderRadius: 28,
     borderWidth: 2,
-    borderColor: '#f4cf75',
-    shadowColor: '#20382f',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
+    borderColor: '#F4CF75',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minHeight: 78,
+    marginBottom: 24,
     elevation: 5,
+    shadowColor: '#20382F',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
   backButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#fff4c6',
   },
   backText: {
-    fontSize: 32,
-    lineHeight: 36,
-    color: '#2f5d50',
-    marginTop: -3,
-    fontWeight: '900',
+    fontSize: 42,
+    lineHeight: 48,
+    fontWeight: '700',
+    color: '#275C4B',
+    marginTop: -4,
   },
-  title: {
+  headerTitle: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '900',
-    color: '#ffffff',
-    paddingHorizontal: 8,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    marginHorizontal: 6,
+    flexShrink: 1,
   },
-  headerSpacer: {
-    width: 46,
-    height: 46,
+  accountActionsWrap: {
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scanHelpCard: {
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#DCE9E3',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     marginBottom: 14,
     flexDirection: 'row',
@@ -490,7 +503,7 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 19,
-    backgroundColor: '#f8d978',
+    backgroundColor: '#E5F6EE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -504,12 +517,12 @@ const styles = StyleSheet.create({
   scanHelpTitle: {
     fontSize: 21,
     lineHeight: 27,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   subtitle: {
     marginTop: 3,
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
@@ -521,13 +534,13 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#216B58',
     borderRadius: 18,
-    minHeight: 66,
+    minHeight: 78,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#f4cf75',
+    borderColor: '#2D806B',
   },
   primaryButtonText: {
     color: '#ffffff',
@@ -536,16 +549,16 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
     borderWidth: 2,
     borderRadius: 18,
-    minHeight: 66,
+    minHeight: 78,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
   },
   secondaryButtonText: {
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     fontSize: 12,
   },
@@ -554,10 +567,10 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   loadingCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#DCE9E3',
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -569,10 +582,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   previewCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#DCE9E3',
     padding: 12,
     marginBottom: 12,
   },
@@ -588,7 +601,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecf1f5',
   },
   rawTextCard: {
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F5FAF8',
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#b9d4f2',
@@ -606,13 +619,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#b9d4f2',
   },
   rawTextTitle: {
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '900',
     fontSize: 18,
   },
   rawTextBadge: {
     fontSize: 11,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     backgroundColor: '#e9f7f1',
     paddingHorizontal: 10,
@@ -631,19 +644,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#d6e7f7',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   rawTextBody: {
-    color: '#24352f',
+    color: '#193D31',
     fontSize: 15,
     lineHeight: 24,
     fontWeight: '700',
     letterSpacing: 0,
   },
   detectedListCard: {
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F5FAF8',
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#b9d4f2',
@@ -669,7 +682,7 @@ const styles = StyleSheet.create({
   fillAllButton: {
     flex: 1,
     minHeight: 58,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#216B58',
     borderRadius: 18,
     paddingHorizontal: 10,
     paddingVertical: 9,
@@ -686,8 +699,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 58,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#DCE9E3',
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     paddingHorizontal: 10,
     paddingVertical: 9,
@@ -707,18 +720,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   detectedButtonIconDark: {
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 20,
     lineHeight: 23,
     fontWeight: '900',
   },
   detectedItemCard: {
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#DCE9E3',
     borderRadius: 20,
     padding: 12,
     marginBottom: 10,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
   },
   detectedName: {
     color: '#263845',
@@ -734,7 +747,7 @@ const styles = StyleSheet.create({
   },
   detectedInput: {
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#DCE9E3',
     borderRadius: 16,
     backgroundColor: '#ffffff',
     minHeight: 48,
@@ -762,7 +775,7 @@ const styles = StyleSheet.create({
   useEntryButton: {
     marginTop: 8,
     flex: 1,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#216B58',
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 11,

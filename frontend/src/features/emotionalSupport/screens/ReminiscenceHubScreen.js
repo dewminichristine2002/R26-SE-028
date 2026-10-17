@@ -1,4 +1,5 @@
 import React from 'react';
+import HeaderAccountActions from '../../../components/HeaderAccountActions';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card, WellnessBackdrop } from '../components/WellnessUI';
 import { colors, screenInsets, spacing, type } from '../theme';
@@ -37,9 +38,7 @@ export default function ReminiscenceHubScreen({ navigation }) {
   return (
     <SafeAreaView style={s.safe}>
       <WellnessBackdrop variant="warm" />
-      <ScrollView contentContainerStyle={s.container}>
-        <View style={s.header}>
-          <View style={s.headerTop}>
+      <View style={s.headerTop}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Go back"
@@ -49,7 +48,10 @@ export default function ReminiscenceHubScreen({ navigation }) {
               <Text style={s.backText}>{'\u2039'}</Text>
             </Pressable>
             <Text style={s.eyebrow}>MEMORY CORNER</Text>
-          </View>
+            <HeaderAccountActions />
+      </View>
+      <ScrollView contentContainerStyle={s.container}>
+        <View style={s.header}>
           <Text accessibilityRole="header" style={s.screenTitle}>Remember Something Nice</Text>
           <Text style={s.subtitle}>Enjoy meaningful moments at your own pace.</Text>
         </View>
@@ -82,12 +84,12 @@ export default function ReminiscenceHubScreen({ navigation }) {
 
 const s = StyleSheet.create({
   safe: { backgroundColor: colors.background, flex: 1 },
-  container: { paddingHorizontal: spacing.lg, paddingTop: screenInsets.top, paddingBottom: screenInsets.bottom + spacing.lg },
+  container: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: screenInsets.bottom + spacing.lg },
   header: { marginBottom: spacing.lg },
-  headerTop: { alignItems: 'center', flexDirection: 'row', marginBottom: spacing.sm },
+  headerTop: { alignItems: 'center', flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: screenInsets.top, borderRadius: 22, borderWidth: 2, borderColor: '#F4CF75', backgroundColor: '#275C4B', padding: 10 },
   back: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, height: 44, justifyContent: 'center', marginRight: spacing.md, width: 44 },
   backText: { color: colors.primary, fontSize: 34, lineHeight: 38 },
-  eyebrow: { ...type.meta, color: colors.primary, letterSpacing: 1.1 },
+  eyebrow: { ...type.meta, color: '#FFFFFF', letterSpacing: 1.1, flex: 1 },
   screenTitle: { color: colors.text, fontSize: 27, fontWeight: '900', lineHeight: 34 },
   subtitle: { ...type.body, color: colors.secondary, marginTop: spacing.xs },
   options: { gap: spacing.md },

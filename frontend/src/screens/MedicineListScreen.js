@@ -12,6 +12,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import AgenticGlowCard from '../components/AgenticGlowCard';
 import AgenticScreenFrame from '../components/AgenticScreenFrame';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { intakeMonitoringService } from '../services/intakeMonitoringService';
 import { medicationService } from '../services/medicationService';
 import { reminderNotificationService } from '../services/reminderNotificationService';
@@ -362,8 +363,8 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1, highlight = null })
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backIcon}>‹</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]}>📋 Medicine List</Text>
-          <View style={styles.headerSpacer} />
+          <Text style={[styles.headerTitle, { fontSize: 22 * textScale, lineHeight: 28 * textScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Medicine List</Text>
+          <HeaderAccountActions />
         </View>
       </View>
 
@@ -674,17 +675,17 @@ const MedicineListScreen = ({ onBack, reminderTextScale = 1, highlight = null })
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 0,
     paddingBottom: 28,
   },
   staticHeaderWrap: {
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 14,
     paddingTop: 26,
   },
@@ -694,7 +695,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 58,
     borderRadius: 22,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     paddingHorizontal: 10,
     marginBottom: 14,
     borderWidth: 2,
@@ -709,7 +710,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -718,7 +719,7 @@ const styles = StyleSheet.create({
   backIcon: {
     fontSize: 32,
     lineHeight: 36,
-    color: '#2f5d50',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -737,9 +738,9 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     minHeight: 56,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     borderRadius: 18,
     paddingHorizontal: 12,
     marginBottom: 14,
@@ -753,7 +754,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     minHeight: 52,
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '800',
     paddingVertical: 0,
   },
@@ -771,7 +772,7 @@ const styles = StyleSheet.create({
   },
   totalMedicineCard: {
     minHeight: 78,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#f4cf75',
     borderRadius: 22,
@@ -788,22 +789,22 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   totalMedicineLabel: {
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '900',
   },
   totalMedicineSubText: {
     marginTop: 4,
-    color: '#74665b',
+    color: '#63736A',
     fontWeight: '700',
   },
   totalMedicineValue: {
     minWidth: 60,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     textAlign: 'right',
   },
   slotGroupCard: {
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     borderWidth: 2,
     borderColor: '#b9d4f2',
     borderRadius: 24,
@@ -819,7 +820,7 @@ const styles = StyleSheet.create({
   },
   slotGroupTitle: {
     flex: 1,
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '900',
     paddingRight: 10,
   },
@@ -827,7 +828,7 @@ const styles = StyleSheet.create({
     minWidth: 40,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     color: '#ffffff',
     fontWeight: '900',
     textAlign: 'center',
@@ -839,20 +840,20 @@ const styles = StyleSheet.create({
   },
   timingGroupTitle: {
     alignSelf: 'flex-start',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     borderRadius: 999,
-    color: '#2f5d50',
+    color: '#275C4B',
     fontWeight: '900',
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 8,
   },
   card: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     borderRadius: 22,
     padding: 14,
     marginBottom: 12,
@@ -881,14 +882,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 14,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
   },
   appearanceIconFrame: {
     width: 46,
     height: 46,
     borderRadius: 16,
-    backgroundColor: '#f7efe4',
+    backgroundColor: '#F7F8F5',
     borderWidth: 1,
     borderColor: '#d8c9b7',
     alignItems: 'center',
@@ -954,27 +955,27 @@ const styles = StyleSheet.create({
   medicineName: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#24352f',
+    color: '#193D31',
   },
   metaText: {
     marginTop: 4,
-    color: '#5d5045',
+    color: '#53645A',
     fontSize: 13,
     fontWeight: '800',
   },
   metaTextLight: {
     marginTop: 3,
-    color: '#74665b',
+    color: '#63736A',
     fontSize: 12,
     fontWeight: '700',
   },
   viewButton: {
     marginTop: 12,
     alignSelf: 'flex-start',
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
@@ -990,7 +991,7 @@ const styles = StyleSheet.create({
   detailPanel: {
     width: '100%',
     maxHeight: '88%',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#f4cf75',
@@ -1045,7 +1046,7 @@ const styles = StyleSheet.create({
   detailTitle: {
     flex: 1,
     fontSize: 18,
-    color: '#2d241d',
+    color: '#193D31',
     fontWeight: '900',
   },
   detailAppearanceRow: {
@@ -1066,7 +1067,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#ffffff',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     marginRight: 12,
   },
   detailAppearanceTextWrap: {
@@ -1085,7 +1086,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    color: '#5d5045',
+    color: '#53645A',
     fontWeight: '900',
     marginBottom: 6,
   },
@@ -1093,11 +1094,11 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     marginBottom: 12,
-    color: '#24352f',
+    color: '#193D31',
     fontWeight: '800',
   },
   fieldRow: {
@@ -1111,8 +1112,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     marginBottom: 12,
   },
@@ -1138,15 +1139,15 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 8,
     alignItems: 'center',
   },
   chipButtonActive: {
-    backgroundColor: '#2f5d50',
-    borderColor: '#2f5d50',
+    backgroundColor: '#275C4B',
+    borderColor: '#275C4B',
   },
   chipButtonDisabled: {
     opacity: 0.7,
@@ -1171,15 +1172,15 @@ const styles = StyleSheet.create({
     width: '48.5%',
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     paddingVertical: 10,
     marginBottom: 8,
     alignItems: 'center',
   },
   mealButtonActive: {
-    borderColor: '#2f5d50',
+    borderColor: '#275C4B',
     backgroundColor: '#e9f7f1',
   },
   mealButtonText: {
@@ -1188,13 +1189,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mealButtonTextActive: {
-    color: '#2f5d50',
+    color: '#275C4B',
   },
   howSection: {
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     marginBottom: 12,
   },
@@ -1212,14 +1213,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#eadcca',
-    backgroundColor: '#fffdf8',
+    borderColor: '#E1E7E0',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 12,
     alignItems: 'center',
   },
   howButtonActive: {
-    borderColor: '#2f5d50',
-    backgroundColor: '#2f5d50',
+    borderColor: '#275C4B',
+    backgroundColor: '#275C4B',
   },
   howButtonText: {
     color: '#5d7489',
@@ -1233,7 +1234,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 2,
     borderColor: '#b9d4f2',
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     padding: 12,
     marginBottom: 12,
   },
@@ -1252,7 +1253,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     minHeight: 54,
     borderRadius: 18,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1270,9 +1271,9 @@ const styles = StyleSheet.create({
     width: '48.5%',
     minHeight: 54,
     borderRadius: 18,
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#eadcca',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1284,7 +1285,7 @@ const styles = StyleSheet.create({
     width: '48.5%',
     minHeight: 54,
     borderRadius: 18,
-    backgroundColor: '#2f5d50',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
   },

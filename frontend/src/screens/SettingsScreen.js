@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { useTranslation } from '../i18n/useTranslation';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { languageService } from '../services/languageService';
 
-const SettingsScreen = ({ onBack, onLogout }) => {
+const SettingsScreen = ({ onBack }) => {
   const { t, i18n } = useTranslation();
   const availableLanguages = languageService.getAvailableLanguages();
 
@@ -37,8 +38,8 @@ const SettingsScreen = ({ onBack, onLogout }) => {
           >
             <Text style={styles.headerBackText}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('settings.title')}</Text>
-          <View style={styles.headerSpacer} />
+          <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('settings.title')}</Text>
+          <HeaderAccountActions />
         </View>
       </View>
 
@@ -71,11 +72,6 @@ const SettingsScreen = ({ onBack, onLogout }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
-        <TouchableOpacity style={[styles.settingItem, styles.logoutButton]} onPress={onLogout}>
-          <Text style={[styles.settingText, styles.logoutText]}>{t('settings.logout')}</Text>
-        </TouchableOpacity>
-      </View>
       </ScrollView>
     </View>
   );
@@ -84,25 +80,25 @@ const SettingsScreen = ({ onBack, onLogout }) => {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
   },
   staticHeaderWrap: {
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 16,
     paddingTop: 24,
   },
   headerRow: {
     minHeight: 60,
     borderRadius: 20,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#E1E7E0',
     paddingHorizontal: 10,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#0f4f7a',
+    shadowColor: '#193D31',
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
@@ -116,12 +112,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
   },
   headerBackText: {
     fontSize: 34,
     lineHeight: 38,
-    color: '#1f6894',
+    color: '#275C4B',
     marginTop: -3,
     fontWeight: '900',
   },
@@ -142,7 +138,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 32,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     flexGrow: 1,
   },
   title: {
@@ -155,10 +151,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#0f4f7a',
+    shadowColor: '#193D31',
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -168,21 +164,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 26,
     fontWeight: '900',
-    color: '#12354d',
+    color: '#193D31',
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#4c6d82',
+    color: '#53645A',
     fontWeight: '700',
     marginBottom: 12,
   },
   languageList: {
-    backgroundColor: '#f9fcff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     overflow: 'hidden',
   },
   languageItem: {
@@ -190,41 +186,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#d5eafa',
+    borderBottomColor: '#E1E7E0',
   },
   selectedLanguage: {
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
   },
   languageText: {
     fontSize: 16,
-    color: '#12354d',
+    color: '#193D31',
     fontWeight: '700',
   },
   selectedLanguageText: {
     fontWeight: '900',
-    color: '#1f6894',
+    color: '#275C4B',
   },
   settingItem: {
     minHeight: 58,
-    backgroundColor: '#f9fcff',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     justifyContent: 'center',
   },
   settingText: {
     fontSize: 16,
-    color: '#12354d',
+    color: '#193D31',
     fontWeight: '800',
-  },
-  logoutButton: {
-    backgroundColor: '#fff5f5',
-    borderColor: '#f3c7c7',
-  },
-  logoutText: {
-    color: '#d32f2f',
-    fontWeight: '900',
   },
 });
 

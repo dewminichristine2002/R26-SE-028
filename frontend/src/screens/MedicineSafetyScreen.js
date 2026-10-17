@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import * as expoModulesCore from 'expo-modules-core';
 import { allergyService } from '../services/allergyService';
 import { extractPrescriptionTextFromImage } from '../services/prescriptionOcrService';
@@ -1140,11 +1142,11 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Text style={styles.backIconText}>{'\u2039'}</Text>
+        <Ionicons name="arrow-back" size={25} color={COLORS.green} />
       </TouchableOpacity>
       <View style={styles.topBarTextWrap}>
         <View style={styles.topBarTitleRow}>
-          <View style={styles.topBarAccent} />
+          <Ionicons name="shield-checkmark-outline" size={22} color="#F8D978" style={styles.topBarAccent} />
           <Text
             style={styles.topBarTitle}
             numberOfLines={1}
@@ -1156,6 +1158,7 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
         </View>
         {subtitle ? <Text style={styles.topBarSubtitle}>{subtitle}</Text> : null}
       </View>
+      <HeaderAccountActions />
     </View>
   );
 
@@ -1711,9 +1714,13 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
         <View style={landingStyles.header}>
           <TouchableOpacity style={landingStyles.backButton} onPress={onBack}
             accessibilityRole="button" accessibilityLabel="Go back">
-            <View style={landingStyles.backChevron} />
+            <Ionicons name="arrow-back" size={25} color={COLORS.green} />
           </TouchableOpacity>
-          <Text style={landingStyles.headerTitle}>Medicine Safety</Text>
+          <View style={landingStyles.headerTitleRow}>
+            <Ionicons name="shield-checkmark-outline" size={22} color="#F8D978" />
+            <Text style={landingStyles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>Medicine Safety</Text>
+          </View>
+          <HeaderAccountActions />
         </View>
         <ScrollView contentContainerStyle={landingStyles.content} showsVerticalScrollIndicator={false}>
           <View style={landingStyles.hero}>
@@ -2484,12 +2491,12 @@ export default function MedicineSafetyScreen({ onBack, initialRoute = 'home' }) 
 
 // Match UnifiedDashboardScreen's palette and native system typography.
 const COLORS = {
-  bg: '#f7efe4',
-  surface: '#fffdf8',
+  bg: '#F7F8F5',
+  surface: '#FFFFFF',
   surfaceSoft: '#e3f8ee',
-  headerBg: '#2f6654',
-  green: '#2f6654',
-  greenDark: '#18352f',
+  headerBg: '#275C4B',
+  green: '#275C4B',
+  greenDark: '#193D31',
   greenSoft: '#e3f8ee',
   mint: '#b8ead6',
   blueSoft: '#eaf7ff',
@@ -2499,11 +2506,11 @@ const COLORS = {
   danger: '#a93447',
   dangerDark: '#8a2636',
   dangerSoft: '#fff1f4',
-  textDark: '#27231f',
-  textMuted: '#5e5143',
-  cardBorder: '#eadfcd',
-  divider: '#eadfcd',
-  white: '#fffdf8',
+  textDark: '#193D31',
+  textMuted: '#53645A',
+  cardBorder: '#E1E7E0',
+  divider: '#E1E7E0',
+  white: '#FFFFFF',
   tealGlow: '#b8ead6',
   sky: '#2576a6',
   shadow: '#7a674f',
@@ -2516,20 +2523,20 @@ const FONTS = { display: undefined, body: undefined, bodyBold: undefined };
 const landingStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.bg },
   header: {
-    backgroundColor: COLORS.bg, paddingHorizontal: 18, paddingTop: 30, paddingBottom: 16,
-    flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.green, borderRadius: 22, borderWidth: 2, borderColor: '#F4CF75',
+    marginHorizontal: 18, marginTop: 22, paddingHorizontal: 10,
+    shadowColor: '#20382F', shadowOpacity: 0.17, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 }, elevation: 4,
   },
   backButton: {
-    width: 48, height: 48, borderRadius: 999, backgroundColor: COLORS.surface,
-    borderWidth: 1, borderColor: COLORS.cardBorder, alignItems: 'center',
-    justifyContent: 'center', marginRight: 14,
+    width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.surface,
+    borderWidth: 1, borderColor: '#FFF4C6', alignItems: 'center',
+    justifyContent: 'center',
   },
-  backChevron: {
-    width: 13, height: 13, borderLeftWidth: 3, borderBottomWidth: 3,
-    borderColor: COLORS.green, transform: [{ rotate: '45deg' }], marginLeft: 5,
-  },
-  headerTitle: { flex: 1, fontSize: 22, lineHeight: 28, fontWeight: '900', color: COLORS.textDark },
+  headerTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  headerTitle: { color: '#FFFFFF', fontSize: 22, lineHeight: 28, fontWeight: '900', marginLeft: 7, flexShrink: 1 },
+  headerSpacer: { width: 50 },
   content: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 56, width: '100%', maxWidth: 600, alignSelf: 'center' },
   hero: {
     backgroundColor: COLORS.green, borderRadius: 22, borderWidth: 2,
@@ -2585,47 +2592,40 @@ const styles = StyleSheet.create({
   },
   topBar: {
     backgroundColor: COLORS.headerBg,
-    paddingTop: 26,
-    paddingBottom: 14,
-    paddingHorizontal: 20,
+    minHeight: 72,
+    marginHorizontal: 18,
+    marginTop: 22,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#e5c44f',
-    shadowColor: '#00110c',
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#F4CF75',
+    borderRadius: 22,
+    shadowColor: '#20382F',
+    shadowOpacity: 0.17,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
   },
   backIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#FFF4C6',
     backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  backIconText: {
-    color: COLORS.green,
-    fontSize: 36,
-    lineHeight: 39,
-    fontWeight: '400',
-  },
-  topBarTextWrap: { flex: 1 },
+  topBarTextWrap: { flex: 1, minWidth: 0 },
   topBarTitleRow: {
     alignItems: 'center',
     flexDirection: 'row',
   },
   topBarAccent: {
-    backgroundColor: COLORS.amber,
-    borderRadius: 3,
-    height: 28,
-    marginRight: 10,
-    width: 4,
+    marginRight: 8,
   },
   topBarTitle: {
     color: '#FFFFFF',
@@ -2633,9 +2633,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.2,
     fontFamily: FONTS.display,
+    flexShrink: 1,
   },
   topBarSubtitle: {
-    color: COLORS.textMuted,
+    color: '#E3F3E9',
     fontSize: 15,
     lineHeight: 21,
     marginTop: 6,

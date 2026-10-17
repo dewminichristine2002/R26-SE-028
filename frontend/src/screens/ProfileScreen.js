@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '../i18n/useTranslation';
+import HeaderAccountActions from '../components/HeaderAccountActions';
 import { userService } from '../services/userService';
 
-const ProfileScreen = ({ user, onBack, onOpenSettings, onProfileUpdated, onLogout }) => {
+const ProfileScreen = ({ user, onOpenSettings, onProfileUpdated }) => {
   const { t } = useTranslation();
   const [form, setForm] = useState({
     fullName: user?.fullName || '',
@@ -75,31 +77,18 @@ const ProfileScreen = ({ user, onBack, onOpenSettings, onProfileUpdated, onLogou
     <View style={styles.page}>
       <View style={styles.staticHeaderWrap}>
         <View style={styles.headerRow}>
+          <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{t('profile.myProfile')}</Text>
           <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel={t('profile.backToHome')}
-            accessibilityHint={t('profile.backToHomeHint')}
-          >
-            <Text style={styles.headerHomeText}>🏠</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('profile.myProfile')}</Text>
-          <TouchableOpacity
-            style={styles.headerIconButton}
+            style={styles.settingsButton}
             onPress={onOpenSettings}
+            hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel={t('profile.openSettings')}
             accessibilityHint={t('profile.openSettingsHint')}
           >
-            <View style={styles.settingsIconOuter}>
-              <View style={styles.settingsIconInner} />
-              <View style={[styles.settingsIconTooth, styles.settingsIconToothTop]} />
-              <View style={[styles.settingsIconTooth, styles.settingsIconToothRight]} />
-              <View style={[styles.settingsIconTooth, styles.settingsIconToothBottom]} />
-              <View style={[styles.settingsIconTooth, styles.settingsIconToothLeft]} />
-            </View>
+            <Ionicons name="settings-outline" size={19} color="#275C4B" />
           </TouchableOpacity>
+          <HeaderAccountActions />
         </View>
       </View>
 
@@ -180,9 +169,6 @@ const ProfileScreen = ({ user, onBack, onOpenSettings, onProfileUpdated, onLogou
           <Text style={styles.saveButtonText}>{saving ? t('profile.saving') : t('profile.saveProfile')}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-          <Text style={styles.logoutButtonText}>{t('profile.logout')}</Text>
-        </TouchableOpacity>
       </View>
       </ScrollView>
     </View>
@@ -192,32 +178,32 @@ const ProfileScreen = ({ user, onBack, onOpenSettings, onProfileUpdated, onLogou
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
   },
   container: {
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 32,
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     flexGrow: 1,
   },
   staticHeaderWrap: {
-    backgroundColor: '#eaf4ff',
+    backgroundColor: '#F7F8F5',
     paddingHorizontal: 16,
     paddingTop: 24,
   },
   headerRow: {
     minHeight: 60,
     borderRadius: 20,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#E1E7E0',
     paddingHorizontal: 14,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#0f4f7a',
+    shadowColor: '#193D31',
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
@@ -225,76 +211,32 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
     fontSize: 24,
     lineHeight: 30,
     color: '#ffffff',
     fontWeight: '900',
     paddingHorizontal: 8,
   },
-  headerIconButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#ffffff',
+  settingsButton: {
+    width: 33,
+    height: 33,
+    borderRadius: 11,
+    backgroundColor: '#F2FAF5',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#d5eafa',
-  },
-  headerHomeText: {
-    fontSize: 26,
-    lineHeight: 30,
-    color: '#1f6894',
-    marginTop: -2,
-    fontWeight: '900',
-  },
-  settingsIconOuter: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 3,
-    borderColor: '#1f6894',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  settingsIconInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#1f6894',
-  },
-  settingsIconTooth: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 2,
-    backgroundColor: '#1f6894',
-  },
-  settingsIconToothTop: {
-    top: -6,
-  },
-  settingsIconToothRight: {
-    right: -6,
-  },
-  settingsIconToothBottom: {
-    bottom: -6,
-  },
-  settingsIconToothLeft: {
-    left: -6,
   },
   profileHero: {
     minHeight: 120,
     borderRadius: 20,
     backgroundColor: '#ffffff',
     borderWidth: 2,
-    borderColor: '#b9d9f2',
+    borderColor: '#E1E7E0',
     padding: 18,
     marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0f4f7a',
+    shadowColor: '#193D31',
     shadowOpacity: 0.12,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 7 },
@@ -304,9 +246,9 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     borderWidth: 4,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -321,14 +263,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroName: {
-    color: '#12354d',
+    color: '#193D31',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   heroSubText: {
     marginTop: 6,
-    color: '#4c6d82',
+    color: '#53645A',
     fontSize: 16,
     lineHeight: 21,
     fontWeight: '800',
@@ -337,17 +279,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#d5eafa',
+    borderColor: '#E1E7E0',
     padding: 18,
     marginBottom: 18,
-    shadowColor: '#0f4f7a',
+    shadowColor: '#193D31',
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
   },
   sectionTitle: {
-    color: '#12354d',
+    color: '#193D31',
     fontSize: 21,
     lineHeight: 27,
     fontWeight: '900',
@@ -355,7 +297,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: '#1f6894',
+    color: '#275C4B',
     marginBottom: 10,
     marginTop: 14,
     fontWeight: '900',
@@ -369,46 +311,28 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 17,
     color: '#1a2332',
-    backgroundColor: '#f9fcff',
+    backgroundColor: '#FFFFFF',
     fontWeight: '800',
   },
   readOnlyInput: {
     backgroundColor: '#f0f4f8',
     color: '#5a6f80',
-    borderColor: '#b9d9f2',
+    borderColor: '#E1E7E0',
   },
   saveButton: {
     marginTop: 20,
     minHeight: 66,
     borderRadius: 14,
-    backgroundColor: '#1f6894',
+    backgroundColor: '#275C4B',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0f4f7a',
+    shadowColor: '#193D31',
     shadowOpacity: 0.2,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
   saveButtonText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 18,
-  },
-  logoutButton: {
-    marginTop: 12,
-    minHeight: 62,
-    borderRadius: 14,
-    backgroundColor: '#d32f2f',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#b71c1c',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  logoutButtonText: {
     color: '#fff',
     fontWeight: '900',
     fontSize: 18,
