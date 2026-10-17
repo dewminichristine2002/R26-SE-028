@@ -3,7 +3,7 @@ import { API_BASE_URL } from './apiConfig';
 import { getAuthHeaders } from './authService';
 
 export const healthAdviceService = {
-  async ask({ question, riskType, latestPrediction, conversationId } = {}) {
+  async ask({ question, riskType, latestPrediction, conversationId, signal } = {}) {
     const headers = await getAuthHeaders();
     const response = await axios.post(
       `${API_BASE_URL}/health-advice`,
@@ -13,7 +13,7 @@ export const healthAdviceService = {
         latestPrediction: latestPrediction || {},
         conversationId: conversationId || null,
       },
-      { headers }
+      { headers, signal }
     );
     return response.data;
   },

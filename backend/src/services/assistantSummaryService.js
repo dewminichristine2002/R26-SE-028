@@ -235,50 +235,48 @@ const emotionalTrendCard = async (userId, ctx) => {
     ),
   };
 
-  if (!(await tableExists('emotional_support_emotion_sessions'))) {
+  const [hasSessions, hasMoodCheckins, hasNarrativeLogs] = await Promise.all([
+    tableExists('emotional_support_emotion_sessions'),
+    tableExists('mood_checkins'),
+    tableExists('narrative_logs'),
+  ]);
+
+  const [sessions, moodCheckins, narrativeLogs] = await Promise.all([
+    hasSessions
+      ? pool.query(`SELECT detected_emotion, stress_score, risk_level FROM emotional_support_emotion_sessions WHERE elder_user_id = $1 AND created_at >= NOW() - INTERVAL '7 days'`, [userId])
+      : Promise.resolve({ rows: [] }),
+    hasMoodCheckins
+      ? pool.query(`SELECT mood_label FROM mood_checkins WHERE user_id = $1 AND logged_at >= NOW() - INTERVAL '7 days'`, [userId])
+      : Promise.resolve({ rows: [] }),
+    hasNarrativeLogs
+      ? pool.query(`SELECT detected_emotional_state, risk_level FROM narrative_logs WHERE user_id = $1 AND logged_at >= NOW() - INTERVAL '7 days'`, [userId])
+      : Promise.resolve({ rows: [] }),
+  ]);
+
+  const records = [
+    ...sessions.rows.map((row) => ({ emotion: row.detected_emotion, stress: safeNumber(row.stress_score), risk: row.risk_level })),
+    ...moodCheckins.rows.map((row) => ({ emotion: row.mood_label, stress: 0, risk: null })),
+    ...narrativeLogs.rows.map((row) => ({ emotion: row.detected_emotional_state, stress: 0, risk: row.risk_level })),
+  ].filter((row) => row.emotion);
+
+  if (records.length === 0) {
     return empty;
   }
 
-  const result = await pool.query(
-    `
-      WITH recent AS (
-        SELECT detected_emotion, stress_score, loneliness_score, risk_level
-        FROM emotional_support_emotion_sessions
-        WHERE elder_user_id = $1
-          AND created_at >= NOW() - INTERVAL '7 days'
-      ),
-      counts AS (
-        SELECT detected_emotion, COUNT(*) AS total
-        FROM recent
-        GROUP BY detected_emotion
-        ORDER BY total DESC, detected_emotion ASC
-        LIMIT 1
-      )
-      SELECT
-        (SELECT COUNT(*) FROM recent)::int AS total,
-        (SELECT detected_emotion FROM counts) AS dominant_emotion,
-        COALESCE((SELECT AVG(stress_score) FROM recent), 0)::float AS avg_stress,
-        COALESCE((SELECT AVG(loneliness_score) FROM recent), 0)::float AS avg_loneliness,
-        (SELECT COUNT(*) FROM recent WHERE risk_level = 'high')::int AS high_risk_count
-    `,
-    [userId]
-  );
-
-  const row = result.rows[0] || {};
-  if (!row.total || row.total === 0) {
-    return empty;
-  }
-
-  const dominant = row.dominant_emotion || 'neutral';
-  const avgStress = safeNumber(row.avg_stress);
-  const highRisk = safeNumber(row.high_risk_count);
+  const counts = records.reduce((acc, row) => {
+    acc[row.emotion] = (acc[row.emotion] || 0) + 1;
+    return acc;
+  }, {});
+  const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || 'neutral';
+  const avgStress = records.reduce((sum, row) => sum + row.stress, 0) / records.length;
+  const highRisk = records.filter((row) => row.risk === 'high').length;
 
   return {
     id: 'emotional_trend',
     title: 'Mood trend (7d)',
     headline: `Mostly ${dominant}`,
-    detail: `${row.total} check-in${row.total === 1 ? '' : 's'} \u00b7 avg stress ${(avgStress * 100).toFixed(0)}%${highRisk > 0 ? ` \u00b7 ${highRisk} high-risk` : ''}.`,
-    metric: { dominant, avgStress, highRisk, total: row.total },
+    detail: `${records.length} check-in${records.length === 1 ? '' : 's'} \u00b7 avg stress ${(avgStress * 100).toFixed(0)}%${highRisk > 0 ? ` \u00b7 ${highRisk} high-risk` : ''}.`,
+    metric: { dominant, avgStress, highRisk, total: records.length },
     severity: highRisk > 0 || avgStress > 0.7 ? 'warning' : 'good',
     chatPrompt: promptFor(
       ctx,

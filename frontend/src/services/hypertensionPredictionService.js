@@ -19,12 +19,12 @@ export const hypertensionPredictionService = {
     return response.data;
   },
 
-  async chat(message, conversationId = null) {
+  async chat(message, conversationId = null, signal) {
     const headers = await getAuthHeaders();
     const response = await axios.post(
       `${API_BASE_URL}/predict/hypertension/chat`,
       { message, conversationId },
-      { headers }
+      { headers, signal }
     );
     return response.data;
   },

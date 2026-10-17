@@ -15,12 +15,12 @@ export const assistantService = {
     return response.data;
   },
 
-  async chat({ message, conversationId } = {}) {
+  async chat({ message, conversationId, signal } = {}) {
     const headers = await getAuthHeaders();
     const response = await client.post(
       '/assistant/chat',
       { message, conversationId: conversationId || null },
-      { headers }
+      { headers, signal }
     );
     return response.data;
   },

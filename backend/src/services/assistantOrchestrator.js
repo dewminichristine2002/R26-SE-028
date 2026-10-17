@@ -98,6 +98,13 @@ const getCachedAssistantResponse = (userId, role, question) => {
     return null;
   }
 
+  // Do not replay the old generic summarizer failure after a newer fallback
+  // or answer-formatting fix has been deployed.
+  if (/could not summarise|couldn't summarise|retrieved some records/i.test(String(entry.response?.answer || ''))) {
+    assistantResponseCache.delete(key);
+    return null;
+  }
+
   return entry.response;
 };
 
@@ -107,6 +114,30 @@ const setCachedAssistantResponse = (userId, role, question, response) => {
     expiresAt: Date.now() + ASSISTANT_RESPONSE_CACHE_TTL_MS,
     response,
   });
+};
+
+const buildDeterministicAnswerFallback = (intent, rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) return '';
+  if (intent === 'caregiver_alert_explanation') {
+    const latest = rows[0] || {};
+    const message = String(latest.message || '').trim();
+    const summary = message
+      ? message.replace(/\s+/g, ' ').replace(/[.。]+$/, '')
+      : 'Recent check-ins suggest your elder may need some extra support';
+    return `This alert means: ${summary}. Check in gently, ask how your elder is feeling, and listen without pressure. Over the next few days, watch for changes in mood, sleep, appetite, or normal activities. If the sadness continues or gets worse, contact a healthcare professional.`;
+  }
+  if (!['saved_medicine_safety_risks', 'medicine_safety_lookup', 'allergy_risk_factors'].includes(intent)) return '';
+
+  const names = rows
+    .map((row) => `${row.medicine_name || 'Unknown medicine'} (${row.risk_level || 'flagged'})`)
+    .slice(0, 8);
+  const dangerous = rows.filter((row) => String(row.risk_level || '').toLowerCase() === 'dangerous').length;
+  const warning = rows.filter((row) => String(row.risk_level || '').toLowerCase() === 'warning').length;
+  const counts = [
+    dangerous ? `${dangerous} dangerous` : '',
+    warning ? `${warning} warning` : '',
+  ].filter(Boolean).join(' and ');
+  return `I found ${rows.length} saved medicine safety record${rows.length === 1 ? '' : 's'}${counts ? ` (${counts})` : ''}: ${names.join(', ')}. Please review the explanation in the safety record and check with your doctor or pharmacist before making medication changes.`;
 };
 
 const SENSITIVE_KEYS = new Set([
@@ -349,27 +380,25 @@ const isHypertensionAssistantRequest = (message, extractedValues) => {
 
 const normalizeMessageText = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 
+// A notification follow-up is a question about an existing record. It must
+// not be treated as a new emotional check-in for the caregiver or elder.
+const isCaregiverAlertExplanationRequest = (message) => {
+  const text = normalizeMessageText(message).toLowerCase();
+  return /\bcaregiver\s+alert\b/.test(text) &&
+    /\b(explain|means?|happen(?:ing)?|monitor|ask|next)\b/.test(text);
+};
+
 const isEmotionalSupportAgentRequest = (message) => {
   const text = normalizeMessageText(message).toLowerCase();
   if (!text) {
     return false;
   }
-
-  const caregiverSubjectPattern =
-    /\b(my\s+(?:mother|mom|father|parent)|mother's|mom's|father's|parent's)\b/i;
-  const caregiverWellbeingQuestion =
-    /\b(how\s+is|how\s+was|how\s+has|how\s+have|tell\s+me\s+about|show|check|what's|whats)\b[\s\S]{0,40}\b(my\s+(?:mother|mom|father|parent)|mother's|mom's|father's|parent's)\b[\s\S]{0,30}\b(these\s+days|recently|lately|today|now|more|mood|emotion|feelings?|feeling|stress|lonely|loneliness)\b/i.test(text);
-
-  if (caregiverSubjectPattern.test(text) && /\b(these\s+days|recently|lately|today|now)\b/i.test(text) && /\b(mood|emotion|feelings?|feeling|stress|lonely|loneliness|more)\b/i.test(text)) {
-    return true;
-  }
-
-  if (caregiverWellbeingQuestion) {
-    return true;
+  if (isCaregiverAlertExplanationRequest(text)) {
+    return false;
   }
 
   const historicalMoodQuestion =
-    /\b(how\s+has|how\s+was|trend|summary|history|recently|last\s+week|show|tell\s+me\s+about)\b[\s\S]{0,40}\b(mood|emotion|stress|lonely|loneliness)\b/i.test(text);
+    /\b(how\s+is|how\s+has|how\s+was|trend|summary|history|recently|last\s+week|today|show|tell\s+me\s+about)\b[\s\S]{0,40}\b(mood|emotion|stress|lonely|loneliness)\b/i.test(text);
   if (historicalMoodQuestion && !/\b(i\s+feel|i\s+am\s+feeling|i'm\s+feeling|my\s+elder\s+feels|my\s+parent\s+feels)\b/i.test(text)) {
     return false;
   }
@@ -1038,7 +1067,8 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     const reason = error.response?.data?.detail || error.message;
     const reply = rows.length === 0
       ? 'I could not find any matching records for that question.'
-      : `I retrieved ${rows.length} record${rows.length === 1 ? '' : 's'} but the AI assistant is not available to summarise them right now. Please try again shortly.`;
+      : buildDeterministicAnswerFallback(intent, rows)
+        || `I retrieved ${rows.length} record${rows.length === 1 ? '' : 's'} but the AI assistant is not available to summarise them right now. Please try again shortly.`;
     await appendMessage({
       conversationId: conversation,
       userId,
@@ -1060,7 +1090,9 @@ const handleChat = async ({ userId, role, message, conversationId }) => {
     };
   }
 
-  const finalAnswer = String(answerResult.answer || '').trim()
+  const deterministicFallback = buildDeterministicAnswerFallback(intent, rows);
+  const finalAnswer = deterministicFallback
+    || String(answerResult.answer || '').trim()
     || (rows.length === 0
       ? 'I could not find any matching records for that question.'
       : 'I retrieved your records but could not summarise them.');

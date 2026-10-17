@@ -320,7 +320,8 @@ const generateHypertensionSummaryWithLLM = async (result, userRole) => {
     ? result.factors.join(', ')
     : 'overall health indicators';
 
-  return `Based on the latest values, the system predicts a ${String(result.riskLevel || 'unknown').toLowerCase()} hypertension risk. The main contributing factors are ${factors}. This is for health risk awareness only and is not a medical diagnosis.`;
+  const subject = String(userRole || '').toLowerCase() === 'caregiver' ? 'your elder' : 'you';
+  return `This check suggests ${subject} has a ${String(result.riskLevel || 'unknown').toLowerCase()} blood pressure risk. The main things linked to this result are ${factors}. This is for awareness only, not a diagnosis.`;
 };
 
 const saveHypertensionPredictionResult = async (userId, result, inputSnapshot, conversationId = null) => {

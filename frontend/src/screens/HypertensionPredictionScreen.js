@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
 import hypertensionPredictionService from '../services/hypertensionPredictionService';
 import HeaderAccountActions from '../components/HeaderAccountActions';
 import healthAdviceService from '../services/healthAdviceService';
+import { SpeakButton, VoiceInputButton } from '../components/VoiceControls';
 
 const emptyForm = {
   age: '',
@@ -146,6 +147,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
   const [chatLoading, setChatLoading] = useState(false);
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [messages, setMessages] = useState([]);
+  const chatRequestRef = useRef(null);
 
   const loadContext = useCallback(async () => {
     setLoading(true);
@@ -297,6 +299,8 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
     setChatInput('');
     setMessages((prev) => [...prev, { role: 'user', text: message }]);
     setChatLoading(true);
+    const controller = new AbortController();
+    chatRequestRef.current = controller;
 
     try {
       if (isAdviceQuestion(message)) {
@@ -305,6 +309,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
           riskType: 'Hypertension',
           latestPrediction: latestPredictionContext,
           conversationId,
+          signal: controller.signal,
         });
         if (advice.conversationId) {
           setConversationId(advice.conversationId);
@@ -318,7 +323,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
         return;
       }
 
-      const response = await hypertensionPredictionService.chat(message, conversationId);
+      const response = await hypertensionPredictionService.chat(message, conversationId, controller.signal);
       if (response.conversationId) {
         setConversationId(response.conversationId);
       }
@@ -366,12 +371,22 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
         }]);
       }
     } catch (error) {
+      if (controller.signal.aborted || error?.code === 'ERR_CANCELED') return;
       const msg = error.response?.data?.error || error.message || 'Failed to process chat update';
       setMessages((prev) => [...prev, { role: 'assistant', text: `Sorry, ${msg}` }]);
     } finally {
-      setChatLoading(false);
+      if (chatRequestRef.current === controller) {
+        chatRequestRef.current = null;
+        setChatLoading(false);
+      }
     }
   }, [chatInput, chatLoading, conversationId, latestPredictionContext]);
+
+  const cancelChat = useCallback(() => {
+    chatRequestRef.current?.abort();
+    chatRequestRef.current = null;
+    setChatLoading(false);
+  }, []);
 
   const onAskAdvice = useCallback(async (prompt) => {
     if (adviceLoading) {
@@ -610,6 +625,7 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
             {chatMessages.map((message, index) => (
               <View key={`${message.role}-${index}`} style={[styles.chatBubble, message.role === 'user' ? styles.chatUser : styles.chatAssistant]}>
                 <Text style={styles.chatText}>{message.text}</Text>
+                {message.role === 'assistant' ? <SpeakButton text={message.text} style={styles.listenButton} /> : null}
                 {Array.isArray(message.sources) && message.sources.length ? (
                   <View style={styles.sourceBox}>
                     <Text style={styles.sourceTitle}>Sources</Text>
@@ -629,15 +645,19 @@ const HypertensionPredictionScreen = ({ user, onBack }) => {
             ))}
           </View>
           <View style={styles.chatInputRow}>
+            <VoiceInputButton onTranscript={(transcript) => setChatInput(transcript)} disabled={chatLoading} style={styles.voiceButton} />
             <TextInput
               value={chatInput}
               onChangeText={setChatInput}
               style={[styles.input, styles.chatInput]}
-              placeholder="Type your message"
+              placeholder="Type your question..."
               placeholderTextColor="#718079"
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
             />
-            <Pressable style={styles.sendButton} onPress={onSendChat} disabled={chatLoading}>
-              <Text style={styles.sendButtonText}>{chatLoading ? '...' : 'Send'}</Text>
+            <Pressable style={[styles.sendButton, chatLoading && styles.cancelButton]} onPress={chatLoading ? cancelChat : onSendChat} disabled={!chatLoading && !chatInput.trim()}>
+              <Text style={styles.sendButtonText}>{chatLoading ? 'Cancel' : 'Send'}</Text>
             </Pressable>
           </View>
         </View>
@@ -714,8 +734,11 @@ const styles = StyleSheet.create({
   safetyBox: { marginTop: 8, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, borderRadius: 16, padding: 9 },
   safetyText: { color: '#1E3A8A', fontSize: 13, fontWeight: '800', lineHeight: 18 },
   chatInputRow: { flexDirection: 'row', alignItems: 'center' },
-  chatInput: { flex: 1, marginRight: 10, minHeight: 54 },
-  sendButton: { backgroundColor: '#275C4B', borderRadius: 16, minHeight: 54, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  chatInput: { flex: 1, minWidth: 0, marginRight: 10, minHeight: 82, maxHeight: 120, paddingHorizontal: 18, paddingVertical: 16, textAlignVertical: 'top' },
+  voiceButton: { minHeight: 54, minWidth: 58, marginRight: 8, borderRadius: 27, borderWidth: 1.5, borderColor: '#275C4B', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F7EF' },
+  listenButton: { alignSelf: 'flex-start', marginTop: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: '#DDF5EC' },
+  cancelButton: { backgroundColor: '#A93447' },
+  sendButton: { backgroundColor: '#275C4B', borderRadius: 16, minHeight: 54, minWidth: 88, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
   sendButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
   disclaimer: { color: '#53645A', fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 2 },
   formIntro: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 14 },

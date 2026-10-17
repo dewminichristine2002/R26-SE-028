@@ -114,7 +114,7 @@ const UnifiedDashboardScreen = ({
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#275C4B" />
-            <Text style={styles.loadingText}>Getting your health summary\u2026</Text>
+            <Text style={styles.loadingText}>Loading your health summary</Text>
           </View>
         ) : null}
 
@@ -140,7 +140,13 @@ const UnifiedDashboardScreen = ({
           <>
             <Text style={styles.sectionHeading}>{sectionHeading}</Text>
             {summary.cards.map((card) => (
-              <SummaryCard key={card.id} card={card} />
+              <SummaryCard
+                key={card.id}
+                card={card}
+                onPress={() => askWithPrompt(
+                  card.chatPrompt || `Please explain my ${String(card.title || 'health summary').toLowerCase()} and what I should do next.`
+                )}
+              />
             ))}
           </>
         ) : null}

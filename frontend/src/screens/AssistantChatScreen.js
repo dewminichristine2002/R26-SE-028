@@ -41,21 +41,25 @@ try {
 }
 
 const ELDER_SUGGESTED_PROMPTS = [
+  'Which of my saved medicines are dangerous?',
+  'Which of my saved medicines have warnings?',
+  'Is paracetamol dangerous for me?',
+  'Why was paracetamol marked as risky?',
+  'Show my recent medicine safety checks.',
+  'What medicines am I taking?',
+  'Which medicines did I miss in the last 7 days?',
+  'Did I miss any medicine today?',
+  'Which medicines are running low?',
+  'When should I refill my medicines?',
+  'What is my medicine schedule?',
+  'How has my mood been recently?',
+  'Summarise my mood and stress from the last week.',
+  'I feel lonely and need support.',
+  'I feel stressed today.',
   'Check my diabetes risk.',
-  'Now my weight is 60kg',
   'Check my stroke risk.',
   'Check my hypertension risk.',
-  'How can I reduce this risk?',
-  'Why is this risk high?',
   'What should my caregiver monitor?',
-  'Is paracetamol risky in my saved allergy checks?',
-  'I feel lonely today.',
-  'I feel confused and need support.',
-  'Did I miss any medicine this week?',
-  'How has my mood been recently?',
-  'Which medicines are running low?',
-  'Are any of my saved medicines dangerous for me?',
-  'Show my recent caregiver alerts.',
 ];
 
 const getCareSubject = () => 'your mother';
@@ -73,18 +77,20 @@ const buildCaregiverSuggestedPrompts = (user) => {
   const possessive = getPossessiveSubject(subject);
 
   return [
-    `How is ${subject} doing today?`,
+    `Show me ${possessive} recent medicine alerts.`,
     `Did ${subject} miss any medicine this week?`,
     `Which medicines are running low for ${subject}?`,
-    `Show me ${possessive} recent caregiver alerts.`,
-    `Has ${subject} seemed lonely or confused recently?`,
-    `What emotional concerns should I check today?`,
+    `How has ${possessive} mood been recently?`,
     `Show ${possessive} mood trend this week.`,
     `Are any saved medicines dangerous for ${subject}?`,
+    `Which saved medicines have warnings for ${subject}?`,
     `Is paracetamol risky in ${possessive} saved allergy checks?`,
-    'Add 20 tablets to Metformin stock.',
-    'Change breakfast routine to 8 AM.',
+    `How is ${possessive} daily routine?`,
+    `What emotional concerns should I check today?`,
     'What should I monitor as a caregiver?',
+    `Check ${possessive} diabetes risk.`,
+    `Check ${possessive} stroke risk.`,
+    `Check ${possessive} hypertension risk.`,
   ];
 };
 
@@ -286,6 +292,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
   const scrollRef = useRef(null);
   const sentInitial = useRef(false);
   const finalTranscriptRef = useRef('');
+  const requestControllerRef = useRef(null);
   const isCaregiver = String(user?.role || '').toLowerCase() === 'caregiver';
   const suggestedPrompts = getAssistantSuggestedPrompts(user);
 
@@ -365,6 +372,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
   }, []);
 
   const startNewChat = useCallback(() => {
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    setSending(false);
     stopSpeaking();
     setMessages([]);
     setInput('');
@@ -374,6 +384,14 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
     sentInitial.current = true;
     closeHistory();
   }, [closeHistory, stopSpeaking]);
+
+  const cancelSending = useCallback(() => {
+    if (!requestControllerRef.current) return;
+    requestControllerRef.current.abort();
+    requestControllerRef.current = null;
+    setSending(false);
+    setAssistantProgressIndex(0);
+  }, []);
 
   const selectConversation = useCallback(
     async (entry) => {
@@ -498,6 +516,8 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
       setError('');
       setSending(true);
       setFollowUpsCollapsed(true);
+      const requestController = new AbortController();
+      requestControllerRef.current = requestController;
 
       const userBubble = {
         id: generateId(),
@@ -512,6 +532,7 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
         const response = await assistantService.chat({
           message: text,
           conversationId,
+          signal: requestController.signal,
         });
 
         if (response.conversationId && response.conversationId !== conversationId) {
@@ -574,6 +595,9 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
           }
         }
       } catch (err) {
+        if (requestController.signal.aborted || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') {
+          return;
+        }
         const errMsg = err.response?.data?.error || err.message || 'Failed to get a reply';
         setError(errMsg);
         setMessages((prev) => [
@@ -586,7 +610,10 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
           },
         ]);
       } finally {
-        setSending(false);
+        if (requestControllerRef.current === requestController) {
+          requestControllerRef.current = null;
+          setSending(false);
+        }
         scrollToBottom();
       }
     },
@@ -908,17 +935,18 @@ const AssistantChatScreen = ({ initialPrompt, onBack, onAgentNavigate, user }) =
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Send my question"
-          disabled={sending || !input.trim()}
-          onPress={() => sendMessage(input)}
+          accessibilityLabel={sending ? 'Cancel sending question' : 'Send my question'}
+          disabled={!sending && !input.trim()}
+          onPress={sending ? cancelSending : () => sendMessage(input)}
           style={({ pressed }) => [
             styles.sendButton,
-            (!input.trim() || sending) && styles.sendButtonDisabled,
+            (!input.trim() && !sending) && styles.sendButtonDisabled,
+            sending && styles.cancelButton,
             pressed && { opacity: 0.8 },
           ]}
         >
-          <Text style={styles.sendButtonIcon}>{'\u27A4'}</Text>
-          <Text style={styles.sendButtonText}>Send</Text>
+          <Text style={styles.sendButtonIcon}>{sending ? '\u2715' : '\u27A4'}</Text>
+          <Text style={styles.sendButtonText}>{sending ? 'Cancel' : 'Send'}</Text>
         </Pressable>
       </View>
 
@@ -1502,6 +1530,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
     flexDirection: 'row',
   },
+  cancelButton: { backgroundColor: '#a93447' },
   sendButtonDisabled: { backgroundColor: '#a5aa9c' },
   sendButtonIcon: { color: '#FFFFFF', fontSize: 16, marginRight: 6 },
   sendButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 17 },

@@ -515,7 +515,8 @@ const generateDiabetesSummaryWithLLM = async (result, userRole) => {
     ? ` with ${Math.round(safeNumber(result.confidence, 0))}% confidence`
     : '';
 
-  return `Based on the latest values, the system predicts a ${String(result.riskLevel || 'unknown').toLowerCase()} diabetes risk${confidenceText}. The main contributing factors are ${factors}. This is for health risk awareness only and is not a medical diagnosis.`;
+  const subject = String(userRole || '').toLowerCase() === 'caregiver' ? 'your elder' : 'you';
+  return `This check suggests ${subject} has a ${String(result.riskLevel || 'unknown').toLowerCase()} diabetes risk${confidenceText}. The main things linked to this result are ${factors}. This is for awareness only, not a diagnosis.`;
 };
 
 const saveDiabetesPredictionResult = async (userId, result, inputSnapshot, conversationId = null) => {

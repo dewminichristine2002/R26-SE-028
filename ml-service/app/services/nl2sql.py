@@ -109,6 +109,17 @@ def _extract_medicine_lookup_term(question: str) -> str | None:
         "on",
         "with",
         "my",
+        "any",
+        "of",
+        "the",
+        "medicines",
+        "medicine",
+        "medications",
+        "medication",
+        "tablets",
+        "tablet",
+        "pills",
+        "pill",
         "for",
         "me",
         "can",
@@ -226,7 +237,7 @@ def _rule_based_sql(question: str) -> Nl2SqlResult | None:
         r"\b(allergy|allergies|allergic|reaction|safe|safety|risky|risk|dangerous|warning|can\s+i\s+take|should\s+i\s+take|may\s+i\s+take)\b",
         normalized,
     )
-    if asks_medicine_safety_lookup and re.search(r"\b(any|which|saved|current|recent|my)\b.*\b(medicines|medications|tablets|pills)\b", normalized):
+    if asks_medicine_safety_lookup and re.search(r"\b(any|which|saved|current|recent|my)\b.*\b(medicines?|medications?|tablets?|pills?)\b", normalized):
         return _result(
             "SELECT medicine_name, risk_level, risk_score, explanation, recommendation, updated_at "
             "FROM allergy_cards "
@@ -273,6 +284,23 @@ def _rule_based_sql(question: str) -> Nl2SqlResult | None:
             "allergy_risk_factors",
         )
 
+    # Caregiver notification follow-ups need the alert record so the answer
+    # model can explain what was observed and what to monitor. Keep this
+    # before the broader emotional-alert rule because the prompt often quotes
+    # the alert text and includes words such as "sadness" and "check-ins".
+    asks_caregiver_alert_explanation = re.search(r"\bcaregiver\s+alert\b", normalized) and re.search(
+        r"\b(explain|means?|happen(?:ing)?|monitor|ask|next)\b",
+        normalized,
+    )
+    if asks_caregiver_alert_explanation:
+        return _result(
+            "SELECT title, message, alert_type, severity, status, created_at "
+            "FROM emotional_support_caregiver_alerts "
+            "WHERE elder_user_id = $1 OR caregiver_user_id = $1 "
+            "ORDER BY created_at DESC LIMIT 10",
+            "caregiver_alert_explanation",
+        )
+
     asks_emotional_alerts = re.search(r"\b(alert|alerts|notification|notifications|warning|warnings)\b", normalized) and re.search(
         r"\b(mood|emotion|emotional|stress|stressed|lonely|loneliness|cognitive|memory|check[-\s]?ins?)\b",
         normalized,
@@ -281,7 +309,7 @@ def _rule_based_sql(question: str) -> Nl2SqlResult | None:
         return _result(
             "SELECT title, message, alert_type, severity, status, created_at "
             "FROM emotional_support_caregiver_alerts "
-            "WHERE elder_user_id = $1 "
+            "WHERE elder_user_id = $1 OR caregiver_user_id = $1 "
             "ORDER BY created_at DESC LIMIT 20",
             "emotional_support_alerts",
         )
