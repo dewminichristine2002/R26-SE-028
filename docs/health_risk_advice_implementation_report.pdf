@@ -1,0 +1,295 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R] /Count 6 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+6 0 obj
+<< /Length 3103 >>
+stream
+BT /F2 20 Tf 50.00 785.89 Td (Health Risk Advice Implementation Report) Tj ET
+BT /F2 13.5 Tf 50.00 733.89 Td (Scope) Tj ET
+BT /F1 10.2 Tf 50.00 704.89 Td (This report explains the advice generation part for the diabetes, stroke, and hypertension) Tj ET
+BT /F1 10.2 Tf 50.00 688.39 Td (risk prediction feature.) Tj ET
+BT /F1 10.2 Tf 50.00 664.89 Td (The advice module does not predict disease risk by itself. The prediction models first) Tj ET
+BT /F1 10.2 Tf 50.00 648.39 Td (produce a risk result. The advice layer then explains what the user can do next using) Tj ET
+BT /F1 10.2 Tf 50.00 631.89 Td (trusted health guidance and the latest prediction result.) Tj ET
+BT /F2 13.5 Tf 50.00 599.39 Td (1. Advice Architecture) Tj ET
+BT /F1 10.2 Tf 50.00 570.39 Td (The advice feature uses a controlled RAG architecture.) Tj ET
+BT /F1 10.2 Tf 50.00 546.89 Td (RAG means Retrieval-Augmented Generation. In this project, the backend first retrieves) Tj ET
+BT /F1 10.2 Tf 50.00 530.39 Td (trusted health guidance chunks, then the ML service generates a short answer using only) Tj ET
+BT /F1 10.2 Tf 50.00 513.89 Td (those chunks and the user's prediction context.) Tj ET
+BT /F1 10.2 Tf 50.00 490.39 Td (The architecture is:) Tj ET
+BT /F3 8.3 Tf 60.00 461.89 Td (Frontend or assistant chat) Tj ET
+BT /F3 8.3 Tf 60.00 450.39 Td (  -> Node/Express backend advice route) Tj ET
+BT /F3 8.3 Tf 60.00 438.89 Td (  -> latest prediction lookup) Tj ET
+BT /F3 8.3 Tf 60.00 427.39 Td (  -> trusted guidance retrieval) Tj ET
+BT /F3 8.3 Tf 60.00 415.89 Td (  -> FastAPI health-advice endpoint) Tj ET
+BT /F3 8.3 Tf 60.00 404.39 Td (  -> controlled LLM answer) Tj ET
+BT /F3 8.3 Tf 60.00 392.89 Td (  -> safety note and sources returned) Tj ET
+BT /F3 8.3 Tf 60.00 381.39 Td (  -> chat history saved) Tj ET
+BT /F2 13.5 Tf 50.00 348.89 Td (2. Main Files) Tj ET
+BT /F1 10.2 Tf 50.00 319.89 Td (Frontend and chat entry:) Tj ET
+BT /F3 8.3 Tf 60.00 291.39 Td (frontend/src/screens/AssistantChatScreen.js) Tj ET
+BT /F3 8.3 Tf 60.00 279.89 Td (frontend/src/services/diabetesPredictionService.js) Tj ET
+BT /F3 8.3 Tf 60.00 268.39 Td (frontend/src/services/strokePredictionService.js) Tj ET
+BT /F3 8.3 Tf 60.00 256.89 Td (frontend/src/services/hypertensionPredictionService.js) Tj ET
+BT /F1 10.2 Tf 50.00 233.39 Td (Backend:) Tj ET
+BT /F3 8.3 Tf 60.00 204.89 Td (backend/src/routes/healthAdvice.js) Tj ET
+BT /F3 8.3 Tf 60.00 193.39 Td (backend/src/routes/predict.js) Tj ET
+BT /F3 8.3 Tf 60.00 181.89 Td (backend/src/services/healthAdviceService.js) Tj ET
+BT /F3 8.3 Tf 60.00 170.39 Td (backend/src/services/assistantOrchestrator.js) Tj ET
+BT /F3 8.3 Tf 60.00 158.89 Td (backend/src/data/healthAdviceKnowledge.js) Tj ET
+BT /F3 8.3 Tf 60.00 147.39 Td (backend/migrations/1747300000000_health_advice_rag.js) Tj ET
+BT /F1 10.2 Tf 50.00 123.89 Td (ML service:) Tj ET
+BT /F3 8.3 Tf 60.00 95.39 Td (ml-service/app/routers/assistant.py) Tj ET
+BT /F3 8.3 Tf 60.00 83.89 Td (ml-service/app/services/health_advice_answer.py) Tj ET
+BT /F3 8.3 Tf 60.00 72.39 Td (ml-service/app/services/ollama_client.py) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 1 of 6) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 2848 >>
+stream
+BT /F2 13.5 Tf 50.00 776.89 Td (3. Entry Points) Tj ET
+BT /F1 10.2 Tf 50.00 747.89 Td (Advice can be triggered from:) Tj ET
+BT /F3 8.3 Tf 60.00 719.39 Td (POST /api/health-advice) Tj ET
+BT /F3 8.3 Tf 60.00 707.89 Td (POST /predict/diabetes/chat) Tj ET
+BT /F3 8.3 Tf 60.00 696.39 Td (POST /predict/stroke/chat) Tj ET
+BT /F3 8.3 Tf 60.00 684.89 Td (POST /predict/hypertension/chat) Tj ET
+BT /F3 8.3 Tf 60.00 673.39 Td (main assistant chat) Tj ET
+BT /F1 10.2 Tf 50.00 649.89 Td (The dedicated advice route calls buildHealthAdviceResponse. The prediction chat routes also) Tj ET
+BT /F1 10.2 Tf 50.00 633.39 Td (call the same advice service when the message is asking for advice instead of asking for a) Tj ET
+BT /F1 10.2 Tf 50.00 616.89 Td (new prediction.) Tj ET
+BT /F2 13.5 Tf 50.00 584.39 Td (4. Intent Detection) Tj ET
+BT /F1 10.2 Tf 50.00 555.39 Td (The backend checks if the message is a health advice question.) Tj ET
+BT /F1 10.2 Tf 50.00 531.89 Td (Risk words include:) Tj ET
+BT /F3 8.3 Tf 60.00 503.39 Td (diabetes, diabetic, sugar, glucose, hypertension,) Tj ET
+BT /F3 8.3 Tf 60.00 491.89 Td (blood pressure, bp, pressure, stroke, risk) Tj ET
+BT /F1 10.2 Tf 50.00 468.39 Td (Advice words include:) Tj ET
+BT /F3 8.3 Tf 60.00 439.89 Td (advice, reduce, lower, prevent, what should, how can,) Tj ET
+BT /F3 8.3 Tf 60.00 428.39 Td (caregiver, monitor, guidance, manage, control, healthy, lifestyle) Tj ET
+BT /F1 10.2 Tf 50.00 404.89 Td (Example advice questions:) Tj ET
+BT /F3 8.3 Tf 60.00 376.39 Td (How can I reduce my diabetes risk?) Tj ET
+BT /F3 8.3 Tf 60.00 364.89 Td (What should I do about high blood pressure?) Tj ET
+BT /F3 8.3 Tf 60.00 353.39 Td (Why is my stroke risk high?) Tj ET
+BT /F3 8.3 Tf 60.00 341.89 Td (What should my caregiver monitor?) Tj ET
+BT /F1 10.2 Tf 50.00 318.39 Td (Medication-only questions are not handled by this advice module unless they also include) Tj ET
+BT /F1 10.2 Tf 50.00 301.89 Td (diabetes, stroke, hypertension, or risk context.) Tj ET
+BT /F2 13.5 Tf 50.00 269.39 Td (5. Risk Type Selection) Tj ET
+BT /F1 10.2 Tf 50.00 240.39 Td (After detecting advice intent, the backend selects one risk type:) Tj ET
+BT /F3 8.3 Tf 60.00 211.89 Td (Diabetes) Tj ET
+BT /F3 8.3 Tf 60.00 200.39 Td (Stroke) Tj ET
+BT /F3 8.3 Tf 60.00 188.89 Td (Hypertension) Tj ET
+BT /F1 10.2 Tf 50.00 165.39 Td (If the question names a condition, that condition is selected. If the question is general,) Tj ET
+BT /F1 10.2 Tf 50.00 148.89 Td (the backend checks the latest saved predictions and chooses the highest-risk condition.) Tj ET
+BT /F1 10.2 Tf 50.00 125.39 Td (The internal risk priority is:) Tj ET
+BT /F3 8.3 Tf 60.00 96.89 Td (High = 3) Tj ET
+BT /F3 8.3 Tf 60.00 85.39 Td (Medium = 2) Tj ET
+BT /F3 8.3 Tf 60.00 73.89 Td (Low = 1) Tj ET
+BT /F3 8.3 Tf 60.00 62.39 Td (Unknown = 0) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 2 of 6) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 2597 >>
+stream
+BT /F1 10.2 Tf 50.00 778.89 Td (This lets a broad question like "What should I do now?" use the most important available) Tj ET
+BT /F1 10.2 Tf 50.00 762.39 Td (risk result.) Tj ET
+BT /F2 13.5 Tf 50.00 729.89 Td (6. Prediction Context) Tj ET
+BT /F1 10.2 Tf 50.00 700.89 Td (The advice service loads or receives the latest prediction context.) Tj ET
+BT /F1 10.2 Tf 50.00 677.39 Td (The context can include:) Tj ET
+BT /F3 8.3 Tf 60.00 648.89 Td (riskLevel) Tj ET
+BT /F3 8.3 Tf 60.00 637.39 Td (confidence) Tj ET
+BT /F3 8.3 Tf 60.00 625.89 Td (selectedAlgorithm) Tj ET
+BT /F3 8.3 Tf 60.00 614.39 Td (factors) Tj ET
+BT /F3 8.3 Tf 60.00 602.89 Td (summary) Tj ET
+BT /F1 10.2 Tf 50.00 579.39 Td (This allows the answer to refer to the user's actual risk level and the main contributing) Tj ET
+BT /F1 10.2 Tf 50.00 562.89 Td (factors, such as high BMI, high blood pressure, high glucose, smoking history, or low) Tj ET
+BT /F1 10.2 Tf 50.00 546.39 Td (physical activity.) Tj ET
+BT /F2 13.5 Tf 50.00 513.89 Td (7. Trusted Knowledge Base) Tj ET
+BT /F1 10.2 Tf 50.00 484.89 Td (Trusted advice chunks are defined in:) Tj ET
+BT /F3 8.3 Tf 60.00 456.39 Td (backend/src/data/healthAdviceKnowledge.js) Tj ET
+BT /F1 10.2 Tf 50.00 432.89 Td (The knowledge base contains guidance from:) Tj ET
+BT /F3 8.3 Tf 60.00 404.39 Td (WHO) Tj ET
+BT /F3 8.3 Tf 60.00 392.89 Td (CDC) Tj ET
+BT /F3 8.3 Tf 60.00 381.39 Td (American Heart Association) Tj ET
+BT /F3 8.3 Tf 60.00 369.89 Td (Sri Lanka NCD Unit) Tj ET
+BT /F1 10.2 Tf 50.00 346.39 Td (Chunks are grouped as:) Tj ET
+BT /F3 8.3 Tf 60.00 317.89 Td (General) Tj ET
+BT /F3 8.3 Tf 60.00 306.39 Td (Diabetes) Tj ET
+BT /F3 8.3 Tf 60.00 294.89 Td (Stroke) Tj ET
+BT /F3 8.3 Tf 60.00 283.39 Td (Hypertension) Tj ET
+BT /F1 10.2 Tf 50.00 259.89 Td (The database migration 1747300000000_health_advice_rag.js creates the health_advice_chunks) Tj ET
+BT /F1 10.2 Tf 50.00 243.39 Td (table and inserts the same trusted chunks with embeddings.) Tj ET
+BT /F1 10.2 Tf 50.00 219.89 Td (If the table is unavailable, the backend falls back to the in-code chunks.) Tj ET
+BT /F2 13.5 Tf 50.00 187.39 Td (8. Retrieval Method) Tj ET
+BT /F1 10.2 Tf 50.00 158.39 Td (The backend builds a retrieval query from:) Tj ET
+BT /F3 8.3 Tf 60.00 129.89 Td (risk type) Tj ET
+BT /F3 8.3 Tf 60.00 118.39 Td (user question) Tj ET
+BT /F3 8.3 Tf 60.00 106.89 Td (latest risk level) Tj ET
+BT /F3 8.3 Tf 60.00 95.39 Td (prediction factors) Tj ET
+BT /F1 10.2 Tf 50.00 71.89 Td (Each chunk has a lightweight local embedding. The embedding method tokenizes text, removes) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 3 of 6) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 2731 >>
+stream
+BT /F1 10.2 Tf 50.00 785.89 Td (stop words, hashes tokens into a 64-dimensional vector, and normalizes the vector.) Tj ET
+BT /F1 10.2 Tf 50.00 762.39 Td (The retrieval score is:) Tj ET
+BT /F3 8.3 Tf 60.00 733.89 Td (final score = 0.7 * cosine similarity) Tj ET
+BT /F3 8.3 Tf 60.00 722.39 Td (            + 0.2 * term overlap) Tj ET
+BT /F3 8.3 Tf 60.00 710.89 Td (            + 0.1 * exact risk type boost) Tj ET
+BT /F1 10.2 Tf 50.00 687.39 Td (The default maximum retrieved chunks is:) Tj ET
+BT /F3 8.3 Tf 60.00 658.89 Td (6) Tj ET
+BT /F1 10.2 Tf 50.00 635.39 Td (This can be configured with:) Tj ET
+BT /F3 8.3 Tf 60.00 606.89 Td (HEALTH_ADVICE_MAX_CHUNKS) Tj ET
+BT /F2 13.5 Tf 50.00 574.39 Td (9. LLM Answer Generation) Tj ET
+BT /F1 10.2 Tf 50.00 545.39 Td (When chunks are found, the backend calls:) Tj ET
+BT /F3 8.3 Tf 60.00 516.89 Td (POST /assistant/health-advice) Tj ET
+BT /F1 10.2 Tf 50.00 493.39 Td (The payload contains:) Tj ET
+BT /F3 8.3 Tf 60.00 464.89 Td (question) Tj ET
+BT /F3 8.3 Tf 60.00 453.39 Td (risk_type) Tj ET
+BT /F3 8.3 Tf 60.00 441.89 Td (prediction) Tj ET
+BT /F3 8.3 Tf 60.00 430.39 Td (retrieved_chunks) Tj ET
+BT /F3 8.3 Tf 60.00 418.89 Td (user_role) Tj ET
+BT /F1 10.2 Tf 50.00 395.39 Td (The Python ML service then calls Ollama through ollama_client.py.) Tj ET
+BT /F1 10.2 Tf 50.00 371.89 Td (The health advice prompt is strict. It instructs the model to:) Tj ET
+BT /F3 8.3 Tf 60.00 343.39 Td (Use only retrieved trusted guidance and the prediction result.) Tj ET
+BT /F3 8.3 Tf 60.00 331.89 Td (Do not diagnose diseases.) Tj ET
+BT /F3 8.3 Tf 60.00 320.39 Td (Do not prescribe medicine.) Tj ET
+BT /F3 8.3 Tf 60.00 308.89 Td (Do not suggest stopping, changing, or starting medicine.) Tj ET
+BT /F3 8.3 Tf 60.00 297.39 Td (Do not replace professional healthcare advice.) Tj ET
+BT /F3 8.3 Tf 60.00 285.89 Td (Recommend professional consultation for high risk or abnormal readings.) Tj ET
+BT /F3 8.3 Tf 60.00 274.39 Td (Write 3 to 6 short sentences.) Tj ET
+BT /F3 8.3 Tf 60.00 262.89 Td (Return exactly one JSON object.) Tj ET
+BT /F1 10.2 Tf 50.00 239.39 Td (This means the LLM is used for wording and explanation, not for independent medical) Tj ET
+BT /F1 10.2 Tf 50.00 222.89 Td (decision-making.) Tj ET
+BT /F2 13.5 Tf 50.00 190.39 Td (10. Fallback Logic) Tj ET
+BT /F1 10.2 Tf 50.00 161.39 Td (If the ML service fails, Ollama is unavailable, or the answer is empty, the backend creates) Tj ET
+BT /F1 10.2 Tf 50.00 144.89 Td (a fallback answer.) Tj ET
+BT /F1 10.2 Tf 50.00 121.39 Td (The fallback uses:) Tj ET
+BT /F3 8.3 Tf 60.00 92.89 Td (risk type) Tj ET
+BT /F3 8.3 Tf 60.00 81.39 Td (risk level) Tj ET
+BT /F3 8.3 Tf 60.00 69.89 Td (top prediction factors) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 4 of 6) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 2665 >>
+stream
+BT /F3 8.3 Tf 60.00 785.89 Td (retrieved guidance topics) Tj ET
+BT /F3 8.3 Tf 60.00 774.39 Td (professional follow-up sentence) Tj ET
+BT /F1 10.2 Tf 50.00 750.89 Td (If no useful guidance chunks are available, the system returns:) Tj ET
+BT /F3 8.3 Tf 60.00 722.39 Td (Reliable guidance is not available in the current knowledge base for this question.) Tj ET
+BT /F1 10.2 Tf 50.00 698.89 Td (This makes the advice feature reliable even when the LLM dependency is down.) Tj ET
+BT /F2 13.5 Tf 50.00 666.39 Td (11. Response Format) Tj ET
+BT /F1 10.2 Tf 50.00 637.39 Td (The backend returns:) Tj ET
+BT /F3 8.3 Tf 60.00 608.89 Td (answer) Tj ET
+BT /F3 8.3 Tf 60.00 597.39 Td (riskType) Tj ET
+BT /F3 8.3 Tf 60.00 585.89 Td (prediction) Tj ET
+BT /F3 8.3 Tf 60.00 574.39 Td (sources) Tj ET
+BT /F3 8.3 Tf 60.00 562.89 Td (safetyNote) Tj ET
+BT /F3 8.3 Tf 60.00 551.39 Td (conversationId) Tj ET
+BT /F3 8.3 Tf 60.00 539.89 Td (fallback) Tj ET
+BT /F3 8.3 Tf 60.00 528.39 Td (followUps) Tj ET
+BT /F1 10.2 Tf 50.00 504.89 Td (The sources field lists the trusted sources used. The fallback field shows whether the) Tj ET
+BT /F1 10.2 Tf 50.00 488.39 Td (backend had to use the deterministic fallback answer.) Tj ET
+BT /F1 10.2 Tf 50.00 464.89 Td (The safety note is:) Tj ET
+BT /F3 8.3 Tf 60.00 436.39 Td (This is general health guidance, not a medical diagnosis.) Tj ET
+BT /F3 8.3 Tf 60.00 424.89 Td (It does not replace advice from a healthcare professional.) Tj ET
+BT /F2 13.5 Tf 50.00 392.39 Td (12. Conversation Storage) Tj ET
+BT /F1 10.2 Tf 50.00 363.39 Td (Advice interactions are saved under the conversation title:) Tj ET
+BT /F3 8.3 Tf 60.00 334.89 Td (Health Risk Advice) Tj ET
+BT /F1 10.2 Tf 50.00 311.39 Td (The backend saves:) Tj ET
+BT /F3 8.3 Tf 60.00 282.89 Td (user question) Tj ET
+BT /F3 8.3 Tf 60.00 271.39 Td (assistant answer) Tj ET
+BT /F3 8.3 Tf 60.00 259.89 Td (retrieved source rows) Tj ET
+BT /F3 8.3 Tf 60.00 248.39 Td (intent = health_risk_advice) Tj ET
+BT /F3 8.3 Tf 60.00 236.89 Td (latency) Tj ET
+BT /F3 8.3 Tf 60.00 225.39 Td (fallback reason when applicable) Tj ET
+BT /F1 10.2 Tf 50.00 201.89 Td (This supports traceability because the app can later show what was asked, what advice was) Tj ET
+BT /F1 10.2 Tf 50.00 185.39 Td (returned, and which chunks were used.) Tj ET
+BT /F2 13.5 Tf 50.00 152.89 Td (13. Why This Architecture Was Selected) Tj ET
+BT /F1 10.2 Tf 50.00 123.89 Td (The advice feature uses RAG instead of a direct free-form chatbot because health advice) Tj ET
+BT /F1 10.2 Tf 50.00 107.39 Td (needs stronger control.) Tj ET
+BT /F1 10.2 Tf 50.00 83.89 Td (This design was selected because:) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 5 of 6) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 1651 >>
+stream
+BT /F1 10.2 Tf 50.00 785.89 Td (- It reuses the latest prediction result instead of guessing risk.) Tj ET
+BT /F1 10.2 Tf 50.00 769.39 Td (- It grounds advice in trusted health guidance.) Tj ET
+BT /F1 10.2 Tf 50.00 752.89 Td (- It returns source links.) Tj ET
+BT /F1 10.2 Tf 50.00 736.39 Td (- It restricts the LLM from diagnosis and medication instructions.) Tj ET
+BT /F1 10.2 Tf 50.00 719.89 Td (- It supports both elder and caregiver wording.) Tj ET
+BT /F1 10.2 Tf 50.00 703.39 Td (- It still returns a fallback answer when the LLM fails.) Tj ET
+BT /F1 10.2 Tf 50.00 686.89 Td (- It keeps the same advice pipeline reusable for diabetes, stroke, and hypertension.) Tj ET
+BT /F2 13.5 Tf 50.00 654.39 Td (14. Final Summary) Tj ET
+BT /F1 10.2 Tf 50.00 625.39 Td (The advice module is a controlled RAG layer built on top of the diabetes, stroke, and) Tj ET
+BT /F1 10.2 Tf 50.00 608.89 Td (hypertension prediction modules.) Tj ET
+BT /F1 10.2 Tf 50.00 585.39 Td (The prediction models answer "What is the risk?". The advice module answers "What should the) Tj ET
+BT /F1 10.2 Tf 50.00 568.89 Td (user know or do next?".) Tj ET
+BT /F1 10.2 Tf 50.00 545.39 Td (Technically, the backend detects advice intent, selects a risk type, loads the latest) Tj ET
+BT /F1 10.2 Tf 50.00 528.89 Td (prediction, retrieves trusted guidance chunks, calls the FastAPI health-advice endpoint, and) Tj ET
+BT /F1 10.2 Tf 50.00 512.39 Td (returns a short safe answer with sources and a medical safety note.) Tj ET
+BT /F1 10.2 Tf 50.00 488.89 Td (This architecture improves usability while keeping medical safety boundaries clear.) Tj ET
+BT /F1 8 Tf 50.00 28 Td (Page 6 of 6) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 16 0 R >>
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000149 00000 n 
+0000000219 00000 n 
+0000000294 00000 n 
+0000000362 00000 n 
+0000003517 00000 n 
+0000003669 00000 n 
+0000006569 00000 n 
+0000006721 00000 n 
+0000009371 00000 n 
+0000009525 00000 n 
+0000012309 00000 n 
+0000012463 00000 n 
+0000015181 00000 n 
+0000015335 00000 n 
+0000017039 00000 n 
+trailer
+<< /Size 18 /Root 1 0 R >>
+startxref
+17193
+%%EOF

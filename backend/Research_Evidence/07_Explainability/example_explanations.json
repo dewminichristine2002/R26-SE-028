@@ -1,0 +1,220 @@
+[
+  {
+    "example_type": "high_confidence_true_positive",
+    "row_position_in_holdout": 10643,
+    "true_label": 1,
+    "predicted_label": 1,
+    "predicted_probability_serious": 0.9999996196889588,
+    "selected_input_snapshot": {
+      "year": 2025,
+      "month": 10,
+      "primary_reaction": "Myocardial infarction",
+      "suspect_drug": "BEVACIZUMAB",
+      "drug_indication": "Hereditary Haemorrhagic Telangiectasia",
+      "patient_age_years": 65.0,
+      "patient_sex": "Female",
+      "country": "CA",
+      "report_age_days": 171
+    },
+    "top_contributors_toward_serious": [
+      {
+        "feature": "numeric__num_reactions",
+        "contribution": 4.883466016670965
+      },
+      {
+        "feature": "numeric__num_drugs",
+        "contribution": 1.3127826930713413
+      },
+      {
+        "feature": "categorical__drug_route_42.0",
+        "contribution": 0.8035662059376281
+      },
+      {
+        "feature": "text__primary_reaction::infarction",
+        "contribution": 0.7235761895975612
+      },
+      {
+        "feature": "text__primary_reaction::myocardial",
+        "contribution": 0.7089364813912896
+      },
+      {
+        "feature": "text__primary_reaction::myocardial infarction",
+        "contribution": 0.6715640568693949
+      },
+      {
+        "feature": "categorical__pharm_class_Vascular Endothelial Growth Factor Inhibitor [EPC]",
+        "contribution": 0.6134070049036157
+      },
+      {
+        "feature": "categorical__country_CA",
+        "contribution": 0.280920343658307
+      },
+      {
+        "feature": "categorical__patient_sex_Female",
+        "contribution": 0.2788152307174034
+      },
+      {
+        "feature": "text__suspect_drug::bevacizumab",
+        "contribution": 0.22150834249786722
+      }
+    ],
+    "top_contributors_toward_non_serious": [
+      {
+        "feature": "numeric__year",
+        "contribution": -0.2479302868631896
+      },
+      {
+        "feature": "text__drug_indication::hereditary",
+        "contribution": -0.11446071654118489
+      },
+      {
+        "feature": "numeric__patient_age_years",
+        "contribution": -0.010722457173049928
+      }
+    ]
+  },
+  {
+    "example_type": "false_negative_example",
+    "row_position_in_holdout": 20330,
+    "true_label": 1,
+    "predicted_label": 0,
+    "predicted_probability_serious": 0.02871387855258251,
+    "selected_input_snapshot": {
+      "year": 2024,
+      "month": 6,
+      "primary_reaction": "No adverse event",
+      "suspect_drug": "DUPILUMAB",
+      "drug_indication": "Dermatitis Atopic",
+      "patient_age_years": 60.0,
+      "patient_sex": "Female",
+      "country": "US",
+      "report_age_days": 648
+    },
+    "top_contributors_toward_serious": [
+      {
+        "feature": "categorical__patient_sex_Female",
+        "contribution": 0.2788152307174034
+      },
+      {
+        "feature": "numeric__report_age_days",
+        "contribution": 0.03809205006570897
+      },
+      {
+        "feature": "categorical__drug_route_58.0",
+        "contribution": 0.004353842361427229
+      }
+    ],
+    "top_contributors_toward_non_serious": [
+      {
+        "feature": "categorical__country_US",
+        "contribution": -2.8379603734591745
+      },
+      {
+        "feature": "text__suspect_drug::dupilumab",
+        "contribution": -0.8056149332097795
+      },
+      {
+        "feature": "categorical__pharm_class_Interleukin-4 Receptor alpha Antagonist [EPC]",
+        "contribution": -0.8056149332097795
+      },
+      {
+        "feature": "numeric__num_reactions",
+        "contribution": -0.7137793008710202
+      },
+      {
+        "feature": "text__primary_reaction::no adverse",
+        "contribution": -0.6237229363378771
+      },
+      {
+        "feature": "text__primary_reaction::no",
+        "contribution": -0.5723530897670519
+      },
+      {
+        "feature": "text__primary_reaction::event",
+        "contribution": -0.41483508844708744
+      },
+      {
+        "feature": "text__primary_reaction::adverse",
+        "contribution": -0.4022663019616825
+      },
+      {
+        "feature": "text__primary_reaction::adverse event",
+        "contribution": -0.3333064499828835
+      },
+      {
+        "feature": "numeric__num_drugs",
+        "contribution": -0.250581179426164
+      }
+    ]
+  },
+  {
+    "example_type": "high_confidence_true_negative",
+    "row_position_in_holdout": 96699,
+    "true_label": 0,
+    "predicted_label": 0,
+    "predicted_probability_serious": 0.021775732882141876,
+    "selected_input_snapshot": {
+      "year": 2021,
+      "month": 4,
+      "primary_reaction": "Product shape issue",
+      "suspect_drug": "BIMATOPROST",
+      "drug_indication": "Product Used For Unknown Indication",
+      "patient_age_years": null,
+      "patient_sex": "Unknown",
+      "country": "US",
+      "report_age_days": 1810
+    },
+    "top_contributors_toward_serious": [
+      {
+        "feature": "categorical__patient_sex_Unknown",
+        "contribution": 0.24962969178023348
+      },
+      {
+        "feature": "numeric__report_age_days",
+        "contribution": 0.007527138429211941
+      }
+    ],
+    "top_contributors_toward_non_serious": [
+      {
+        "feature": "categorical__country_US",
+        "contribution": -2.8379603734591745
+      },
+      {
+        "feature": "text__primary_reaction::product",
+        "contribution": -1.4175896258532936
+      },
+      {
+        "feature": "text__primary_reaction::issue",
+        "contribution": -1.027771718272184
+      },
+      {
+        "feature": "text__suspect_drug::bimatoprost",
+        "contribution": -1.0045497606332119
+      },
+      {
+        "feature": "categorical__drug_route_61.0",
+        "contribution": -0.7152918009989481
+      },
+      {
+        "feature": "numeric__num_reactions",
+        "contribution": -0.5738481679324705
+      },
+      {
+        "feature": "categorical__pharm_class_Prostaglandin Analog [EPC]",
+        "contribution": -0.43201825713330394
+      },
+      {
+        "feature": "numeric__num_drugs",
+        "contribution": -0.250581179426164
+      },
+      {
+        "feature": "numeric__year",
+        "contribution": -0.0495838973504071
+      },
+      {
+        "feature": "text__drug_indication::unknown",
+        "contribution": -0.04260199875745182
+      }
+    ]
+  }
+]

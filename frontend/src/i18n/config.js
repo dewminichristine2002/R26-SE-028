@@ -6,12 +6,16 @@ import * as Localization from 'expo-localization';
 import en from './locales/en.json';
 import es from './locales/es.json';
 import fr from './locales/fr.json';
+import si from './locales/si.json';
+import ta from './locales/ta.json';
 
 // Translation resources
 const resources = {
   en: { translation: en },
   es: { translation: es },
   fr: { translation: fr },
+  si: { translation: si },
+  ta: { translation: ta },
 };
 
 // Get device language
@@ -22,7 +26,7 @@ i18n
   .init({
     compatibilityJSON: 'v3',
     resources,
-    lng: deviceLanguage === 'es' || deviceLanguage === 'fr' ? deviceLanguage : 'en',
+    lng: ['en', 'es', 'fr', 'si', 'ta'].includes(deviceLanguage) ? deviceLanguage : 'en',
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,

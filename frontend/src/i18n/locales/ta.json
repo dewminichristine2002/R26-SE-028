@@ -1,0 +1,244 @@
+{
+  "app": {
+    "name": "ElderMeds",
+    "welcome": "ElderMeds-க்கு வரவேற்கிறோம்"
+  },
+  "navigation": {
+    "home": "முகப்பு",
+    "profile": "சுயவிவரம்",
+    "settings": "அமைப்புகள்"
+  },
+  "home": {
+    "title": "முகப்பு",
+    "welcome": "மீண்டும் வரவேற்கிறோம்!",
+    "reminder": "நினைவூட்டல்",
+    "allergies": "ஒவ்வாமை",
+    "emotions": "உணர்வுகள்",
+    "dashboard": "டாஷ்போர்டு",
+    "medications": "மருந்துகள்",
+    "appointments": "சந்திப்புகள்",
+    "health": "சுகாதார நிலை",
+    "goodDay": "நல்ல நாள், {{name}}",
+    "careReady": "நீங்கள் தயாராக இருக்கும் போது உங்கள் மருந்து பராமரிப்பு தயாராக உள்ளது.",
+    "care": "பராமரிப்பு",
+    "mainAction": "முக்கிய செயல்",
+    "openScheduleTools": "இன்றைய அட்டவணை மற்றும் மருந்து கருவிகளைத் திறக்கவும்.",
+    "quickCare": "விரைவு பராமரிப்பு",
+    "largeButtons": "எளிதாகத் தொட பெரிய பொத்தான்கள்",
+    "featurePreparing": "இந்த அம்சம் ElderMeds க்காக தயாராகிறது.",
+    "logoutHint": "ElderMeds இலிருந்து வெளியேறும்",
+    "profileHint": "உங்கள் ElderMeds சுயவிவரத்தைத் திறக்கும்",
+    "menu": {
+      "medicineReminder": {
+        "title": "மருந்து நினைவூட்டல்",
+        "subtitle": "இன்றைய அட்டவணை, மருந்து பட்டியல், இருப்பு மற்றும் பாதுகாப்பு கருவிகள்.",
+        "helper": "திற"
+      },
+      "allergyNotes": {
+        "title": "ஒவ்வாமை குறிப்புகள்",
+        "subtitle": "முக்கிய ஒவ்வாமை தகவலை அருகில் வைத்திருங்கள்.",
+        "helper": "விரைவில்"
+      },
+      "moodCheck": {
+        "title": "மனநிலை சரிபார்ப்பு",
+        "subtitle": "நீங்கள் எப்படி உணர்கிறீர்கள் என்பதை பதிவு செய்ய எளிய இடம்.",
+        "helper": "விரைவில்"
+      },
+      "healthDashboard": {
+        "title": "சுகாதார டாஷ்போர்டு",
+        "subtitle": "உங்கள் பராமரிப்பு முன்னேற்றத்தை அமைதியான பார்வையில் காணுங்கள்.",
+        "helper": "விரைவில்"
+      }
+    },
+    "reminderMenu": {
+      "titleLine1": "மருந்து",
+      "titleLine2": "நினைவூட்டல்",
+      "chooseAction": "செயலைத் தேர்ந்தெடுக்கவும்",
+      "text": "எழுத்து",
+      "scheduleBoard": {
+        "title": "அட்டவணை பலகை",
+        "subtitle": "இன்றைய மருந்துகளைப் பார்க்கவும்",
+        "helper": "இன்று"
+      },
+      "routineSetup": {
+        "title": "வழக்கமான அமைப்பு",
+        "subtitle": "உணவு நேரங்களை அமைக்கவும்",
+        "helper": "நேரங்கள்"
+      },
+      "addMedicine": {
+        "title": "மருந்தைச் சேர்க்கவும்",
+        "subtitle": "புதிய மருந்தைச் சேர்க்கவும்",
+        "helper": "சேர்"
+      },
+      "medicineList": {
+        "title": "மருந்து பட்டியல்",
+        "subtitle": "மருந்துகளைப் பார்க்கவும்",
+        "helper": "பட்டியல்"
+      },
+      "medicineStock": {
+        "title": "மருந்து இருப்பு",
+        "subtitle": "மருந்து அளவைச் சரிபார்க்கவும்",
+        "helper": "இருப்பு"
+      },
+      "safetyCenter": {
+        "title": "பாதுகாப்பு மையம்",
+        "subtitle": "பாதுகாப்பு எச்சரிக்கைகளைப் பார்க்கவும்",
+        "helper": "பாதுகாப்பு"
+      }
+    },
+    "addMedicine": {
+      "title": "மருந்தைச் சேர்க்கவும்",
+      "chooseHow": "எப்படி சேர்ப்பது என்பதைத் தேர்வு செய்யவும்",
+      "pickEasiest": "எளிய வழியைத் தேர்வு செய்யுங்கள்.",
+      "scanReceipt": "ரசீதை ஸ்கேன் செய்யவும்",
+      "scanReceiptHint": "மருந்துகளைச் சேர்க்க மருந்தக ரசீதை ஸ்கேன் செய்யவும்",
+      "useCamera": "கேமராவைப் பயன்படுத்தவும். விரைவான வழி.",
+      "typeDetails": "விவரங்களைத் தட்டச்சு செய்யவும்",
+      "manualEntry": "கைமுறை உள்ளீடு",
+      "manualEntryHint": "மருந்து விவரங்களை கைமுறையாகத் தட்டச்சு செய்யவும்",
+      "enterYourself": "நீங்களே உள்ளிடுங்கள்."
+    },
+    "caregiver": {
+      "dashboard": "பராமரிப்பாளர் டாஷ்போர்டு",
+      "subtitle": "மருந்து செயல்பாட்டை கண்காணித்து விரைவாக பதிலளிக்கவும்.",
+      "active": "செயலில்",
+      "unreadAlerts": "படிக்காத எச்சரிக்கைகள்",
+      "timelineEvents": "காலவரிசை நிகழ்வுகள்",
+      "immediateAction": "உடனடி செயல்",
+      "markRead": "படித்ததாக குறி",
+      "recentUpdates": "சமீபத்திய புதுப்பிப்புகள்",
+      "noNotifications": "இன்னும் அறிவிப்புகள் இல்லை.",
+      "timelineView": "காலவரிசை பார்வை",
+      "noTimelineEvents": "இன்னும் காலவரிசை நிகழ்வுகள் இல்லை.",
+      "minimize": "சிறிதாக்கு",
+      "maximize": "பெரிதாக்கு",
+      "showMore": "மேலும் {{count}} காட்டு",
+      "viewProfile": "சுயவிவரத்தைக் காண்க",
+      "notifications": "அறிவிப்புகள்",
+      "noUnreadAlerts": "இப்போது படிக்காத எச்சரிக்கைகள் இல்லை.",
+      "markNotificationsRead": "பராமரிப்பாளர் அறிவிப்புகளை படித்ததாக குறிக்கவும்",
+      "markNotificationsReadHint": "படிக்காத பராமரிப்பாளர் எச்சரிக்கைகளை படித்ததாக குறிக்கும்",
+      "markAlertRead": "எச்சரிக்கையை படித்ததாக குறி",
+      "refillAlert": "மீண்டும் நிரப்பல் எச்சரிக்கை",
+      "caregiverAlert": "பராமரிப்பாளர் எச்சரிக்கை",
+      "unknownDay": "தெரியாத நாள்",
+      "today": "இன்று",
+      "yesterday": "நேற்று",
+      "medicine": "மருந்து",
+      "doubleDose": "இரட்டை அளவு கண்டறியப்பட்டது",
+      "missed": "தவறியது",
+      "taken": "எடுத்தது",
+      "reminderPending": "நினைவூட்டல் நிலுவையில்",
+      "statusUpdated": "நிலை புதுப்பிக்கப்பட்டது"
+    }
+  },
+  "auth": {
+    "signIn": "உள்நுழைக",
+    "signInSubtitle": "மருந்து பராமரிப்பைத் தொடர உங்கள் கணக்கு விவரங்களைப் பயன்படுத்தவும்.",
+    "email": "மின்னஞ்சல்",
+    "emailPlaceholder": "you@example.com",
+    "passwordOrPhone": "கடவுச்சொல் அல்லது பராமரிப்பாளர் தொலைபேசி",
+    "passwordPlaceholder": "கடவுச்சொல்லை உள்ளிடவும்",
+    "showPassword": "கடவுச்சொல்லைக் காட்டு",
+    "hidePassword": "கடவுச்சொல்லை மறை",
+    "passwordToggleHint": "கடவுச்சொல் தெரிவை மாற்றும்",
+    "login": "உள்நுழை",
+    "signingIn": "உள்நுழைகிறது...",
+    "createAccount": "கணக்கை உருவாக்கு",
+    "missingFieldsTitle": "தேவையான புலங்கள் இல்லை",
+    "loginMissingFields": "மின்னஞ்சல் மற்றும் கடவுச்சொல்லை உள்ளிடவும்.",
+    "loginFailedTitle": "உள்நுழைவு தோல்வியடைந்தது",
+    "loginFailedFallback": "உள்நுழைவு தோல்வியடைந்தது",
+    "registerTitle": "ElderMeds கணக்கை உருவாக்கு",
+    "registerSubtitle": "உங்கள் சுயவிவரம் மற்றும் நினைவூட்டல்கள் ஒத்திசைக்கப்பட்டிருக்கும்",
+    "fullNamePlaceholder": "முழு பெயர்",
+    "passwordMinPlaceholder": "கடவுச்சொல் (குறைந்தது 6 எழுத்துகள்)",
+    "creating": "உருவாக்குகிறது...",
+    "register": "பதிவு செய்",
+    "backToLogin": "உள்நுழைவிற்கு திரும்பு",
+    "registerMissingFields": "பெயர், மின்னஞ்சல் மற்றும் கடவுச்சொல்லை உள்ளிடவும்.",
+    "registrationFailedTitle": "பதிவு தோல்வியடைந்தது",
+    "registrationFailedFallback": "பதிவு தோல்வியடைந்தது"
+  },
+  "profile": {
+    "title": "சுயவிவரம்",
+    "myProfile": "என் சுயவிவரம்",
+    "name": "பெயர்",
+    "email": "மின்னஞ்சல்",
+    "phone": "தொலைபேசி",
+    "dateOfBirth": "பிறந்த தேதி",
+    "bloodType": "இரத்த வகை",
+    "emergencyContact": "அவசர தொடர்பு",
+    "personalDetails": "தனிப்பட்ட விவரங்கள்",
+    "healthDetails": "சுகாதார விவரங்கள்",
+    "fullName": "முழு பெயர்",
+    "fullNamePlaceholder": "உங்கள் முழு பெயர்",
+    "phonePlaceholder": "உதா. +94 77 123 4567",
+    "caregiverEmail": "பராமரிப்பாளர் மின்னஞ்சல்",
+    "caregiverEmailPlaceholder": "caregiver@email.com",
+    "caregiverPhone": "பராமரிப்பாளர் தொலைபேசி",
+    "caregiverPhonePlaceholder": "பராமரிப்பாளர் உள்நுழைவிற்கு பயன்படுத்தப்படும்",
+    "dateOfBirthFormat": "பிறந்த தேதி (YYYY-MM-DD)",
+    "dateOfBirthPlaceholder": "1950-01-15",
+    "bloodTypePlaceholder": "உதா. O+",
+    "saveProfile": "சுயவிவரத்தை சேமி",
+    "saving": "சேமிக்கிறது...",
+    "logout": "வெளியேறு",
+    "userFallback": "பயனர்",
+    "noEmail": "மின்னஞ்சல் இல்லை",
+    "backToHome": "முகப்பிற்கு திரும்பு",
+    "backToHomeHint": "முகப்பு திரைக்கு திரும்பும்",
+    "openSettings": "அமைப்புகளைத் திற",
+    "openSettingsHint": "ஆப் அமைப்புகளைத் திறக்கும்",
+    "validationTitle": "சரிபார்ப்பு",
+    "fullNameRequired": "முழு பெயர் தேவை.",
+    "caregiverEmailDifferent": "பராமரிப்பாளர் மின்னஞ்சல் உங்கள் சொந்த மின்னஞ்சலிலிருந்து வேறுபட வேண்டும்.",
+    "savedTitle": "சேமிக்கப்பட்டது",
+    "savedMessage": "உங்கள் சுயவிவரம் புதுப்பிக்கப்பட்டது.",
+    "errorTitle": "பிழை",
+    "saveFailedFallback": "சுயவிவரத்தை சேமிக்க முடியவில்லை"
+  },
+  "settings": {
+    "title": "அமைப்புகள்",
+    "language": "மொழி",
+    "currentLanguage": "தேர்ந்தெடுத்த மொழி: {{language}}",
+    "backToProfile": "சுயவிவரத்திற்கு திரும்பு",
+    "notifications": "அறிவிப்புகள்",
+    "privacy": "தனியுரிமை",
+    "help": "உதவி & ஆதரவு",
+    "about": "பற்றி",
+    "logout": "வெளியேறு"
+  },
+  "medications": {
+    "title": "மருந்துகள்",
+    "addMedication": "மருந்தைச் சேர்க்கவும்",
+    "medicationName": "மருந்து பெயர்",
+    "dosage": "அளவு",
+    "frequency": "அடிக்கடி",
+    "time": "நேரம்",
+    "instructions": "வழிமுறைகள்",
+    "sideEffects": "பக்க விளைவுகள்"
+  },
+  "common": {
+    "save": "சேமி",
+    "cancel": "ரத்து செய்",
+    "delete": "நீக்கு",
+    "edit": "திருத்து",
+    "add": "சேர்",
+    "search": "தேடு",
+    "yes": "ஆம்",
+    "no": "இல்லை",
+    "ok": "சரி",
+    "close": "மூடு",
+    "loading": "ஏற்றுகிறது...",
+    "error": "பிழை",
+    "success": "வெற்றி",
+    "warning": "எச்சரிக்கை"
+  },
+  "errors": {
+    "networkError": "வலைப்பின்னல் பிழை. உங்கள் இணைப்பைச் சரிபார்க்கவும்.",
+    "serverError": "சேவையக பிழை. பின்னர் மீண்டும் முயற்சிக்கவும்.",
+    "invalidInput": "தவறான உள்ளீடு. உங்கள் தரவைச் சரிபார்க்கவும்.",
+    "unauthorized": "அனுமதி இல்லை. மீண்டும் உள்நுழைக."
+  }
+}

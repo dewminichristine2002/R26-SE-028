@@ -1,0 +1,185 @@
+{
+  "selectedAlgorithm": "Logistic Regression",
+  "accuracy": 0.7465753424657534,
+  "precision": 0.1384083044982699,
+  "recall": 0.8,
+  "f1Score": 0.2359882005899705,
+  "rocAuc": 0.8425720164609054,
+  "confusionMatrix": [
+    [
+      723,
+      249
+    ],
+    [
+      10,
+      40
+    ]
+  ],
+  "featuresUsed": [
+    "age",
+    "hypertension",
+    "heart_disease",
+    "avg_glucose_level",
+    "bmi",
+    "gender",
+    "ever_married",
+    "work_type",
+    "Residence_type",
+    "smoking_status"
+  ],
+  "numericFeatures": [
+    "age",
+    "hypertension",
+    "heart_disease",
+    "avg_glucose_level",
+    "bmi"
+  ],
+  "categoricalFeatures": [
+    "gender",
+    "ever_married",
+    "work_type",
+    "Residence_type",
+    "smoking_status"
+  ],
+  "datasetPath": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\data\\raw\\healthcare-dataset-stroke-data.csv",
+  "visualizations": {
+    "confusionMatrix": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\confusion_matrix.png",
+    "rocCurve": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\roc_curve.png",
+    "modelMetricsComparison": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\model_metrics_comparison.png",
+    "featureCorrelationHeatmap": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\feature_correlation_heatmap.png",
+    "targetCorrelationBar": "C:\\Users\\dewmi_my9uqcw\\OneDrive\\Desktop\\R26-SE-028\\ml-service\\app\\models\\training_visualizations\\stroke\\target_correlation_bar.png"
+  },
+  "classBalance": {
+    "trainPositive": 199,
+    "trainNegative": 3889
+  },
+  "selectionPolicy": {
+    "bestIndividualAlgorithm": "Logistic Regression",
+    "ensembleAlgorithm": "Soft Voting Ensemble",
+    "ensembleBaseAlgorithms": [
+      "Logistic Regression",
+      "Random Forest",
+      "XGBoost"
+    ],
+    "ensembleSelected": false,
+    "requiredEnsembleImprovementMetrics": [
+      "accuracy",
+      "recall",
+      "f1Score",
+      "rocAuc"
+    ],
+    "ensembleSelectionRule": "Select the soft-voting ensemble only when it is at least as strong as the best individual model on every required metric and improves at least one required metric."
+  },
+  "modelComparison": [
+    {
+      "algorithm": "Logistic Regression",
+      "metrics": {
+        "accuracy": 0.7465753424657534,
+        "precision": 0.1384083044982699,
+        "recall": 0.8,
+        "f1Score": 0.2359882005899705,
+        "rocAuc": 0.8425720164609054,
+        "confusionMatrix": [
+          [
+            723,
+            249
+          ],
+          [
+            10,
+            40
+          ]
+        ],
+        "positiveRate": 0.3189447331524576
+      }
+    },
+    {
+      "algorithm": "Decision Tree",
+      "metrics": {
+        "accuracy": 0.7906066536203522,
+        "precision": 0.13063063063063063,
+        "recall": 0.58,
+        "f1Score": 0.21323529411764705,
+        "rocAuc": 0.7083950617283951,
+        "confusionMatrix": [
+          [
+            779,
+            193
+          ],
+          [
+            21,
+            29
+          ]
+        ],
+        "positiveRate": 0.16880421797899595
+      }
+    },
+    {
+      "algorithm": "Random Forest",
+      "metrics": {
+        "accuracy": 0.9432485322896281,
+        "precision": 0.34615384615384615,
+        "recall": 0.18,
+        "f1Score": 0.23684210526315788,
+        "rocAuc": 0.7929423868312756,
+        "confusionMatrix": [
+          [
+            955,
+            17
+          ],
+          [
+            41,
+            9
+          ]
+        ],
+        "positiveRate": 0.12104301153346257
+      }
+    },
+    {
+      "algorithm": "XGBoost",
+      "metrics": {
+        "accuracy": 0.8649706457925636,
+        "precision": 0.20270270270270271,
+        "recall": 0.6,
+        "f1Score": 0.30303030303030304,
+        "rocAuc": 0.8251851851851852,
+        "confusionMatrix": [
+          [
+            854,
+            118
+          ],
+          [
+            20,
+            30
+          ]
+        ],
+        "positiveRate": 0.17931075394153595
+      }
+    },
+    {
+      "algorithm": "Soft Voting Ensemble",
+      "baseAlgorithms": [
+        "Logistic Regression",
+        "Random Forest",
+        "XGBoost"
+      ],
+      "metrics": {
+        "accuracy": 0.8718199608610567,
+        "precision": 0.2206896551724138,
+        "recall": 0.64,
+        "f1Score": 0.3282051282051282,
+        "rocAuc": 0.8370164609053499,
+        "confusionMatrix": [
+          [
+            859,
+            113
+          ],
+          [
+            18,
+            32
+          ]
+        ],
+        "positiveRate": 0.20643283088544798
+      }
+    }
+  ]
+}

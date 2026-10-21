@@ -1,0 +1,2 @@
+model_version,evaluation_set,evaluated_samples,accuracy,macro_precision,macro_recall,macro_f1,macro_specificity
+minilm_logistic_regression_v4,ElderMeds Domain Test,140,0.8142857142857143,0.8278231811412589,0.8142857142857143,0.8165781179245072,0.969047619047619

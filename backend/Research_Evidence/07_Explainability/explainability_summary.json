@@ -1,0 +1,255 @@
+{
+  "model_artifact": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S2\\R26-SE-028 (1)\\R26-SE-028\\backend\\ml\\models\\fda_serious_baselines\\logistic_regression_tuned_with_threshold.joblib",
+  "operating_threshold": 0.55,
+  "dataset_path": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S2\\R26-SE-028 (1)\\R26-SE-028\\backend\\ml\\data\\fda_adverse_events_2015_2026_CLEAN.csv",
+  "holdout_rows": 105600,
+  "numeric_caps": {
+    "num_reactions": 41.0,
+    "num_drugs": 59.0,
+    "report_age_days": 4068.0
+  },
+  "explanation_method": {
+    "primary_method": "fitted logistic regression coefficient and per-row contribution analysis",
+    "shap_status": "not used in this script; SHAP-style plots are coefficient-based proxies built from the deployed pipeline",
+    "note": "Because the saved FDA model is a sparse text-plus-tabular Logistic Regression pipeline, this script derives explanations directly from transformed feature values multiplied by the fitted coefficients. This preserves alignment with the deployed artifact without retraining."
+  },
+  "top_positive_features_for_serious": [
+    {
+      "feature": "text__primary_reaction::death",
+      "coefficient": 2.7584390669935273,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::cancer",
+      "coefficient": 2.5324425472931034,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::pneumonia",
+      "coefficient": 2.103127383744098,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::hospitalisation",
+      "coefficient": 1.9040544589494435,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::fracture",
+      "coefficient": 1.7280927036446738,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::renal",
+      "coefficient": 1.572845434919951,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::malignant",
+      "coefficient": 1.5546035531326585,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__suspect_drug::rivaroxaban",
+      "coefficient": 1.5379813644968787,
+      "feature_group": "suspect_drug"
+    },
+    {
+      "feature": "text__suspect_drug::avandia",
+      "coefficient": 1.4960124090947817,
+      "feature_group": "suspect_drug"
+    },
+    {
+      "feature": "text__suspect_drug::zantac",
+      "coefficient": 1.4707295276319166,
+      "feature_group": "suspect_drug"
+    },
+    {
+      "feature": "text__primary_reaction::operation",
+      "coefficient": 1.427169092227756,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "categorical__drug_route_64.0",
+      "coefficient": 1.3697805033536887,
+      "feature_group": "drug"
+    },
+    {
+      "feature": "text__primary_reaction::blindness",
+      "coefficient": 1.3529565837801836,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::thrombosis",
+      "coefficient": 1.3412834469245156,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::haemorrhage",
+      "coefficient": 1.332696924059967,
+      "feature_group": "primary_reaction"
+    }
+  ],
+  "top_negative_features_for_non_serious": [
+    {
+      "feature": "categorical__country_US",
+      "coefficient": -2.8379603734591745,
+      "feature_group": "country"
+    },
+    {
+      "feature": "text__primary_reaction::product",
+      "coefficient": -2.1867980909990226,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "categorical__country_PR",
+      "coefficient": -2.012598860162739,
+      "feature_group": "country"
+    },
+    {
+      "feature": "text__primary_reaction::drug hypersensitivity",
+      "coefficient": -1.762972144752804,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::discomfort",
+      "coefficient": -1.6224891074190773,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::fatigue",
+      "coefficient": -1.6027107599722723,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::site",
+      "coefficient": -1.5826060497479184,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::headache",
+      "coefficient": -1.546449043677441,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::pruritus",
+      "coefficient": -1.5364155388786176,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::rash",
+      "coefficient": -1.4909141832636374,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::drug",
+      "coefficient": -1.4738627098726824,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "categorical__country_Unknown",
+      "coefficient": -1.466026464219007,
+      "feature_group": "country"
+    },
+    {
+      "feature": "text__primary_reaction::nausea",
+      "coefficient": -1.4260880802863396,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::nasopharyngitis",
+      "coefficient": -1.4182217018343952,
+      "feature_group": "primary_reaction"
+    },
+    {
+      "feature": "text__primary_reaction::pain",
+      "coefficient": -1.4083190526924472,
+      "feature_group": "primary_reaction"
+    }
+  ],
+  "top_feature_groups_by_mean_absolute_contribution": [
+    {
+      "feature_group": "country",
+      "mean_abs_contribution": 1.847394510695368
+    },
+    {
+      "feature_group": "primary_reaction",
+      "mean_abs_contribution": 0.9582698620502433
+    },
+    {
+      "feature_group": "num_reactions",
+      "mean_abs_contribution": 0.6696356393193365
+    },
+    {
+      "feature_group": "suspect_drug",
+      "mean_abs_contribution": 0.42197356031682576
+    },
+    {
+      "feature_group": "patient",
+      "mean_abs_contribution": 0.3511012908021187
+    },
+    {
+      "feature_group": "drug_indication",
+      "mean_abs_contribution": 0.24674502939855084
+    },
+    {
+      "feature_group": "num_drugs",
+      "mean_abs_contribution": 0.2435225908396122
+    },
+    {
+      "feature_group": "drug",
+      "mean_abs_contribution": 0.203305201183822
+    },
+    {
+      "feature_group": "pharm",
+      "mean_abs_contribution": 0.19863676684141168
+    },
+    {
+      "feature_group": "year",
+      "mean_abs_contribution": 0.13539090391588607
+    }
+  ],
+  "dataset_summary_reference": {
+    "dataset_path": "C:\\Users\\thyag\\OneDrive\\Desktop\\Y4S2\\R26-SE-028 (1)\\R26-SE-028\\backend\\ml\\data\\fda_adverse_events_2015_2026_CLEAN.csv",
+    "rows_loaded": 528000,
+    "rows_used": 528000,
+    "sample_size": null,
+    "label_distribution": {
+      "0": 133000,
+      "1": 395000
+    },
+    "leakage_columns_present": [
+      "report_id",
+      "receive_date",
+      "quarter",
+      "serious_flags",
+      "is_fatal",
+      "is_hospitalized",
+      "is_life_threat",
+      "is_disabling",
+      "reaction_outcomes",
+      "patient_recovered",
+      "patient_weight_kg",
+      "brand_name",
+      "manufacturer",
+      "reactions",
+      "age_group",
+      "drug_count_category"
+    ],
+    "feature_columns": [
+      "year",
+      "month",
+      "primary_reaction",
+      "num_reactions",
+      "suspect_drug",
+      "drug_route",
+      "drug_indication",
+      "pharm_class",
+      "num_drugs",
+      "patient_age_years",
+      "patient_sex",
+      "country",
+      "report_age_days"
+    ]
+  }
+}

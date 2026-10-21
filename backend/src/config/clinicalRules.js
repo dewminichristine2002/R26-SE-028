@@ -1,0 +1,341 @@
+/**
+ * Section 12.1 — CLIPS-adapted production rule catalog.
+ *
+ * Each rule follows the pattern:
+ *   IF <conditions> THEN (assert risk-factor) WITH salience <priority> AND score <n>
+ *
+ * Python dissertation pseudocode maps to this declarative JS catalog + clinicalRuleEngine.js.
+ */
+
+const CLINICAL_RULES = Object.freeze({
+  P1: {
+    ruleId: 'P1',
+    priority: 1,
+    salience: 1000,
+    shortCircuit: true,
+    factorType: 'allergy_match',
+    name: 'direct_allergy_match',
+    defaultScore: 80,
+    severity: 'high',
+    evidenceSource: 'PATIENT_PROFILE',
+    clipsTemplate: '(defrule P1_direct_allergy_match (patient-allergy ?a) (drug ?d) (match ?a ?d)) => (assert (risk-factor allergy_match +80)))',
+    recommendation: 'Do not take — direct documented allergy match.',
+  },
+  P2: {
+    ruleId: 'P2',
+    priority: 2,
+    salience: 900,
+    shortCircuit: false,
+    factorType: 'allergy_class_match',
+    name: 'atc_class_allergy_overlap',
+    defaultScore: 65,
+    severityMultipliers: { mild: 0.5, moderate: 0.75, severe: 1.0, anaphylactic: 1.25 },
+    severity: 'high',
+    evidenceSource: 'WHO_ATC+DDInter',
+    clipsTemplate: '(defrule P2_class_allergy (allergy-class ?c) (drug-class ?d ?c)) => (assert (risk-factor allergy_class_match (* 65 severity_multiplier))))',
+  },
+  P3: {
+    ruleId: 'P3',
+    priority: 3,
+    salience: 850,
+    shortCircuit: false,
+    factorType: 'nsaid_aspirin_cross_allergy',
+    name: 'nsaid_aspirin_cross_reactivity',
+    defaultScore: 60,
+    severity: 'high',
+    evidenceSource: 'PATIENT_PROFILE+DDInter',
+    clipsTemplate: '(defrule P3_nsaid_cross (aspirin-allergy) (nsaid ?d)) => (assert (risk-factor nsaid_cross +60)))',
+  },
+  P4: {
+    ruleId: 'P4',
+    priority: 4,
+    salience: 800,
+    shortCircuit: false,
+    factorType: 'ddinter_interaction',
+    name: 'ddinter_ddi',
+    defaultScore: 30,
+    severity: 'medium',
+    evidenceSource: 'DDInter',
+    clipsTemplate: '(defrule P4_ddi (interaction ?i) (severity ?s)) => (assert (risk-factor ddinter_interaction ?s)))',
+  },
+  P5: {
+    ruleId: 'P5',
+    priority: 5,
+    salience: 750,
+    shortCircuit: false,
+    factorType: 'pregnancy_contraindication',
+    name: 'pregnancy_high_risk_medicine',
+    defaultScore: 70,
+    severity: 'high',
+    evidenceSource: 'PATIENT_PROFILE+SIDER',
+    clipsTemplate: '(defrule P5_pregnancy (pregnant) (high-risk-drug ?d)) => (assert (risk-factor pregnancy +70)))',
+  },
+  P6: {
+    ruleId: 'P6',
+    priority: 6,
+    salience: 700,
+    shortCircuit: false,
+    factorType: 'dangerous_combination',
+    name: 'dangerous_polypharmacy_combo',
+    defaultScore: 32,
+    severity: 'high',
+    evidenceSource: 'PATIENT_PROFILE+DDInter',
+    clipsTemplate: '(defrule P6_combo (anticoagulant) (nsaid-concurrent)) => (assert (risk-factor dangerous_combination +32)))',
+  },
+  P7: {
+    ruleId: 'P7',
+    priority: 7,
+    salience: 600,
+    shortCircuit: false,
+    factorType: 'sider_symptom_match',
+    name: 'sider_side_effect_overlap',
+    defaultScore: 12,
+    severity: 'medium',
+    evidenceSource: 'SIDER',
+    clipsTemplate: '(defrule P7_sider (symptom-match ?n)) => (assert (risk-factor sider_symptom_match +12)))',
+  },
+  P8: {
+    ruleId: 'P8',
+    priority: 8,
+    salience: 550,
+    shortCircuit: false,
+    factorType: 'chronic_condition',
+    name: 'chronic_contraindication',
+    defaultScore: 10,
+    severity: 'medium',
+    evidenceSource: 'PATIENT_PROFILE+SIDER',
+    clipsTemplate: '(defrule P8_chronic (chronic ?c) (contraindicated-class ?d)) => (assert (risk-factor chronic_condition +10)))',
+  },
+  P9: {
+    ruleId: 'P9',
+    priority: 9,
+    salience: 500,
+    shortCircuit: false,
+    factorType: 'past_reaction',
+    name: 'past_reaction_history',
+    defaultScore: 5,
+    severity: 'medium',
+    evidenceSource: 'PATIENT_PROFILE',
+    clipsTemplate: '(defrule P9_past_reaction (had-reaction-before)) => (assert (risk-factor past_reaction +5)))',
+  },
+  P10: {
+    ruleId: 'P10',
+    priority: 10,
+    salience: 450,
+    shortCircuit: false,
+    factorType: 'polypharmacy_risk',
+    name: 'polypharmacy',
+    defaultScore: 7,
+    severity: 'medium',
+    evidenceSource: 'PATIENT_PROFILE',
+    clipsTemplate: '(defrule P10_polypharmacy (med-count >= 5)) => (assert (risk-factor polypharmacy_risk +7)))',
+  },
+  P11: {
+    ruleId: 'P11',
+    priority: 11,
+    salience: 400,
+    shortCircuit: false,
+    factorType: 'elder_risk',
+    name: 'elderly_sensitivity',
+    defaultScore: 5,
+    severity: 'medium',
+    evidenceSource: 'PATIENT_PROFILE',
+    clipsTemplate: '(defrule P11_elder (age >= 65)) => (assert (risk-factor elder_risk +5)))',
+  },
+  P12: {
+    ruleId: 'P12',
+    priority: 12,
+    salience: 350,
+    shortCircuit: false,
+    factorType: 'narrow_therapeutic_index',
+    name: 'nti_drug',
+    defaultScore: 15,
+    severity: 'medium',
+    evidenceSource: 'RxNorm+SIDER',
+    clipsTemplate: '(defrule P12_nti (nti-drug)) => (assert (risk-factor narrow_therapeutic_index +15)))',
+  },
+  P13: {
+    ruleId: 'P13',
+    priority: 13,
+    salience: 300,
+    shortCircuit: false,
+    factorType: 'renal_impairment_risk',
+    name: 'renal_clearance_risk',
+    defaultScore: 10,
+    severity: 'medium',
+    evidenceSource: 'PATIENT_PROFILE+RxNorm',
+    clipsTemplate: '(defrule P13_renal (renal-disease) (renal-drug)) => (assert (risk-factor renal_impairment_risk +10)))',
+  },
+  P14: {
+    ruleId: 'P14',
+    priority: 14,
+    salience: 290,
+    shortCircuit: false,
+    factorType: 'hepatic_impairment_risk',
+    name: 'hepatic_metabolism_risk',
+    defaultScore: 10,
+    severity: 'medium',
+    evidenceSource: 'PATIENT_PROFILE+RxNorm',
+    clipsTemplate: '(defrule P14_hepatic (hepatic-disease) (hepatic-drug)) => (assert (risk-factor hepatic_impairment_risk +10)))',
+  },
+  P15: {
+    ruleId: 'P15',
+    priority: 15,
+    salience: 200,
+    shortCircuit: false,
+    factorType: 'medicine_history',
+    name: 'prior_check_history',
+    defaultScore: 0,
+    severity: 'low',
+    evidenceSource: 'SYSTEM_HISTORY',
+    clipsTemplate: '(defrule P15_history (prior-check ?level)) => (assert (risk-factor medicine_history ?score)))',
+  },
+  P16: {
+    ruleId: 'P16',
+    priority: 16,
+    salience: 150,
+    shortCircuit: false,
+    factorType: 'knowledge_gap',
+    name: 'rxnorm_match_gap',
+    defaultScore: 12,
+    severity: 'medium',
+    evidenceSource: 'RxNorm',
+    clipsTemplate: '(defrule P16_knowledge_gap (not (rxnorm-match ?d))) => (assert (risk-factor knowledge_gap +12)))',
+  },
+});
+
+const RULE_BY_FACTOR_TYPE = Object.fromEntries(
+  Object.values(CLINICAL_RULES).map((rule) => [rule.factorType, rule])
+);
+
+const P1_RULE = CLINICAL_RULES.P1;
+
+/**
+ * Cross-reactivity matrix for drug classes.
+ * Maps allergen drug classes to arrays of drug classes that cross-react with them.
+ * Based on pharmacological beta-lactam family, NSAID cross-reactivity, etc.
+ */
+const DRUG_CLASS_CROSS_REACTIVITY_MATRIX = Object.freeze({
+  // Beta-lactam family: Penicillins cross-react with cephalosporins and carbapenems
+  penicillin: [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'cephalosporins',
+    'first-generation cephalosporin',
+    'first generation cephalosporin',
+    'second-generation cephalosporin',
+    'second generation cephalosporin',
+    'third-generation cephalosporin',
+    'third generation cephalosporin',
+    'carbapenems',
+    'carbapenem',
+  ],
+
+  // Cephalosporins cross-react with penicillins (beta-lactam family)
+  cephalosporin: [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'cephalosporins',
+    'first-generation cephalosporin',
+    'first generation cephalosporin',
+    'second-generation cephalosporin',
+    'second generation cephalosporin',
+    'third-generation cephalosporin',
+    'third generation cephalosporin',
+    'carbapenems',
+  ],
+  cephalosporins: [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'cephalosporins',
+    'first-generation cephalosporin',
+    'first generation cephalosporin',
+    'second-generation cephalosporin',
+    'second generation cephalosporin',
+    'third-generation cephalosporin',
+    'third generation cephalosporin',
+  ],
+
+  // Specific cephalosporin generations
+  'first-generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'first-generation cephalosporin',
+  ],
+  'first generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'first generation cephalosporin',
+  ],
+  'second-generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'second-generation cephalosporin',
+  ],
+  'second generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'second generation cephalosporin',
+  ],
+  'third-generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'third-generation cephalosporin',
+  ],
+  'third generation cephalosporin': [
+    'penicillin',
+    'beta-lactam',
+    'beta lactam',
+    'cephalosporin',
+    'third generation cephalosporin',
+  ],
+
+  // NSAID and Aspirin/Salicylate cross-reactivity
+  nsaid: ['nsaid', 'nonsteroidal anti-inflammatory', 'non steroidal anti inflammatory', 'salicylate', 'aspirin'],
+  salicylate: ['salicylate', 'nsaid', 'aspirin', 'nonsteroidal anti-inflammatory'],
+  aspirin: ['aspirin', 'salicylate', 'nsaid', 'nonsteroidal anti-inflammatory'],
+});
+
+/**
+ * Check if two drug classes cross-react with each other.
+ * @param {string} allergyDrugClass - The drug class from the allergy profile
+ * @param {string} currentDrugClass - The drug class of the current medication
+ * @returns {boolean} true if cross-reactivity exists between the classes
+ */
+const hasClassCrossReactivity = (allergyDrugClass, currentDrugClass) => {
+  if (!allergyDrugClass || !currentDrugClass) {
+    return false;
+  }
+
+  const allergyNormalized = String(allergyDrugClass).toLowerCase().trim();
+  const currentNormalized = String(currentDrugClass).toLowerCase().trim();
+
+  const crossReactiveClasses = DRUG_CLASS_CROSS_REACTIVITY_MATRIX[allergyNormalized] || [];
+  return crossReactiveClasses.some(
+    (cl) => cl === currentNormalized || currentNormalized.includes(cl) || cl.includes(currentNormalized)
+  );
+};
+
+module.exports = {
+  CLINICAL_RULES,
+  RULE_BY_FACTOR_TYPE,
+  P1_RULE,
+  DRUG_CLASS_CROSS_REACTIVITY_MATRIX,
+  hasClassCrossReactivity,
+};

@@ -1,0 +1,244 @@
+{
+  "app": {
+    "name": "ElderMeds",
+    "welcome": "ElderMeds වෙත සාදරයෙන් පිළිගනිමු"
+  },
+  "navigation": {
+    "home": "මුල් පිටුව",
+    "profile": "පැතිකඩ",
+    "settings": "සැකසුම්"
+  },
+  "home": {
+    "title": "මුල් පිටුව",
+    "welcome": "නැවත සාදරයෙන් පිළිගනිමු!",
+    "reminder": "මතක් කිරීම",
+    "allergies": "අසාත්මිකතා",
+    "emotions": "හැඟීම්",
+    "dashboard": "පාලක පුවරුව",
+    "medications": "ඖෂධ",
+    "appointments": "හමුවීම්",
+    "health": "සෞඛ්‍ය තත්ත්වය",
+    "goodDay": "සුබ දවසක්, {{name}}",
+    "careReady": "ඔබ සූදානම් වූ විට ඔබගේ ඖෂධ සත්කාරය සූදානම්.",
+    "care": "සත්කාර",
+    "mainAction": "ප්‍රධාන ක්‍රියාව",
+    "openScheduleTools": "අද කාලසටහන සහ ඖෂධ මෙවලම් විවෘත කරන්න.",
+    "quickCare": "ඉක්මන් සත්කාර",
+    "largeButtons": "පහසුවෙන් තට්ටු කිරීමට විශාල බොත්තම්",
+    "featurePreparing": "මෙම විශේෂාංගය ElderMeds සඳහා සූදානම් කරමින් පවතී.",
+    "logoutHint": "ElderMeds වෙතින් පිටවෙයි",
+    "profileHint": "ඔබගේ ElderMeds පැතිකඩ විවෘත කරයි",
+    "menu": {
+      "medicineReminder": {
+        "title": "ඖෂධ මතක් කිරීම",
+        "subtitle": "අද කාලසටහන, ඖෂධ ලැයිස්තුව, තොගය සහ ආරක්ෂක මෙවලම්.",
+        "helper": "විවෘත"
+      },
+      "allergyNotes": {
+        "title": "අසාත්මිකතා සටහන්",
+        "subtitle": "වැදගත් අසාත්මිකතා තොරතුරු ළඟ තබා ගන්න.",
+        "helper": "ඉක්මනින්"
+      },
+      "moodCheck": {
+        "title": "මනෝභාව පරීක්ෂාව",
+        "subtitle": "ඔබට දැනෙන ආකාරය සටහන් කිරීමට සරල ස්ථානයක්.",
+        "helper": "ඉක්මනින්"
+      },
+      "healthDashboard": {
+        "title": "සෞඛ්‍ය පාලක පුවරුව",
+        "subtitle": "ඔබගේ සත්කාර ප්‍රගතිය සන්සුන් දසුනකින් බලන්න.",
+        "helper": "ඉක්මනින්"
+      }
+    },
+    "reminderMenu": {
+      "titleLine1": "ඖෂධ",
+      "titleLine2": "මතක් කිරීම",
+      "chooseAction": "ක්‍රියාව තෝරන්න",
+      "text": "අකුරු",
+      "scheduleBoard": {
+        "title": "කාලසටහන් පුවරුව",
+        "subtitle": "අද ඖෂධ බලන්න",
+        "helper": "අද"
+      },
+      "routineSetup": {
+        "title": "දිනචරියා සැකසුම",
+        "subtitle": "කෑම වේලාවන් සකසන්න",
+        "helper": "වේලා"
+      },
+      "addMedicine": {
+        "title": "ඖෂධ එක් කරන්න",
+        "subtitle": "නව ඖෂධ එක් කරන්න",
+        "helper": "එක් කරන්න"
+      },
+      "medicineList": {
+        "title": "ඖෂධ ලැයිස්තුව",
+        "subtitle": "ඖෂධ බලන්න",
+        "helper": "ලැයිස්තුව"
+      },
+      "medicineStock": {
+        "title": "ඖෂධ තොගය",
+        "subtitle": "ඖෂධ ප්‍රමාණය පරීක්ෂා කරන්න",
+        "helper": "තොගය"
+      },
+      "safetyCenter": {
+        "title": "ආරක්ෂක මධ්‍යස්ථානය",
+        "subtitle": "ආරක්ෂක අනතුරු ඇඟවීම් බලන්න",
+        "helper": "ආරක්ෂිත"
+      }
+    },
+    "addMedicine": {
+      "title": "ඖෂධ එක් කරන්න",
+      "chooseHow": "එක් කරන ආකාරය තෝරන්න",
+      "pickEasiest": "පහසුම ආකාරය තෝරන්න.",
+      "scanReceipt": "රිසිට්පත ස්කෑන් කරන්න",
+      "scanReceiptHint": "ඖෂධ එක් කිරීමට ෆාමසි රිසිට්පත ස්කෑන් කරන්න",
+      "useCamera": "කැමරාව භාවිතා කරන්න. වේගවත් ක්‍රමය.",
+      "typeDetails": "විස්තර ටයිප් කරන්න",
+      "manualEntry": "අතින් ඇතුළත් කිරීම",
+      "manualEntryHint": "ඖෂධ විස්තර අතින් ටයිප් කරන්න",
+      "enterYourself": "ඔබම ඇතුළත් කරන්න."
+    },
+    "caregiver": {
+      "dashboard": "සත්කාරක පාලක පුවරුව",
+      "subtitle": "ඖෂධ ක්‍රියාකාරකම් නිරීක්ෂණය කර ඉක්මනින් ප්‍රතිචාර දක්වන්න.",
+      "active": "සක්‍රීය",
+      "unreadAlerts": "නොකියවූ අනතුරු ඇඟවීම්",
+      "timelineEvents": "කාලරේඛා සිදුවීම්",
+      "immediateAction": "ක්ෂණික ක්‍රියාව",
+      "markRead": "කියවූ ලෙස සලකන්න",
+      "recentUpdates": "මෑත යාවත්කාලීන",
+      "noNotifications": "තවම දැනුම්දීම් නැත.",
+      "timelineView": "කාලරේඛා දසුන",
+      "noTimelineEvents": "තවම කාලරේඛා සිදුවීම් නැත.",
+      "minimize": "කුඩා කරන්න",
+      "maximize": "විශාල කරන්න",
+      "showMore": "තවත් {{count}} පෙන්වන්න",
+      "viewProfile": "පැතිකඩ බලන්න",
+      "notifications": "දැනුම්දීම්",
+      "noUnreadAlerts": "මේ මොහොතේ නොකියවූ අනතුරු ඇඟවීම් නැත.",
+      "markNotificationsRead": "සත්කාරක දැනුම්දීම් කියවූ ලෙස සලකන්න",
+      "markNotificationsReadHint": "නොකියවූ සත්කාරක අනතුරු ඇඟවීම් කියවූ ලෙස සලකයි",
+      "markAlertRead": "අනතුරු ඇඟවීම කියවූ ලෙස සලකන්න",
+      "refillAlert": "නැවත පුරවීමේ අනතුරු ඇඟවීම",
+      "caregiverAlert": "සත්කාරක අනතුරු ඇඟවීම",
+      "unknownDay": "නොදන්නා දිනය",
+      "today": "අද",
+      "yesterday": "ඊයේ",
+      "medicine": "ඖෂධ",
+      "doubleDose": "ද්විත්ව මාත්‍රාව හඳුනාගැනුණි",
+      "missed": "මඟහැරුණි",
+      "taken": "ගෙන ඇත",
+      "reminderPending": "මතක් කිරීම බලාපොරොත්තුවෙන්",
+      "statusUpdated": "තත්ත්වය යාවත්කාලීන විය"
+    }
+  },
+  "auth": {
+    "signIn": "පිවිසෙන්න",
+    "signInSubtitle": "ඖෂධ සත්කාරය දිගටම භාවිතා කිරීමට ඔබගේ ගිණුම් විස්තර භාවිතා කරන්න.",
+    "email": "ඊමේල්",
+    "emailPlaceholder": "you@example.com",
+    "passwordOrPhone": "මුරපදය හෝ සත්කාරක දුරකථනය",
+    "passwordPlaceholder": "මුරපදය ඇතුළත් කරන්න",
+    "showPassword": "මුරපදය පෙන්වන්න",
+    "hidePassword": "මුරපදය සඟවන්න",
+    "passwordToggleHint": "මුරපද දෘශ්‍යතාව මාරු කරයි",
+    "login": "පිවිසෙන්න",
+    "signingIn": "පිවිසෙමින්...",
+    "createAccount": "ගිණුමක් සාදන්න",
+    "missingFieldsTitle": "අවශ්‍ය තොරතුරු නොමැත",
+    "loginMissingFields": "කරුණාකර ඊමේල් සහ මුරපදය ඇතුළත් කරන්න.",
+    "loginFailedTitle": "පිවිසීම අසාර්ථකයි",
+    "loginFailedFallback": "පිවිසීම අසාර්ථකයි",
+    "registerTitle": "ElderMeds ගිණුමක් සාදන්න",
+    "registerSubtitle": "ඔබගේ පැතිකඩ සහ මතක් කිරීම් සමමුහුර්තව පවතී",
+    "fullNamePlaceholder": "සම්පූර්ණ නම",
+    "passwordMinPlaceholder": "මුරපදය (අවම අකුරු 6)",
+    "creating": "සාදමින්...",
+    "register": "ලියාපදිංචි වන්න",
+    "backToLogin": "පිවිසුමට ආපසු",
+    "registerMissingFields": "කරුණාකර නම, ඊමේල් සහ මුරපදය ඇතුළත් කරන්න.",
+    "registrationFailedTitle": "ලියාපදිංචිය අසාර්ථකයි",
+    "registrationFailedFallback": "ලියාපදිංචිය අසාර්ථකයි"
+  },
+  "profile": {
+    "title": "පැතිකඩ",
+    "myProfile": "මගේ පැතිකඩ",
+    "name": "නම",
+    "email": "ඊමේල්",
+    "phone": "දුරකථන",
+    "dateOfBirth": "උපන් දිනය",
+    "bloodType": "රුධිර වර්ගය",
+    "emergencyContact": "හදිසි සම්බන්ධතා",
+    "personalDetails": "පෞද්ගලික විස්තර",
+    "healthDetails": "සෞඛ්‍ය විස්තර",
+    "fullName": "සම්පූර්ණ නම",
+    "fullNamePlaceholder": "ඔබගේ සම්පූර්ණ නම",
+    "phonePlaceholder": "උදා. +94 77 123 4567",
+    "caregiverEmail": "සත්කාරක ඊමේල්",
+    "caregiverEmailPlaceholder": "caregiver@email.com",
+    "caregiverPhone": "සත්කාරක දුරකථන",
+    "caregiverPhonePlaceholder": "සත්කාරක පිවිසුම සඳහා භාවිතා වේ",
+    "dateOfBirthFormat": "උපන් දිනය (YYYY-MM-DD)",
+    "dateOfBirthPlaceholder": "1950-01-15",
+    "bloodTypePlaceholder": "උදා. O+",
+    "saveProfile": "පැතිකඩ සුරකින්න",
+    "saving": "සුරකිමින්...",
+    "logout": "පිටවීම",
+    "userFallback": "පරිශීලක",
+    "noEmail": "ඊමේල් නැත",
+    "backToHome": "මුල් පිටුවට ආපසු",
+    "backToHomeHint": "මුල් පිටුවට ආපසු යයි",
+    "openSettings": "සැකසුම් විවෘත කරන්න",
+    "openSettingsHint": "යෙදුම් සැකසුම් විවෘත කරයි",
+    "validationTitle": "වලංගුකරණය",
+    "fullNameRequired": "සම්පූර්ණ නම අවශ්‍යයි.",
+    "caregiverEmailDifferent": "සත්කාරක ඊමේල් ඔබගේ ඊමේල් ලිපිනයෙන් වෙනස් විය යුතුය.",
+    "savedTitle": "සුරකින ලදී",
+    "savedMessage": "ඔබගේ පැතිකඩ යාවත්කාලීන කර ඇත.",
+    "errorTitle": "දෝෂය",
+    "saveFailedFallback": "පැතිකඩ සුරැකීමට අසමත් විය"
+  },
+  "settings": {
+    "title": "සැකසුම්",
+    "language": "භාෂාව",
+    "currentLanguage": "තෝරාගත් භාෂාව: {{language}}",
+    "backToProfile": "පැතිකඩට ආපසු",
+    "notifications": "දැනුම්දීම්",
+    "privacy": "පෞද්ගලිකත්වය",
+    "help": "උදව් සහ සහාය",
+    "about": "පිළිබඳ",
+    "logout": "පිටවීම"
+  },
+  "medications": {
+    "title": "ඖෂධ",
+    "addMedication": "ඖෂධ එක් කරන්න",
+    "medicationName": "ඖෂධ නම",
+    "dosage": "මාත්‍රාව",
+    "frequency": "වාර ගණන",
+    "time": "වේලාව",
+    "instructions": "උපදෙස්",
+    "sideEffects": "අතුරු ආබාධ"
+  },
+  "common": {
+    "save": "සුරකින්න",
+    "cancel": "අවලංගු කරන්න",
+    "delete": "මකන්න",
+    "edit": "සංස්කරණය",
+    "add": "එක් කරන්න",
+    "search": "සොයන්න",
+    "yes": "ඔව්",
+    "no": "නැහැ",
+    "ok": "හරි",
+    "close": "වසන්න",
+    "loading": "පූරණය වෙමින්...",
+    "error": "දෝෂය",
+    "success": "සාර්ථකයි",
+    "warning": "අවවාදය"
+  },
+  "errors": {
+    "networkError": "ජාල දෝෂයකි. කරුණාකර ඔබගේ සම්බන්ධතාව පරීක්ෂා කරන්න.",
+    "serverError": "සේවාදායක දෝෂයකි. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+    "invalidInput": "වලංගු නොවන ඇතුළත් කිරීමකි. කරුණාකර දත්ත පරීක්ෂා කරන්න.",
+    "unauthorized": "අවසර නැත. කරුණාකර නැවත පිවිසෙන්න."
+  }
+}

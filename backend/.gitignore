@@ -1,9 +1,45 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .env.local
 .DS_Store
 npm-debug.log
 yarn-error.log
+logs/
+*.log
+*.out
+*.err
 dist/
 build/
 coverage/
+htmlcov/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+ml/data/public/ePillID_data/
+ml/data/public/pillbox/
+.venv-mediapipe/
+ml/.venv311/
+venv/
+.venv/
+.npm-cache/
+ml/runs/
+ml/.ultralytics/
+.venv*/
+venv*/
+**/.venv*/
+**/venv*/
+**/__pycache__/
+# Large local research datasets
+ml/data/fda_adverse_events_2015_2026_CLEAN.csv
+# Large ML model artifacts
+ml/models/fda_serious_baselines/random_forest.joblib
+ml/models/fda_serious_baselines/random_forest_tuned.joblib
+# Local Tesseract OCR language data
+eng.traineddata
+# Local Tesseract OCR language data
+eng.traineddata

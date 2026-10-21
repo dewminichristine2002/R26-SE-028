@@ -1,18 +1,531 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, BackHandler, Platform, StatusBar, View } from 'react-native';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './src/i18n/config';
 import { languageService } from './src/services/languageService';
 import HomeScreen from './src/screens/HomeScreen';
+import SplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import MedicineSafetyScreen from './src/screens/MedicineSafetyScreen';
+import UnifiedDashboardScreen from './src/screens/UnifiedDashboardScreen';
+import QuickCareScreen from './src/screens/QuickCareScreen';
+import AssistantChatScreen from './src/screens/AssistantChatScreen';
+import DiabetesPredictionScreen from './src/screens/DiabetesPredictionScreen';
+import StrokePredictionScreen from './src/screens/StrokePredictionScreen';
+import HypertensionPredictionScreen from './src/screens/HypertensionPredictionScreen';
+import AssistantFAB from './src/components/AssistantFAB';
+import AppHeader from './src/components/AppHeader';
+import { HeaderAccountContext } from './src/components/HeaderAccountActions';
+import AppTabBar from './src/components/AppTabBar';
+import EmotionalSupportNavigator from './src/features/emotionalSupport/EmotionalSupportNavigator';
+import { authService } from './src/services/authService';
+import { userService } from './src/services/userService';
+import { reminderNotificationService } from './src/services/reminderNotificationService';
+
+let NotificationsModule = null;
+let SpeechModule = null;
+
+const PREDICTION_SCREENS = new Set([
+  'diabetes-prediction',
+  'stroke-prediction',
+  'hypertension-prediction',
+]);
+
+try {
+  NotificationsModule = require('expo-notifications');
+} catch (error) {
+  console.log('[App] Notifications module unavailable:', error?.message || error);
+}
+
+try {
+  SpeechModule = require('expo-speech');
+} catch (error) {
+  console.log('[App] Speech module unavailable:', error?.message || error);
+}
 
 export default function App() {
-  useEffect(() => {
-    // Load saved language preference on app startup
-    languageService.loadSavedLanguage();
+  const [isBooting, setIsBooting] = useState(true);
+  const [authMode, setAuthMode] = useState('login');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeScreen, setActiveScreen] = useState('home');
+  const [profileReturnScreen, setProfileReturnScreen] = useState('home');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [homeLaunchIntent, setHomeLaunchIntent] = useState(null);
+  const [medicineSafetyReturn, setMedicineSafetyReturn] = useState('home');
+  const [assistantInitialPrompt, setAssistantInitialPrompt] = useState('');
+  const [assistantReturnScreen, setAssistantReturnScreen] = useState('home');
+  const [predictionReturnScreen, setPredictionReturnScreen] = useState('quick-care');
+  const [homeSection, setHomeSection] = useState('home');
+  const [tabNavigationKey, setTabNavigationKey] = useState(0);
+  const [emotionalSupportLaunch, setEmotionalSupportLaunch] = useState({ route: 'ElderHome', nonce: 0 });
+
+  const handleHomeSectionChange = useCallback((section) => {
+    setHomeSection(section);
+    if (section === 'home') {
+      setActiveScreen((screen) => screen === 'medicines' ? 'home' : screen);
+    }
   }, []);
+
+  const selectTab = (tab) => {
+    if (tab === 'safety') {
+      if (activeScreen === 'allergies') return;
+      setMedicineSafetyReturn(activeScreen === 'medicines' || (activeScreen === 'home' && homeSection === 'medicines') ? 'medicines' : 'home');
+      setActiveScreen('allergies');
+      return;
+    }
+    if (tab === 'home' || tab === 'medicines') {
+      setHomeLaunchIntent(null);
+      setHomeSection(tab);
+      setTabNavigationKey((key) => key + 1);
+      setActiveScreen(tab);
+      return;
+    }
+    if (tab === 'wellness') {
+      openEmotionalSupport();
+      return;
+    }
+    setActiveScreen({ overview: 'unified-dashboard', care: 'quick-care' }[tab]);
+  };
+
+  const handleAssistantNavigation = (navigation = {}) => {
+    const launchIntent = navigation.launchIntent
+      ? { ...navigation.launchIntent, nonce: navigation.launchIntent.nonce || Date.now() }
+      : null;
+
+    if (navigation.screen === 'home' || launchIntent) {
+      if (launchIntent) {
+        setHomeLaunchIntent(launchIntent);
+      }
+      setActiveScreen('home');
+      setAssistantInitialPrompt('');
+      return;
+    }
+
+    if (navigation.screen) {
+      if (PREDICTION_SCREENS.has(navigation.screen)) {
+        setPredictionReturnScreen(assistantReturnScreen || 'quick-care');
+      }
+      setActiveScreen(navigation.screen);
+      setAssistantInitialPrompt('');
+    }
+  };
+
+  // Android hardware back button navigation
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      if (!isAuthenticated) {
+        return false;
+      }
+      if (activeScreen === 'assistant-chat') {
+        const returnScreen = assistantReturnScreen && assistantReturnScreen !== 'assistant-chat'
+          ? assistantReturnScreen
+          : 'unified-dashboard';
+        setActiveScreen(returnScreen);
+        setAssistantInitialPrompt('');
+        return true;
+      }
+      if (
+        activeScreen === 'diabetes-prediction' ||
+        activeScreen === 'stroke-prediction' ||
+        activeScreen === 'hypertension-prediction'
+      ) {
+        setActiveScreen(predictionReturnScreen || 'quick-care');
+        return true;
+      }
+      if (activeScreen === 'quick-care') {
+        setActiveScreen('home');
+        return true;
+      }
+      if (activeScreen === 'unified-dashboard') {
+        setActiveScreen('home');
+        return true;
+      }
+      if (activeScreen === 'profile') {
+        setActiveScreen(profileReturnScreen);
+        return true;
+      }
+      if (activeScreen === 'settings') {
+        setActiveScreen('profile');
+        return true;
+      }
+      if (activeScreen === 'allergies') {
+        setHomeLaunchIntent(null);
+        setActiveScreen(medicineSafetyReturn === 'medicines' ? 'medicines' : 'home');
+        return true;
+      }
+      if (activeScreen !== 'home') {
+        setActiveScreen('home');
+        return true;
+      }
+      return false;
+    };
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, [isAuthenticated, activeScreen, assistantReturnScreen, predictionReturnScreen, medicineSafetyReturn, profileReturnScreen]);
+
+  const openAssistant = (options = {}) => {
+    const fromScreen = activeScreen === 'assistant-chat' ? assistantReturnScreen : activeScreen;
+    setAssistantReturnScreen(fromScreen && fromScreen !== 'assistant-chat' ? fromScreen : 'unified-dashboard');
+    setAssistantInitialPrompt(options.initialPrompt || '');
+    setActiveScreen('assistant-chat');
+  };
+
+  const openMedicineSafety = (returnTo = 'home') => {
+    setMedicineSafetyReturn(returnTo);
+    setActiveScreen('allergies');
+  };
+
+  const openEmotionalSupport = (route = 'ElderHome') => {
+    setEmotionalSupportLaunch({ route, nonce: Date.now() });
+    setActiveScreen('emotional-support');
+  };
+
+  const closeAssistant = () => {
+    const returnScreen = assistantReturnScreen && assistantReturnScreen !== 'assistant-chat'
+      ? assistantReturnScreen
+      : 'unified-dashboard';
+    setActiveScreen(returnScreen);
+    setAssistantInitialPrompt('');
+  };
+
+  const openPredictionScreen = (screen) => {
+    setPredictionReturnScreen(activeScreen || 'quick-care');
+    setActiveScreen(screen);
+  };
+
+  const closePredictionScreen = () => {
+    setActiveScreen(predictionReturnScreen || 'quick-care');
+  };
+
+  const openAssistantFromFab = () => {
+    if (activeScreen === 'unified-dashboard') {
+      openAssistant({
+        initialPrompt: currentUser?.role === 'caregiver'
+          ? 'Give me a short overall summary of how my elder is doing today.'
+          : 'Give me a short overall summary of how I am doing today.',
+      });
+      return;
+    }
+
+    openAssistant();
+  };
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      await languageService.loadSavedLanguage();
+
+      const token = await authService.getToken();
+
+      if (token) {
+        try {
+          const profile = await userService.getMyProfile();
+          setCurrentUser(profile);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.log('[App] Session restore failed, clearing local auth:', error.message);
+          await authService.logout();
+        }
+      }
+
+      setTimeout(() => {
+        setIsBooting(false);
+      }, 1500);
+    };
+
+    bootstrap();
+  }, []);
+
+  useEffect(() => {
+    const scheduleReminders = async () => {
+      if (!isAuthenticated) {
+        return;
+      }
+
+      try {
+        await reminderNotificationService.rescheduleDailyReminders();
+      } catch (error) {
+        console.log('[App] Reminder scheduling failed:', error?.message || error);
+      }
+    };
+
+    scheduleReminders();
+  }, [isAuthenticated, currentUser?.id]);
+
+  useEffect(() => {
+    if (!NotificationsModule || !SpeechModule) {
+      return undefined;
+    }
+
+    const subscription = NotificationsModule.addNotificationReceivedListener((event) => {
+      const title = event?.request?.content?.title || '';
+      const body = event?.request?.content?.body || '';
+      const speechText = [title, body].filter(Boolean).join('. ');
+
+      if (!speechText) {
+        return;
+      }
+
+      SpeechModule.speak(speechText, {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.95,
+      });
+    });
+
+    return () => {
+      subscription?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!NotificationsModule) {
+      return undefined;
+    }
+
+    const responseSubscription = NotificationsModule.addNotificationResponseReceivedListener((response) => {
+      const notificationType = response?.notification?.request?.content?.data?.type;
+      if (notificationType !== 'medicine-reminder') {
+        return;
+      }
+
+      setActiveScreen('home');
+      setHomeLaunchIntent({
+        type: 'schedule-board',
+        nonce: Date.now(),
+      });
+    });
+
+    return () => {
+      responseSubscription?.remove?.();
+    };
+  }, []);
+
+  const handleLoginSuccess = async (user) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setActiveScreen('home');
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Log out of ElderMeds?', 'You can sign in again to access your care information.', [
+      { text: 'Stay signed in', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await authService.logout();
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+            setAuthMode('login');
+            setActiveScreen('home');
+          } catch (error) {
+            Alert.alert('Could not log out', 'Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleProfileUpdated = (updatedUser) => {
+    setCurrentUser(updatedUser);
+  };
+
+  const renderContent = () => {
+    if (isBooting) {
+      return <SplashScreen />;
+    }
+
+    if (!isAuthenticated) {
+      if (authMode === 'register') {
+        return (
+          <RegisterScreen
+            onRegisterSuccess={handleLoginSuccess}
+            onBackToLogin={() => setAuthMode('login')}
+          />
+        );
+      }
+
+      return (
+        <LoginScreen
+          onLoginSuccess={handleLoginSuccess}
+          onNavigateRegister={() => setAuthMode('register')}
+        />
+      );
+    }
+
+    if (activeScreen === 'profile') {
+      return (
+        <ProfileScreen
+          user={currentUser}
+          onOpenSettings={() => setActiveScreen('settings')}
+          onProfileUpdated={handleProfileUpdated}
+        />
+      );
+    }
+
+    if (activeScreen === 'settings') {
+      return (
+        <SettingsScreen
+          onBack={() => setActiveScreen('profile')}
+        />
+      );
+    }
+
+    if (activeScreen === 'allergies') {
+      return (
+        <MedicineSafetyScreen
+          onBack={() => {
+            setHomeLaunchIntent(null);
+            setActiveScreen(medicineSafetyReturn === 'medicines' ? 'medicines' : 'home');
+          }}
+          onLogout={handleLogout}
+          initialRoute="home"
+        />
+      );
+    }
+
+    if (activeScreen === 'history' || activeScreen === 'medicine-profile') {
+      return (
+        <SettingsScreen
+          onBack={() => setActiveScreen('profile')}
+        />
+      );
+    }
+
+    if (activeScreen === 'emotional-support') {
+      return <EmotionalSupportNavigator key={emotionalSupportLaunch.nonce} user={currentUser} initialRoute={emotionalSupportLaunch.route} onExit={() => setActiveScreen('home')} />;
+    }
+
+    if (activeScreen === 'unified-dashboard') {
+      return (
+        <UnifiedDashboardScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+          onOpenAssistant={openAssistant}
+          onOpenQuickCare={() => setActiveScreen('quick-care')}
+        />
+      );
+    }
+
+    if (activeScreen === 'quick-care') {
+      return (
+        <QuickCareScreen
+          user={currentUser}
+          onBack={() => setActiveScreen('home')}
+          onOpenSummary={() => setActiveScreen('unified-dashboard')}
+          onOpenAssistant={openAssistant}
+          onOpenDiabetesPrediction={() => openPredictionScreen('diabetes-prediction')}
+          onOpenStrokePrediction={() => openPredictionScreen('stroke-prediction')}
+          onOpenHypertensionPrediction={() => openPredictionScreen('hypertension-prediction')}
+        />
+      );
+    }
+
+    if (activeScreen === 'diabetes-prediction') {
+      return (
+        <DiabetesPredictionScreen
+          user={currentUser}
+          onBack={closePredictionScreen}
+        />
+      );
+    }
+
+    if (activeScreen === 'stroke-prediction') {
+      return (
+        <StrokePredictionScreen
+          user={currentUser}
+          onBack={closePredictionScreen}
+        />
+      );
+    }
+
+    if (activeScreen === 'hypertension-prediction') {
+      return (
+        <HypertensionPredictionScreen
+          user={currentUser}
+          onBack={closePredictionScreen}
+        />
+      );
+    }
+
+    if (activeScreen === 'assistant-chat') {
+      return (
+        <AssistantChatScreen
+          initialPrompt={assistantInitialPrompt}
+          onBack={closeAssistant}
+          onAgentNavigate={handleAssistantNavigation}
+          user={currentUser}
+        />
+      );
+    }
+
+    return (
+      <HomeScreen
+        key={`${activeScreen}-${tabNavigationKey}`}
+        user={currentUser}
+        initialSection={activeScreen === 'medicines' ? 'medicines' : 'home'}
+        onOpenAllergies={(options) => openMedicineSafety(options?.returnTo === 'medicines' ? 'medicines' : 'home')}
+        onOpenMedicine={() => openMedicineSafety()}
+        onOpenHistory={() => setActiveScreen('history')}
+        launchIntent={homeLaunchIntent}
+        onLaunchIntentConsumed={() => setHomeLaunchIntent(null)}
+        onSectionChange={handleHomeSectionChange}
+        onOpenEmotionalSupport={openEmotionalSupport}
+        onOpenDashboard={() => setActiveScreen('unified-dashboard')}
+        onOpenQuickCare={() => setActiveScreen('quick-care')}
+        onOpenAssistant={openAssistant}
+      />
+    );
+  };
+
+  const showFab =
+    isAuthenticated &&
+    !isBooting &&
+    (activeScreen === 'unified-dashboard' || (activeScreen === 'home' && homeSection === 'home'));
+  const showTabs = isAuthenticated && !isBooting && [
+    'home', 'medicines', 'allergies', 'unified-dashboard', 'quick-care', 'emotional-support', 'profile',
+  ].includes(activeScreen);
+  const tabScreen = activeScreen === 'profile' ? profileReturnScreen : activeScreen;
+  const activeTab = tabScreen === 'medicines' ? 'medicines' : tabScreen === 'home'
+    ? homeSection
+    : { allergies: 'safety', 'unified-dashboard': 'overview', 'quick-care': 'care', 'emotional-support': 'wellness' }[tabScreen];
+  const headerBackground = activeScreen === 'home' && homeSection === 'home'
+    ? '#ECF8F1'
+    : activeScreen === 'medicines' || (activeScreen === 'home' && homeSection === 'medicines')
+      ? '#F0F5EF'
+      : activeScreen === 'unified-dashboard'
+        ? '#F2F7F3'
+        : '#F7F8F5';
+  const openProfile = () => {
+    if (activeScreen === 'profile') return;
+    if (activeScreen !== 'settings') {
+      setProfileReturnScreen(activeScreen === 'home' && homeSection === 'medicines' ? 'medicines' : activeScreen);
+    }
+    setActiveScreen('profile');
+  };
 
   return (
     <I18nextProvider i18n={i18n}>
-      <HomeScreen />
+      <StatusBar barStyle="dark-content" backgroundColor={isAuthenticated && !isBooting ? headerBackground : '#F7F8F5'} />
+      <HeaderAccountContext.Provider value={{ onOpenProfile: openProfile, onLogout: handleLogout, isProfileActive: activeScreen === 'profile' }}>
+        <View style={{ flex: 1, backgroundColor: '#F7F8F5' }}>
+        {isAuthenticated && !isBooting && activeScreen === 'home' && homeSection === 'home' && (
+          <AppHeader
+            onOpenProfile={openProfile}
+            onLogout={handleLogout}
+            backgroundColor={headerBackground}
+          />
+        )}
+        <View style={{ flex: 1 }}>{renderContent()}</View>
+        {showTabs && <AppTabBar activeTab={activeTab} onSelect={selectTab} />}
+        <AssistantFAB visible={showFab} bottomOffset={showTabs ? 85 : 20} onPress={openAssistantFromFab} />
+        </View>
+      </HeaderAccountContext.Provider>
     </I18nextProvider>
   );
 }

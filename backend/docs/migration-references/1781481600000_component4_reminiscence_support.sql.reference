@@ -1,0 +1,187 @@
+-- Component 4: Reminiscence-Based AI Emotional and Cognitive Engagement Support
+-- This migration creates only the database objects required for the finalized
+-- reminiscence, mood check-in, narrative logging, support activity, and caregiver alert flow.
+
+-- Supabase normally enables pgcrypto, but this keeps gen_random_uuid() portable.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Stores curated reminiscence prompts shown to elders before voice storytelling.
+CREATE TABLE IF NOT EXISTS reminiscence_prompts (
+  prompt_id SERIAL PRIMARY KEY,
+  prompt_code VARCHAR(80) UNIQUE NOT NULL,
+  title VARCHAR(150) NOT NULL,
+  image_storage_url TEXT,
+  prompt_text TEXT NOT NULL,
+  category VARCHAR(80),
+  historical_era VARCHAR(100),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Stores simple daily mood check-ins, including manual and voice-assisted entries.
+CREATE TABLE IF NOT EXISTS mood_checkins (
+  checkin_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  mood_label VARCHAR(30) NOT NULL,
+  mood_score INTEGER NOT NULL CHECK (mood_score BETWEEN 1 AND 5),
+  reflection_text TEXT,
+  input_mode VARCHAR(20) DEFAULT 'manual',
+  logged_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Stores the transcribed reminiscence narrative and explainable NLP output.
+CREATE TABLE IF NOT EXISTS narrative_logs (
+  interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  prompt_id INTEGER REFERENCES reminiscence_prompts(prompt_id),
+  transcribed_narrative TEXT NOT NULL,
+  detected_emotional_state VARCHAR(50) NOT NULL,
+  confidence_score NUMERIC(5,2),
+  risk_level VARCHAR(20),
+  support_activity_key VARCHAR(100),
+  caregiver_notification_required BOOLEAN DEFAULT FALSE,
+  support_directive JSONB,
+  logged_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Stores safe predefined support activities recommended after emotion analysis.
+CREATE TABLE IF NOT EXISTS support_activities (
+  activity_id SERIAL PRIMARY KEY,
+  activity_key VARCHAR(100) UNIQUE NOT NULL,
+  activity_title VARCHAR(150) NOT NULL,
+  activity_type VARCHAR(80) NOT NULL,
+  target_emotion VARCHAR(50) NOT NULL,
+  instruction_text TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Stores caregiver notifications generated only from repeated concern patterns.
+CREATE TABLE IF NOT EXISTS emotional_caregiver_alerts (
+  alert_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  alert_type VARCHAR(80) NOT NULL,
+  alert_message TEXT NOT NULL,
+  trigger_reason TEXT,
+  severity VARCHAR(20) DEFAULT 'medium',
+  is_acknowledged BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Query indexes for elder history, trend monitoring, emotion filtering, and prompt lookup.
+CREATE INDEX IF NOT EXISTS mood_checkins_user_logged_idx
+  ON mood_checkins (user_id, logged_at DESC);
+
+CREATE INDEX IF NOT EXISTS narrative_logs_user_logged_idx
+  ON narrative_logs (user_id, logged_at DESC);
+
+CREATE INDEX IF NOT EXISTS narrative_logs_emotional_state_idx
+  ON narrative_logs (detected_emotional_state);
+
+CREATE INDEX IF NOT EXISTS emotional_caregiver_alerts_user_created_idx
+  ON emotional_caregiver_alerts (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS reminiscence_prompts_code_idx
+  ON reminiscence_prompts (prompt_code);
+
+-- Sample reminiscence prompts for voice-first storytelling sessions.
+INSERT INTO reminiscence_prompts (
+  prompt_code,
+  title,
+  image_storage_url,
+  prompt_text,
+  category,
+  historical_era
+) VALUES
+  (
+    'old_radio_childhood_songs',
+    'Old Radio and Childhood Songs',
+    NULL,
+    'Think about a song or radio program you enjoyed when you were younger. What do you remember about that moment?',
+    'music_memory',
+    'childhood'
+  ),
+  (
+    'family_meal_memory',
+    'Family Meal Memory',
+    NULL,
+    'Can you remember a family meal that felt special to you? Who was there, and what food do you remember?',
+    'family_memory',
+    'daily_life'
+  ),
+  (
+    'avurudu_festival_memory',
+    'Avurudu Festival Memory',
+    NULL,
+    'Tell me about an Avurudu celebration you remember. What games, food, music, or family moments come to mind?',
+    'cultural_memory',
+    'festival'
+  ),
+  (
+    'school_days_memory',
+    'School Days Memory',
+    NULL,
+    'What is one memory from your school days that still stays with you?',
+    'school_memory',
+    'youth'
+  ),
+  (
+    'old_workplace_proud_skill',
+    'Workplace or Proud Skill Memory',
+    NULL,
+    'Think about work you did or a skill you were proud of. What made you feel capable or respected?',
+    'proud_skill_memory',
+    'adulthood'
+  )
+ON CONFLICT (prompt_code) DO NOTHING;
+
+-- Sample safe support activities mapped to emotional and cognitive engagement states.
+INSERT INTO support_activities (
+  activity_key,
+  activity_title,
+  activity_type,
+  target_emotion,
+  instruction_text
+) VALUES
+  (
+    'sensory_breathing_guide',
+    'Sensory Breathing Guide',
+    'breathing_guidance',
+    'anxiety',
+    'Guide the elder through slow breathing while naming one thing they can see, hear, and feel around them.'
+  ),
+  (
+    'memory_puzzle',
+    'Gentle Memory Puzzle',
+    'cognitive_activity',
+    'cognitive_fog',
+    'Offer a simple memory matching or sequence activity using familiar daily objects and encouraging language.'
+  ),
+  (
+    'relaxing_music',
+    'Relaxing Music Moment',
+    'music_support',
+    'sadness',
+    'Suggest soft familiar music and invite the elder to rest quietly or share what the song reminds them of.'
+  ),
+  (
+    'conversation_prompt',
+    'Warm Conversation Prompt',
+    'conversation_support',
+    'loneliness',
+    'Ask a gentle follow-up question about family, friends, or a meaningful memory to encourage connection.'
+  ),
+  (
+    'positive_journal',
+    'Positive Journal Reflection',
+    'journaling',
+    'happiness',
+    'Invite the elder to record one good memory, person, or activity from today that made them feel positive.'
+  ),
+  (
+    'standard_menu',
+    'Standard Support Menu',
+    'general_support',
+    'neutral',
+    'Show a simple menu of optional activities such as music, memory prompt, breathing, or journaling.'
+  )
+ON CONFLICT (activity_key) DO NOTHING;
